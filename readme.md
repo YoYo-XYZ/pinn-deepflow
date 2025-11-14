@@ -2,6 +2,8 @@
 [![PyPI version](https://badge.fury.io/py/deepflow.svg)](https://badge.fury.io/py/deepflow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+![alt text](<examples/logo_name_deepflow_d0jn2w1s269cpsiibh89_23 (3) (1).svg>)
+
 DeepFlow is a framework for solving PDEs like Navier-Stokes equations using **Physics-Informed Neural Networks (PINNs)**.
 
 ## Features
@@ -13,15 +15,24 @@ DeepFlow is a framework for solving PDEs like Navier-Stokes equations using **Ph
 
 
 ![Steady-State Channel Flow Simulation Result](examples/cylinder_flow_steady/cylinder_flow_steady.png)
----
+
+
+
+## Install DeepFlow
+```
+pip install deepflow
+```
+
+
+
 
 ## Quick Start
 
-Here’s a quick example of how to simulate a steady channel flow.
+This example shows how to simulate steady channel flow. We recommend using a Python notebook (`.ipynb`) for an interactive run.
 
-### 1. Define the Geometry and Physics Constraint
+### 1. Define the Geometry and Physics
 
-First, define the boundaries of your domain. Then, attach the boundary conditions and the governing PDE to the geometric entities.
+First, define the geometries of your domain. Then, attach the boundary conditions and the governing PDE to the geometric entities.
 
 ```python
 from deepflow import PINN, Geometry, Physics, NetworkTrainer, Evaluate, ProblemDomain
@@ -41,7 +52,7 @@ domain.area_list[0].define_pde(Physics.NVS_nondimensional(U=0.0001, L=1, mu=0.00
 
 # Sampling initial collocation points
 domain.sampling_random_r([100, 100, 200, 100], [5000])
-domain.show_coordinates(display_conditions = True)
+domain.show_coordinates(display_conditions = True) #display collocation points
 ```
 
 ### 2. Define the Model and Loss
@@ -105,7 +116,7 @@ loss_history = area_eval.plot_loss_curve(log_scale=True)
 ```
 This will produce a visual representation of the steady-state channel flow and loss curve of trained PINN.
 
----
-## Examples
 
-You can find more detailed examples, including flow around a cylinder and other complex geometries, in the `examples/` directory.
+This guide is simplified for demonstration purposes. Explore `examples/` for real use cases including:
+- steady cylinder flow
+- cavity flow
