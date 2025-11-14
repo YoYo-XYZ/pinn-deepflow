@@ -73,15 +73,15 @@ domain.bound_list[1].define_bc({'u': 0, 'v': 0})
 domain.bound_list[2].define_bc({'u': 1, 'v': 0})
 domain.bound_list[3].define_bc({'p': 0})
 domain.area_list[0].define_pde(Physics.NVS_nondimensional(U=0.0001, L=1, mu=0.001, rho=1000))
-
-# Sampling initial collocation points
-domain.sampling_random_r([100, 100, 200, 100], [5000])
-domain.show_coordinates(display_conditions=True)  # Display collocation points
 ```
 ![alt text](examples/quickstart/setup.png)
 
 Next, sample the initial collocation points. This will automatically create training data according to the defined physics.
-
+```python
+# Sampling initial collocation points
+domain.sampling_random_r([100, 100, 200, 100], [5000])
+domain.show_coordinates(display_conditions=True)  # display
+```
 ![alt text](examples/quickstart/collocation_points.png)
 ### 2. Define the Model and Loss
 
@@ -146,6 +146,7 @@ loss_history = area_eval.plot_loss_curve(log_scale=True)
 ```
 ![alt text](examples/quickstart/flow_field.png)
 ![alt text](examples/quickstart/loss_curve.png)
+
 This will produce a visual representation of the steady-state channel flow and the loss curve of the trained PINN.
 
 ## Examples
