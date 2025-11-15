@@ -10,47 +10,53 @@ class PINN(nn.Module):
     A feedforward neural network that takes {'x':, "y", t)
     and outputs the fluid velocity components u, v and pressure p.
     """
-    def __init__(self, width, length, inputs = ['x','y'], outputs = ['u','v','p']):
+    def __init__(self, width, length, input_var = ['x','y'], output_var = ['u','v','p']):
         super().__init__()
-
-        self.input_key = inputs
-        self.output_key = outputs
-        self.input_param = len(inputs)
-        self.output_param = len(outputs)
-        self.is_steady = not 't' in inputs
+        self.input_key = input_var
+        self.output_key = output_var
+        self.input_num = len(input_var)
+        self.output_num = len(output_var)
+        self.init_network_config()
 
         layers = []
         # Input layer
-        layers.append(nn.Linear(self.input_param, width))
+        layers.append(nn.Linear(self.input_num, width))
         layers.append(nn.Tanh())
         # Hidden layers
         for _ in range(length):
             layers.append(nn.Linear(width, width))
             layers.append(nn.Tanh())
         # Output layer
-        layers.append(nn.Linear(width, self.output_param))
+        layers.append(nn.Linear(width, self.output_num))
         self.net = nn.Sequential(*layers)
 
-        if self.is_steady:
+    def init_network_config(self):
+        self.output_key_index = {val: i for i, val in enumerate(self.output_key)}
+        if 't' not in self.input_key:
             self.loss_history_dict = {'total_loss':[], 'bc_loss':[], 'pde_loss':[]}
         else:
             self.loss_history_dict = {'total_loss':[], 'bc_loss':[], 'ic_loss':[], 'pde_loss':[]}
 
+        self.hard_condition_list = []
+
     def forward(self, inputs_dict):
         """Forward pass through the network."""
-        if self.is_steady:
-            input_tensor = torch.cat([inputs_dict[key] for key in self.input_key], dim=1)
-        else:
-            input_tensor = torch.cat([inputs_dict[key] for key in self.output_key], dim=1)
-
+        input_tensor = torch.cat([inputs_dict[key] for key in self.input_key], dim=1)
         pred = self.net(input_tensor)
-        output_dict = {}
-        for i, key in enumerate(self.output_key):
-            output_dict[key] = pred[:, i:i+1]
+        self.apply_hard_condition(pred, inputs_dict)
+
+        output_dict = {key:pred[:, i:i+1] for i, key in enumerate(self.output_key)}
         return output_dict
     
     def show_updates(self):
         print(f"epoch {len(self.loss_history_dict['total_loss'])}, " + ", ".join(f"{key}: {value[-1]:.5f}" for key, value in self.loss_history_dict.items()))
+
+    def apply_hard_condition(self, pred, inputs_dict):
+        for condition in self.hard_condition_list:
+            pred[:, condition[0]] = condition[2](inputs_dict[condition[1]])
+    def define_hard_condition(self, key, func=('x', lambda x: 2*x)):
+        i = self.output_key_index[key]
+        self.hard_condition_list.append([i, func, func])
 
 #-----------------------------------------------------------------------
 class NetworkTrainer():

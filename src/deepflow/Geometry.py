@@ -1,6 +1,5 @@
 import torch
 from .Utility import *
-from .Physics import PDE, NVS
 import copy
 from .PhysicsInformedAttach import PhysicsAttach
 
@@ -51,6 +50,10 @@ def line_horizontal(y, x_range):
 
 def line_vertical(x, y_range):
     return Bound(y_range, lambda y: x * torch.ones_like(y), False, ref_axis='y')
+
+def line_point_to_point(pos1:list, pos2:list):
+    slope = (pos2[1] - pos1[1]) / (pos2[0] - pos1[0])
+    return Bound(x_range=[pos1[0], pos2[0]], func_x = lambda x: slope * (x - pos1[0]) + pos1[1], is_inside=False, ref_axis='x')
 
 class Bound(PhysicsAttach):
     def __init__(self, range_x, func_x, is_inside, ref_axis='x', func_n_x=None, func_n_y=None, range_n=None):
