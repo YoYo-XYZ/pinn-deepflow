@@ -3,160 +3,174 @@ from .Utility import *
 import copy
 from .PhysicsInformedAttach import PhysicsAttach
 
-def string_to_grad(input:str):
-    """""
-    example use
-    input: 'p'_'x'
-    output: ['p','x']
-    """
-    character_list = input.split('_')
-        
-    return character_list
-
 def rectangle(x_range:list , y_range:list):
-    bound_list = [
-        Bound(x_range, lambda x: y_range[0] * torch.ones_like(x), False, ref_axis='x'), # Bottom wall
-        Bound(x_range, lambda x: y_range[1] * torch.ones_like(x), True, ref_axis='x'),  # Top wall
-        Bound(y_range, lambda y: x_range[0] * torch.ones_like(y), False, ref_axis='y'), # Inlet
-        Bound(y_range, lambda y: x_range[1] * torch.ones_like(y), True, ref_axis='y') # Outlet
-    ]
+    return polygon([x_range[0], y_range[0]], [x_range[1], y_range[0]], [x_range[1], y_range[1]], [x_range[0], y_range[1]])
 
+def line_horizontal(y, range_x):
+    return Bound(range_x, lambda x: y * torch.ones_like(x), ref_axis='x')
+
+def line_vertical(x, range_y):
+    bound = Bound(range_y, lambda y: x * torch.ones_like(y), ref_axis='y')
+    bound.define_func([x- 1e-6, x +1e-6], lambda x_: 99999*(x_-x) + (range_y[0]+range_y[1])/2, ref_axis='x')
+    return bound
+
+def line(pos1:list, pos2:list):
+    try:
+        slope = (pos2[1] - pos1[1]) / (pos2[0] - pos1[0])
+    except ZeroDivisionError:
+        return line_vertical(pos1[0], sorted([pos2[1], pos1[1]]))
+    return Bound(sorted([pos1[0], pos2[0]]), lambda x: slope * (x - pos1[0]) + pos1[1], ref_axis='x')
+
+def polygon(*pos):
+    bound_list = []
+    for i, _ in enumerate(pos):
+        bound_list.append(line(pos[i],pos[i-1]))
     return Area(bound_list)
-
-def circle(x, y, r):
-    def func_up(X_tensor):
-        return torch.sqrt(r**2 - (X_tensor-x)**2) + y
-    def func_down(X_tensor):
-        return -torch.sqrt(r**2 - (X_tensor-x)**2) + y
-    
-    def func_n_x_up(n):
-        return x + r*torch.cos(n)
-    def func_n_y_up(n):
-        return y + r*torch.sin(n)
-    def func_n_x_down(n):
-        return x + r*torch.cos(n+torch.pi)
-    def func_n_y_down(n):
-        return y + r*torch.sin(n+torch.pi)
-    
-    bound_list = [
-    Bound([x-r,x+r], func_up, True, ref_axis='x', func_n_x=func_n_x_up, func_n_y=func_n_y_up, range_n = [0,torch.pi]),
-    Bound([x-r,x+r], func_down, False, ref_axis='x', func_n_x=func_n_x_down, func_n_y=func_n_y_down, range_n = [0,torch.pi])
-    ]
-
-    return Area(bound_list)
-
-def line_horizontal(y, x_range):
-    return Bound(x_range, lambda x: y * torch.ones_like(x), False, ref_axis='x')
-
-def line_vertical(x, y_range):
-    return Bound(y_range, lambda y: x * torch.ones_like(y), False, ref_axis='y')
-
-def line_point_to_point(pos1:list, pos2:list):
-    slope = (pos2[1] - pos1[1]) / (pos2[0] - pos1[0])
-    return Bound(x_range=[pos1[0], pos2[0]], func_x = lambda x: slope * (x - pos1[0]) + pos1[1], is_inside=False, ref_axis='x')
 
 class Bound(PhysicsAttach):
-    def __init__(self, range_x, func_x, is_inside, ref_axis='x', func_n_x=None, func_n_y=None, range_n=None):
-        super().__init__()
-        self.range_x = range_x
-        self.func_x = func_x
-        self.is_inside = is_inside
-        self.ref_axis = ref_axis
-    
-        self.func_n_x = func_n_x #for circle
-        self.func_n_y = func_n_y
-        self.range_n = range_n
+    dim = 2
+    axes = list(range(dim))
 
-        if ref_axis == 'x':
-            range_true_x = range_x
-            if self.func_n_x is not None:
-                _, f_x = self.sampling_line(10000)
-                f_x = f_x.detach().numpy()
-            else:
-                f_x = self.func_x(torch.linspace(self.range_x[0], self.range_x[1],10000)).detach().numpy()
-            range_true_y = [float(min(f_x)),float(max(f_x))]
+    def define_func(self, range_, *func, ref_axis='y'):
+        if ref_axis == 'x' :
+            ax = 0
         elif ref_axis == 'y':
-            range_true_y = range_x
-            F_y = func_x(torch.linspace(range_x[0], range_x[1],1000)).detach().numpy()
-            range_true_x = [float(min(F_y)), float(max(F_y))]
+            ax = 1
+        else:
+            ax = 2
+        self.funcs[ax] = list(func)
+        self.ranges[ax] = sorted(range_)
 
-        self.length = range_true_x[1] - range_true_x[0]
-        self.width = range_true_y[1] - range_true_y[0]
+    def __init__(self, range_, *func , ref_axis = 'x'):
+        super().__init__()
+        self.ranges = {}
+        self.funcs = {}
+        self.coords = {}
+        if ref_axis == 'x' :
+            self.ax = 0
+        elif ref_axis == 'y':
+            self.ax = 1
+        else:
+            self.ax = 2
 
-        self.x_center = range_true_x[0] + self.length / 2
-        self.y_center = range_true_y[0] + self.width / 2
+        self.axes_sec = list(self.axes)
+        if self.ax in self.axes_sec:
+            self.axes_sec.remove(self.ax)
+
+        self.ranges[self.ax] = sorted(range_)
+        # print(self.ranges)
+        self.funcs[self.ax] = list(func) #func is list
+        self.reject_above = True
+        self._postprocess()
+
+    def _postprocess(self):
+        self.sampling_line(10000, random=False)
+        self.lengths = {}
+        self.centers = {}
+        for ax in self.axes_sec:
+            self.ranges[ax] = [self.coords[ax].min().item(), self.coords[ax].max().item()]
+            # secondary varibales
+        for ax in self.axes:
+            self.lengths[ax] = self.ranges[ax][1] - self.ranges[ax][0]
+            self.centers[ax] = self.ranges[ax][0] + self.lengths[ax]/2
 
     def sampling_line(self, n_points, random=False):
-        if self.func_n_x is None:
-            if random:
-                X = torch.empty(n_points).uniform_(self.range_x[0], self.range_x[1])
-            else:
-                X = torch.linspace(self.range_x[0], self.range_x[1], n_points)
-            Y = self.func_x(X)
+        if random:
+            self.coords[self.ax] = torch.empty(n_points).uniform_(self.ranges[self.ax][0], self.ranges[self.ax][1])
         else:
-            if random:
-                N = torch.empty(n_points).uniform_(self.range_n[0], self.range_n[1])
-            else:
-                N = torch.linspace(self.range_n[0], self.range_n[1], n_points)
-            X = self.func_n_x(N)
-            Y = self.func_n_y(N)
+            self.coords[self.ax] = torch.linspace(self.ranges[self.ax][0], self.ranges[self.ax][1], n_points)
 
-        if self.ref_axis == 'x':
-            self.X = X
-            self.Y = Y
-            return X, Y
-        else:
-            self.X = Y
-            self.Y = X
-            return Y, X
+        for i, ax in enumerate(self.axes_sec): self.coords[ax] = self.funcs[self.ax][i](self.coords[self.ax])
+        return (self.coords[ax] for ax in self.axes)
+
+    def mask_area(self, *x: torch.Tensor):
+        reject_masks = []
+        self.ranges[self.ax] = sorted(self.ranges[self.ax])
+        reject_masks.append((x[self.ax] > self.ranges[self.ax][0]) & (x[self.ax] < self.ranges[self.ax][1]))
+        for sec_ax in self.axes_sec:
+            if self.reject_above:
+                reject_masks.append((x[sec_ax] >= self.funcs[self.ax][0](x[self.ax])))
+            else:
+                reject_masks.append((x[sec_ax] <= self.funcs[self.ax][0](x[self.ax])))
+        return reject_masks[0] & reject_masks[1]
+
+    def __add__(self, other_bound):
+        bound_list = [self, other_bound]
+        return Area(bound_list)
     
-    def mask_area(self, x, y):
-        if self.ref_axis == 'y':
-            x, y = y, x
+    def __str__(self):
+        return f'axis: {self.ax} reject above: {self.reject_above}, ranges: {self.ranges}, centers: {self.centers}, lengths: {self.lengths}'
 
-        reject_mask_x = (self.range_x[0] < x) & (x < self.range_x[1])
-        if self.is_inside:
-            reject_mask_y = (y > self.func_x(x))
-        else:
-            reject_mask_y = (y < self.func_x(x))
-
-        return reject_mask_x & reject_mask_y
 class Area(PhysicsAttach):
-    def __init__(self, bound_list: list[Bound], negative_bound_list:list[Bound] = None):
+    dim = 2
+    axes = list(range(dim))
+    def __init__(self, bound_list: list[Bound], bounds_negative:list[Bound] = None):
         super().__init__()
+        self.ranges = {}
         self.bound_list = bound_list
-        self.negative_bound_list = negative_bound_list
+        self.negative_bound_list = bounds_negative
+        
+        for ax in self.axes:
+            range_list = []
+            for bound in bound_list:
+                range_list += bound.ranges[ax]
+            self.ranges[ax] = (min(range_list), max(range_list))
+        self._postprocess()
+        self.checkbound()
 
-        range_x = []
-        range_y = []
-        for bound in bound_list:
-            if bound.ref_axis == 'x':
-                range_x += bound.range_x
-                if bound.func_n_x is not None:
-                    _, f_x = bound.sampling_line(10000)
-                    f_x = f_x.detach().numpy()
-                else:
-                    f_x = bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy()
-                range_y += [float(min(f_x)),float(max(f_x))]
-            elif bound.ref_axis == 'y':
-                range_y += bound.range_x
-                F_y = bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy()
-                range_x += [float(min(F_y)),float(max(F_y))]
+    def _postprocess(self):
+        self.lengths = {}
+        self.centers = {}
+        for ax in self.axes:
+            self.lengths[ax] = self.ranges[ax][1] - self.ranges[ax][0]
+            self.centers[ax] = self.ranges[ax][0] + self.lengths[ax]/2
 
-        self.range_x = [min(range_x), max(range_x)]
-        self.range_y = [min(range_y), max(range_y)]
-
-        self.length = self.range_x[1] - self.range_x[0]
-        self.width = self.range_y[1] - self.range_y[0]
-
-        self.x_center = self.range_x[0] + self.length / 2
-        self.y_center = self.range_y[0] + self.width / 2
+    def checkbound(self):
+        bound_list = self.bound_list
+        def is_inrange(x, range_x):
+            return range_x[0] < x < range_x[1]
+        #brute force checking
+        ax = 0
+        for i, bound in enumerate(bound_list):
+            if bound.ax == ax:
+                x = bound.centers[ax]
+                # assign reject_above based on sorted y-values at x_center
+                y_dict = {}
+                for j, bound_opponent in enumerate(bound_list):
+                    # create sorted y_value dict
+                    if is_inrange(x, bound_opponent.ranges[ax]):
+                        y_dict[j] = bound_opponent.funcs[ax][0](x)
+                    sorted_index =  [index for (index, y) in sorted(y_dict.items(), key=lambda item: item[1])]
+                    # assign reject_above based on sorted y-values
+                    for jj, index in enumerate(sorted_index):
+                        if jj % 2 == 0:
+                            bound_list[index].reject_above = False
+                        else:
+                            bound_list[index].reject_above = True
+            else:
+                x = bound.centers[ax]+ 1e-4
+                # assign reject_above based on sorted y-values at x_center
+                y_dict = {}
+                for j, bound_opponent in enumerate(bound_list):
+                    # create sorted y_value dict
+                    if is_inrange(x, bound_opponent.ranges[ax]):
+                        y_dict[j] = bound_opponent.funcs[ax][0](x)
+                    sorted_index =  [index for (index, y) in sorted(y_dict.items(), key=lambda item: item[1])]
+                    # assign reject_above based on sorted y-values
+                    if sorted_index:
+                        for jj, index in enumerate(sorted_index):
+                            if round(y_dict[index],2) == round(bound.ranges[1][0],2):
+                                bound.reject_above = False if jj % 2 == 0 else True
+                            elif round(y_dict[index],2) == round(bound.ranges[1][1],2):
+                                bound.reject_above = True if jj % 2 == 0 else False
+                    else:
+                        bound.reject_above = True
 
     def sampling_area(self, n_points_square, random=False):
         if random:
             points = torch.empty(n_points_square, 2)
-            points[:, 0].uniform_(self.range_x[0] + 1e-6, self.range_x[1] - 1e-6)  # x values
-            points[:, 1].uniform_(self.range_y[0] + 1e-6, self.range_y[1] - 1e-6)  # y values
+            points[:, 0].uniform_(self.ranges[0][0]+1e-6, self.ranges[0][1]-1e-6)  # x values
+            points[:, 1].uniform_(self.ranges[1][0]+1e-6, self.ranges[1][1]-1e-6)  # y values
             X = points[:, 0]  # x-coordinates
             Y = points[:, 1]  # y-coordinates
         else:
@@ -165,8 +179,8 @@ class Area(PhysicsAttach):
                 n_points_square_y = n_points_square[1]
             else:
                 n_points_square_x = n_points_square_y = n_points_square
-            X_range = torch.linspace(self.range_x[0]+1e-6, self.range_x[1]-1e-6, n_points_square_x)
-            Y_range = torch.linspace(self.range_y[0]+1e-6, self.range_y[1]-1e-6, n_points_square_y)
+            X_range = torch.linspace(self.ranges[0][0]+1e-6, self.ranges[0][1]-1e-6, n_points_square_x)
+            Y_range = torch.linspace(self.ranges[1][0]+1e-6, self.ranges[1][1]-1e-6, n_points_square_y)
             X, Y = torch.meshgrid(X_range, Y_range)
             X = X.reshape(-1)  # x-coordinates
             Y = Y.reshape(-1)  # y-coordinates
@@ -174,6 +188,7 @@ class Area(PhysicsAttach):
         reject_mask_list = []
         for bound in self.bound_list:
             reject_mask_list.append(bound.mask_area(X,Y))
+
         self.reject_mask = torch.stack(reject_mask_list, dim=0).any(dim=0)
 
         if self.negative_bound_list is not None:
@@ -182,7 +197,6 @@ class Area(PhysicsAttach):
                 negative_reject_mask_list.append(bound.mask_area(X,Y))
             negative_reject_mask = torch.stack(negative_reject_mask_list, dim=0).all(dim=0)
             self.reject_mask = self.reject_mask | negative_reject_mask
-
         self.X, self.Y = X[~self.reject_mask], Y[~self.reject_mask]
         self.sampled_area = (self.X, self.Y)
         return self.X, self.Y
@@ -190,10 +204,19 @@ class Area(PhysicsAttach):
     def __sub__(self, other_area):
         bound_list = copy.deepcopy(other_area.bound_list)
         for bound in bound_list:
-            bound.is_inside = not bound.is_inside
+            bound.reject_above = not bound.reject_above
         return Area(self.bound_list, bound_list)
 
     def __add__(self, other_bound):
-        X = torch.cat([self.sampled_area[0], other_bound.sampled_area[0]], dim=0)
-        Y = torch.cat([self.sampled_area[1], other_bound.sampled_area[1]], dim=0)
-        return X, Y
+        bound_list_new = self.bound_list.copy().append(other_bound)
+        return Area(bound_list_new)
+    
+    def __iter__(self):
+        return iter(self.bound_list)
+    
+    def __str__(self):
+        string = ''
+        for i, bound in enumerate(self.bound_list):
+            string += f"{i} {bound}\n"
+        string += f"ranges: {self.ranges}"
+        return string
