@@ -8,7 +8,6 @@ def circle(x, y, r):
         return (r**2 - (X_tensor-x)**2)**0.5 + y
     def func_down(X_tensor):
         return -(r**2 - (X_tensor-x)**2)**0.5 + y
-
     def func_n_x_up(n):
         return x + r*torch.cos(n)
     def func_n_y_up(n):
@@ -276,12 +275,13 @@ class Area(PhysicsAttach):
         string += f"ranges: {self.ranges}"
         return string
     
-    def show(self):
+    def show(self, show_index=False):
         import matplotlib.pyplot as plt
         for bound in self.bound_list:
             X, Y = bound.sampling_line(1000)
             plt.plot(X.numpy(), Y.numpy())
-            plt.text(bound.centers[0], bound.centers[1], f'{self.bound_list.index(bound)}')
+            if show_index:
+                plt.text(bound.centers[0], bound.centers[1], f'{self.bound_list.index(bound)}')
         for bound in self.negative_bound_list or []:
             X, Y = bound.sampling_line(1000)
             plt.plot(X.numpy(), Y.numpy(), color='red')

@@ -134,5 +134,3 @@ class PhysicsAttach():
         self.PDE.calc(inputs_dict = self.model_inputs | self.model_outputs)
 
 #-----------------------------------------------------------------------------------------------
-    # def evaluate(self, model):
-    #     return Evaluate(model, self)
