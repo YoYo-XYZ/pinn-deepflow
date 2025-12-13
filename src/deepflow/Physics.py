@@ -93,7 +93,6 @@ class NVS(PDE):
                                 p_y / self.rho)    
 
         self.residual_fields = (mass_residual, x_momentum_residual, y_momentum_residual)
-
         return self.residual_fields
 
 class NVS_nondimensional(PDE):
@@ -168,7 +167,6 @@ class NVS_nondimensional(PDE):
                                 p_y)    
 
         self.residual_fields = (mass_residual, x_momentum_residual, y_momentum_residual)
-
         return self.residual_fields
 
     def dimensionalize(self):

@@ -41,17 +41,21 @@ class PINN(nn.Module):
 
     def forward(self, inputs_dict):
         """Forward pass through the network."""
-        input_tensor = torch.cat([inputs_dict[key].unsqueeze(1) for key in self.input_key], dim=1)
+        input_tensor = torch.stack([inputs_dict[key] for key in self.input_key], dim=1)
         pred = self.net(input_tensor)
 
         # apply hard constraints
+        output_dict = {}
+        coords = None
         if self.hard_constraints:
             coords = {i: inputs_dict[key] for i, key in enumerate(self.input_key)}
-            for key in self.hard_constraints:
-                pred[:,self.output_key_index[key]] = self.hard_constraints[key](coords)*pred[:,self.output_key_index[key]] + self.hard_constants[key]
 
-        # post process output
-        output_dict = {key:pred[:, i:i+1] for i, key in enumerate(self.output_key)}
+        for i, key in enumerate(self.output_key):
+            val = pred[:, i]
+            if self.hard_constraints and key in self.hard_constraints:
+                val = self.hard_constraints[key](coords) * val + self.hard_constants[key]
+            output_dict[key] = val
+
         return output_dict
 
     def show_updates(self):
@@ -79,83 +83,122 @@ class PINN(nn.Module):
                 self.hard_constraints[key] = constraint_func
 #-----------------------------------------------------------------------
 class NetworkTrainer():
+
     def __init__(self):
-        self.optimizer_choice = {"Adam":None, "LBFGS":None}
+        self.optimizer_choice = {"Adam": None, "LBFGS": None}
 
     @staticmethod
     def record_loss(loss_hist_dict, loss_dict):
         for key in loss_dict:
-            loss_hist_dict[key].append(loss_dict[key].item())
+            val = loss_dict[key]
+            if hasattr(val, 'item'):
+                val = val.item()
+            loss_hist_dict[key].append(val)
         return loss_hist_dict
 
     @staticmethod
-    def train_adam(model, learning_rate, epochs, calc_loss, print_every=50, threshold_loss=None, device= 'cpu'):
+    def train_adam(model,
+                   learning_rate,
+                   epochs,
+                   calc_loss,
+                   print_every=50,
+                   threshold_loss=None,
+                   device='cpu'):
         model = copy.deepcopy(model.to(device))
         if device == 'cuda' and sys.platform.startswith('linux'):
-            model = torch.compile(model, mode="reduce-overhead", fullgraph=False, dynamic=True, backend="inductor")
+            model = torch.compile(model,
+                                  mode="reduce-overhead",
+                                  fullgraph=False,
+                                  dynamic=True,
+                                  backend="inductor")
             print('model is compiled for cuda')
 
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-        for epoch in range(epochs):
-            optimizer.zero_grad()
-            loss_dict = calc_loss(model)
-            loss_dict['total_loss'].backward()
-            optimizer.step()
-
-            model.loss_history_dict = NetworkTrainer.record_loss(model.loss_history_dict, loss_dict)
-
-            if epoch % print_every == 0:
-                model.show_updates()
-
-            if model.loss_history_dict['total_loss'][-1] < threshold_loss:
-                print(f"Training stopped at epoch {epoch} as total loss reached the threshold of {threshold_loss}.")
-                break
-        return model.to(device)
-
-    @staticmethod
-    def train_lbfgs(model, epochs, calc_loss, print_every=50, threshold_loss=None, device= 'cpu'):
-        model = copy.deepcopy(model.to(device))
-        if device == 'cuda' and sys.platform.startswith('linux'):
-            model = torch.compile(model, mode="reduce-overhead", fullgraph=False, dynamic=True, backend="inductor")
-            print('model is compiled for cuda')
-
-        optimizer = torch.optim.LBFGS(model.parameters(), history_size=20, max_iter=10, line_search_fn="strong_wolfe")
-        for epoch in range(epochs):
-            # Create a closure that captures loss_dict
-            loss_dict_container = {}
-
-            def closure():
+        try:
+            for epoch in range(epochs):
                 optimizer.zero_grad()
                 loss_dict = calc_loss(model)
                 loss_dict['total_loss'].backward()
-                # Store loss_dict in the container
-                loss_dict_container['loss_dict'] = loss_dict
-                return loss_dict['total_loss']
+                optimizer.step()
 
-            optimizer.step(closure)
+                model.loss_history_dict = NetworkTrainer.record_loss(
+                    model.loss_history_dict, loss_dict)
 
-            # Retrieve the loss_dict from the container
-            loss_dict = loss_dict_container['loss_dict']
-            model.loss_history_dict = NetworkTrainer.record_loss(model.loss_history_dict, loss_dict)
+                if epoch % print_every == 0:
+                    model.show_updates()
 
-            if epoch % print_every == 0:
-                model.show_updates()
+                if model.loss_history_dict['total_loss'][-1] < threshold_loss:
+                    print(
+                        f"Training stopped at epoch {epoch} as total loss reached the threshold of {threshold_loss}."
+                    )
+                    break
+        except KeyboardInterrupt:
+            print('Training interrupted by user.')
+            return model.to(device)
+        return model.to(device)
 
-            if threshold_loss is not None and model.loss_history_dict['total_loss'][-1] < threshold_loss:
-                print(f"Training stopped at epoch {epoch} as total loss reached the threshold of {threshold_loss}.")
-                break
+    @staticmethod
+    def train_lbfgs(model,
+                    epochs,
+                    calc_loss,
+                    print_every=50,
+                    threshold_loss=None,
+                    device='cpu'):
+        model = copy.deepcopy(model.to(device))
+        if device == 'cuda' and sys.platform.startswith('linux'):
+            model = torch.compile(model,
+                                  mode="reduce-overhead",
+                                  fullgraph=False,
+                                  dynamic=True,
+                                  backend="inductor")
+            print('model is compiled for cuda')
+
+        optimizer = torch.optim.LBFGS(model.parameters(),
+                                      history_size=20,
+                                      max_iter=10,
+                                      line_search_fn="strong_wolfe")
+        try:
+            for epoch in range(epochs):
+                # Create a closure that captures loss_dict
+                loss_dict_container = {}
+
+                def closure():
+                    optimizer.zero_grad()
+                    loss_dict = calc_loss(model)
+                    loss_dict['total_loss'].backward()
+                    # Store loss_dict in the container
+                    loss_dict_container['loss_dict'] = loss_dict
+                    return loss_dict['total_loss']
+
+                optimizer.step(closure)
+
+                # Retrieve the loss_dict from the container
+                loss_dict = loss_dict_container['loss_dict']
+                model.loss_history_dict = NetworkTrainer.record_loss(
+                    model.loss_history_dict, loss_dict)
+
+                if epoch % print_every == 0:
+                    model.show_updates()
+
+                if threshold_loss is not None and model.loss_history_dict[
+                        'total_loss'][-1] < threshold_loss:
+                    print(
+                        f"Training stopped at epoch {epoch} as total loss reached the threshold of {threshold_loss}."
+                    )
+                    break
+        except KeyboardInterrupt:
+            print('Training interrupted by user.')
+            return model.to(device)
         return model
 
 #-----------------------------------------------------------------------------------------------
-from .Geometry import Area, Bound
-
-
-class HardConstraint(Bound):
+class HardConstraint():
     def __init__(self, constant=0):
         self.constant = constant
-
     @staticmethod
     def define_zero_func(bound):
         zero_func = lambda coords: coords[bound.axes_sec[0]] - bound.funcs[
             bound.ax][0](coords[bound.ax])
         return zero_func
+    def __str__(self):
+        return str(self.constant)

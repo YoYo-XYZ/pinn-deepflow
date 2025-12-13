@@ -2,6 +2,7 @@ from .Geometry import Area, Bound
 import matplotlib.pyplot as plt
 import torch
 import sympy as sp
+from .Network import HardConstraint
 class ProblemDomain():
     def __init__(self, bound_list:list[Bound], area_list:list[Area], device='cpu'):
         self.bound_list = bound_list
@@ -17,7 +18,7 @@ class ProblemDomain():
             return f"${str(sp.latex(v[1](sp.symbols(v[0]))))}$"
 
         if hasattr(obj, 'condition_dict'):
-            conditions = ', '.join([f"{k}={(str(v) if isinstance(v,(float,int)) else func_to_latex(v))}" for k, v in obj.condition_dict.items()])
+            conditions = ', '.join([f"{k}={(str(v) if isinstance(v,(float,int,HardConstraint)) else func_to_latex(v))}" for k, v in obj.condition_dict.items()])
             return conditions
         elif hasattr(obj, 'PDE'):
             return f"PDE: {obj.PDE.__class__.__name__}"
@@ -32,20 +33,24 @@ class ProblemDomain():
     def sampling_uniform(self, bound_sampling_res:list, area_sampling_res:list):
         self.sampling_option = 'uniform'
         for i, bound in enumerate(self.bound_list):
-            bound.sampling_line(bound_sampling_res[i])
-            bound.process_coordinates(self.device)
+            if bound_sampling_res[i] is not None:
+                bound.sampling_line(bound_sampling_res[i])
+                bound.process_coordinates(self.device)
         for i, area in enumerate(self.area_list):
-            area.sampling_area(area_sampling_res[i])
-            area.process_coordinates(self.device)
+            if area_sampling_res[i] is not None:
+                area.sampling_area(area_sampling_res[i])
+                area.process_coordinates(self.device)
 
     def sampling_random_r(self, bound_sampling_res:list, area_sampling_res:list):
         self.sampling_option = 'random_r'
         for i, bound in enumerate(self.bound_list):
-            bound.sampling_line(bound_sampling_res[i], random=True)
-            bound.process_coordinates(self.device)
+            if bound_sampling_res[i] is not None:
+                bound.sampling_line(bound_sampling_res[i], random=True)
+                bound.process_coordinates(self.device)
         for i, area in enumerate(self.area_list):
-            area.sampling_area(area_sampling_res[i], random=True)
-            area.process_coordinates(self.device)
+            if area_sampling_res[i] is not None:
+                area.sampling_area(area_sampling_res[i], random=True)
+                area.process_coordinates(self.device)
 
     def sampling_RAR(self, bound_top_k_list:list, area_top_k_list:list, model, bound_candidates_num_list:list=None, area_candidates_num_list:list=None):
         self.sampling_option = self.sampling_option + ' + RAR'
@@ -108,95 +113,62 @@ class ProblemDomain():
             bound.X = bound.saved_X.clone()
             bound.Y = bound.saved_Y.clone()
     
-    def show_coordinates(self, display_conditions=False):
+    #---------------------------------------------------------------------------------------------
+    def _plot_items(self, items, name, get_xy, scatter_kw, text_kw, show_label=True):
+        for i, obj in enumerate(items):
+            x, y = get_xy(obj, i)
+            plt.scatter(x, y, **scatter_kw)
+            if show_label:
+                cond = self._format_condition_dict(obj, name)
+                lbl = f"{name} {i}\n{cond}" if cond else f"{name} {i}"
+                plt.text(obj.centers[0], obj.centers[1], lbl, ha='center', va='center', **text_kw)
+
+    def show_coordinates(self, display_conditions=False, xlim=None, ylim=None):
         plt.figure(figsize=(20,20))
         
-        for i, area in enumerate(self.area_list): #plot areas
-            plt.scatter(area.X,area.Y,s=2, color='black', alpha=0.3)
-            if display_conditions:
-                condition_str = self._format_condition_dict(area, "Area")
-                label = f"Area {i}\n{condition_str}" if condition_str else f"Area {i}"
-            else:
-                label = None
-            plt.text(
-                area.x_center,
-                area.y_center,
-                label,
-                fontsize=20,
-                color='navy',
-                fontstyle='italic',
-                fontweight='bold',
-                family='serif',
-                ha='center',
-                va='center',
-                bbox=dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)  # simple white background
-            )
-        for i, bound in enumerate(self.bound_list): #plot bounds
-            plt.scatter(bound.X,bound.Y,s=5, color='red', alpha=0.5)
-            if display_conditions:
-                condition_str = self._format_condition_dict(bound, "Bound")
-                label = f"Bound {i}\n{condition_str}" if condition_str else f"Bound {i}"
-            else:
-                label = None
-            plt.text(
-                bound.x_center,
-                bound.y_center,
-                label,
-                fontsize=16,
-                color='darkgreen',
-                fontstyle='italic',
-                fontweight='bold',
-                family='serif',   # elegant serif font
-                ha='center',
-                va='center',
-                bbox=dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)  # simple white background
-            )
+        self._plot_items(self.area_list, "Area", lambda o, i: (o.X, o.Y),
+            {'s': 5, 'color': 'black', 'alpha': 0.3},
+            {'fontsize': 20, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+             'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)},
+            show_label=display_conditions)
+            
+        self._plot_items(self.bound_list, "Bound", lambda o, i: (o.X, o.Y),
+            {'s': 10, 'color': 'red', 'alpha': 0.5},
+            {'fontsize': 16, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+             'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)},
+            show_label=display_conditions)
+            
         plt.gca().set_aspect('equal', adjustable='box')
+        if xlim: plt.xlim(xlim)
+        if ylim: plt.ylim(ylim)
         plt.show()
 
-    def show_setup(self, bound_sampling_res:list=None, area_sampling_res:list=None):
+    def show_setup(self, bound_sampling_res:list=None, area_sampling_res:list=None, xlim=None, ylim=None):
         plt.figure(figsize=(20,20))
         
         if bound_sampling_res is None:
-            bound_sampling_res = [int(800*(bound.range_x[1] - bound.range_x[0])) for bound in self.bound_list]
+            bound_sampling_res = [int(800*(b.ranges[b.ax][1] - b.ranges[b.ax][0])) for b in self.bound_list]
         if area_sampling_res is None:
-            area_sampling_res = [[400, int(400*area.width/area.length)] for area in self.area_list]
+            area_sampling_res = [[200, int(200*a.lengths[1]/a.lengths[0])] for a in self.area_list]
 
-        for i, area in enumerate(self.area_list): #plot areas
+        def get_area_xy(area, i):
             area.sampling_area(area_sampling_res[i])
-            plt.scatter(area.X,area.Y,s=5, color='black', alpha=0.2, marker='s')
-            condition_str = self._format_condition_dict(area, "Area")
-            label = f"Area {i}\n{condition_str}" if condition_str else f"Area {i}"
-            plt.text(
-                area.x_center,
-                area.y_center,
-                label,
-                fontsize=20,
-                color='navy',
-                fontstyle='italic',
-                fontweight='bold',
-                family='serif',
-                ha='center',
-                va='center',
-                bbox=dict(facecolor='white', alpha=0.2, edgecolor='none', pad=1)  # simple white background
-            )
-        for i, bound in enumerate(self.bound_list): #plot bounds
-            x, y = bound.sampling_line(bound_sampling_res[i])
-            plt.scatter(x,y,s=2, color='red', alpha=0.5)
-            condition_str = self._format_condition_dict(bound, "Bound")
-            label = f"Bound {i}\n{condition_str}" if condition_str else f"Bound {i}"
-            plt.text(
-                bound.x_center,
-                bound.y_center,
-                label,
-                fontsize=16,
-                color='darkgreen',
-                fontstyle='italic',
-                fontweight='bold',
-                family='serif',   # elegant serif font
-                ha='center',
-                va='center',
-                bbox=dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)  # simple white background
-            )
+            return area.X, area.Y
+        
+        def get_bound_xy(bound, i):
+            bound.sampling_line(bound_sampling_res[i])
+            return bound.X, bound.Y
+
+        self._plot_items(self.area_list, "Area", get_area_xy,
+            {'s': 1, 'color': 'black', 'alpha': 0.5, 'marker': 's'},
+            {'fontsize': 20, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+             'bbox': dict(facecolor='white', alpha=0.2, edgecolor='none', pad=1)})
+        self._plot_items(self.bound_list, "Bound", get_bound_xy,
+            {'s': 5, 'color': 'red', 'alpha': 0.5},
+            {'fontsize': 16, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+             'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)})
+             
         plt.gca().set_aspect('equal', adjustable='box')
+        if xlim: plt.xlim(xlim)
+        if ylim: plt.ylim(ylim)
         plt.show()

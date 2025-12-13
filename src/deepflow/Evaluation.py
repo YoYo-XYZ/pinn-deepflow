@@ -55,7 +55,10 @@ class Evaluate(Visualizer):
             if isinstance(data_dict[key], list):
                 data_dict[key] = np.array(data_dict[key])
             else:
-                data_dict[key] = data_dict[key].detach().flatten().cpu().numpy()
+                try:
+                    data_dict[key] = data_dict[key].detach().cpu().numpy()
+                except:
+                    print(key)
 
         # store in self.data_dict
         self.data_dict = data_dict

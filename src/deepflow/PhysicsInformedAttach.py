@@ -1,3 +1,4 @@
+from .Network import HardConstraint
 from .Physics import PDE
 from .Utility import calc_grad
 import torch
@@ -37,15 +38,15 @@ class PhysicsAttach():
             if random:
                 self.t = torch.empty(n_points).uniform_(self.range_t[0], self.range_t[1])
             else:
-                self.t = torch.linspace(self.range_t[0], self.range_t[1])[:,None]
+                self.t = torch.linspace(self.range_t[0], self.range_t[1])[None]
 
     def process_coordinates(self, device = 'cpu'):
         """Prepare coordinates data to be feed to PINNs"""
-        self.X_ = self.X[:,None].to(device).requires_grad_()
-        self.Y_ = self.Y[:,None].to(device).requires_grad_()
+        self.X_ = self.X.to(device).requires_grad_()
+        self.Y_ = self.Y.to(device).requires_grad_()
 
         if self.range_t is not None:
-            self.T_ = self.t[:,None].to(device).requires_grad_()
+            self.T_ = self.t.to(device).requires_grad_()
             self.inputs_tensor_dict = {'x':self.X_,'y':self.Y_,'t':self.T_}
         else:
             self.inputs_tensor_dict = {'x':self.X_,'y':self.Y_, 't':None}
@@ -54,6 +55,7 @@ class PhysicsAttach():
             target_output_tensor_dict = {}
 
             for key in self.condition_dict: #loop over condition
+                if isinstance(self.condition_dict[key], HardConstraint): continue
                 if isinstance(self.condition_dict[key],(float,int)): #if condition is constant
                     target_output_tensor_dict[key] = self.condition_dict[key] * torch.ones_like(self.X_, device=device)
                 else: #if condition varies function
@@ -68,7 +70,6 @@ class PhysicsAttach():
         """"Post-process the model's output to get predict (based from target_output_dict.)"""
         prediction_dict = model(self.inputs_tensor_dict)
         pred_dict = {}
-
         for key in self.target_output_tensor_dict:
             if '_' in key:
                 key_split = key.split('_')
@@ -79,7 +80,9 @@ class PhysicsAttach():
     
     def calc_loss(self, model, loss_fn = torch.nn.MSELoss()):
         """Calculate loss from PINNs output"""
-        if self.physics_type == "IC" or self.physics_type == "BC": 
+        if self.physics_type == "IC" or self.physics_type == "BC":
+            if all(isinstance(cond, HardConstraint) for cond in self.condition_dict.values()):
+                return 0.0
             pred_dict = self.calc_output(model)
 
             loss = 0
@@ -116,6 +119,7 @@ class PhysicsAttach():
     def sampling_residual_based(self, top_k:int, model): #need more optimized
         """Add sampling points based on residual loss"""
         self.calc_loss_field(model) #TODO: NEED TO AVOID REPETETIVE CAL LOSS
+        if isinstance(self.loss_field, int): return torch.tensor([]), torch.tensor([]) #if loss field is not calculated
         _, top_k_index = torch.topk(self.loss_field ,top_k, dim=0)
         top_k_index = top_k_index.flatten().to('cpu')
         self.X = torch.cat([self.X, self.X[top_k_index]])

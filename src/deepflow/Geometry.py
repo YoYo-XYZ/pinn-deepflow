@@ -111,7 +111,8 @@ class Bound(PhysicsAttach):
         else:
             for i, axis in enumerate(self.axes_sec):
                 self.coords[axis] = self.funcs[ax][i](self.coords[ax])
-        return self.coords[0], self.coords[1]
+        self.X, self.Y = self.coords[0], self.coords[1]
+        return self.X, self.Y
 
     def mask_area(self, *x: torch.Tensor):
         reject_masks = []
@@ -289,7 +290,6 @@ class Area(PhysicsAttach):
         plt.scatter(X.numpy(), Y.numpy(), s=0.05, color='green')
         plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
-        return X, Y
     
 def shape(bound_list: list[Bound]):
     return Area(bound_list)
