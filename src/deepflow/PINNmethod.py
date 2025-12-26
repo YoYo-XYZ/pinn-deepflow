@@ -3,12 +3,31 @@ import matplotlib.pyplot as plt
 import torch
 import sympy as sp
 from .Network import HardConstraint
+
+def domain(*geometries):
+    bound_list = []
+    area_list = []
+    for geometry in geometries:
+        if isinstance(geometry, list):
+            if all(isinstance(g, Bound) for g in geometry):
+                bound_list+=geometry
+            elif all(isinstance(g, Area) for g in geometry):
+                area_list+=geometry
+            else:
+                raise TypeError("List must contain only Bound or Area objects")
+        elif isinstance(geometry, Bound):
+            bound_list.append(geometry)
+        elif isinstance(geometry, Area):
+            area_list.append(geometry)
+        else:
+            raise TypeError(f"Expected Bound or Area, got {type(geometry)}")
+    return ProblemDomain(bound_list, area_list)
+
 class ProblemDomain():
-    def __init__(self, bound_list:list[Bound], area_list:list[Area], device='cpu'):
+    def __init__(self, bound_list, area_list):
         self.bound_list = bound_list
         self.area_list = area_list
         self.sampling_option = None
-        self.device = device
         
     def __str__(self):
         return f"""number of bound : {len(self.bound_list)}
@@ -21,22 +40,22 @@ class ProblemDomain():
         for i, bound in enumerate(self.bound_list):
             if bound_sampling_res[i] is not None:
                 bound.sampling_line(bound_sampling_res[i])
-                bound.process_coordinates(self.device)
+                bound.process_coordinates()
         for i, area in enumerate(self.area_list):
             if area_sampling_res[i] is not None:
                 area.sampling_area(area_sampling_res[i])
-                area.process_coordinates(self.device)
+                area.process_coordinates()
 
     def sampling_random_r(self, bound_sampling_res:list, area_sampling_res:list):
         self.sampling_option = 'random_r'
         for i, bound in enumerate(self.bound_list):
             if bound_sampling_res[i] is not None:
                 bound.sampling_line(bound_sampling_res[i], random=True)
-                bound.process_coordinates(self.device)
+                bound.process_coordinates()
         for i, area in enumerate(self.area_list):
             if area_sampling_res[i] is not None:
                 area.sampling_area(area_sampling_res[i], random=True)
-                area.process_coordinates(self.device)
+                area.process_coordinates()
 
     def sampling_RAR(self, bound_top_k_list:list, area_top_k_list:list, model, bound_candidates_num_list:list=None, area_candidates_num_list:list=None):
         self.sampling_option = self.sampling_option + ' + RAR'
@@ -50,7 +69,7 @@ class ProblemDomain():
                 
                 # Sample new candidates
                 bound.sampling_line(bound_candidates_num_list[i], random=True)
-                bound.process_coordinates(self.device)
+                bound.process_coordinates()
                 X, Y = bound.sampling_residual_based(bound_top_k_list[i], model)
                 
                 # Restore and concatenate
@@ -60,7 +79,7 @@ class ProblemDomain():
                 else:
                     bound.X = X
                     bound.Y = Y
-            bound.process_coordinates(self.device)
+            bound.process_coordinates()
         for i, area in enumerate(self.area_list):
             if area_candidates_num_list is None:
                 area.sampling_residual_based(area_top_k_list[i], model)
@@ -71,7 +90,7 @@ class ProblemDomain():
                 
                 # Sample new candidates
                 area.sampling_area(area_candidates_num_list[i], random=True)
-                area.process_coordinates(self.device)
+                area.process_coordinates()
                 X, Y = area.sampling_residual_based(area_top_k_list[i], model)
                 
                 # Restore and concatenate
@@ -81,7 +100,7 @@ class ProblemDomain():
                 else:
                     area.X = X
                     area.Y = Y
-            area.process_coordinates(self.device)
+            area.process_coordinates()
 #------------------------------------------------------------------------------------------------
     def _format_condition_dict(self, obj, obj_type='Bound'):
         """Helper function to format condition dictionary for display."""

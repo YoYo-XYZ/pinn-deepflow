@@ -1,6 +1,6 @@
 from .Network import HardConstraint
 from .Physics import PDE
-from .Utility import calc_grad
+from .Utility import calc_grad, get_device
 import torch
 
 class PhysicsAttach():
@@ -40,7 +40,8 @@ class PhysicsAttach():
             else:
                 self.t = torch.linspace(self.range_t[0], self.range_t[1])[None]
 
-    def process_coordinates(self, device = 'cpu'):
+    def process_coordinates(self, device=None):
+        device = get_device() if device is None else device
         """Prepare coordinates data to be feed to PINNs"""
         self.X_ = self.X.to(device).requires_grad_()
         self.Y_ = self.Y.to(device).requires_grad_()

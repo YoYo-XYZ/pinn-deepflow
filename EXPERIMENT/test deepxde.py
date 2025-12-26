@@ -1,5 +1,4 @@
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Uncomment this line to disable GPU
+import os  # Uncomment this line to disable GPU
 os.environ["DDE_BACKEND"] = "pytorch"  # Must be before importing deepxde
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,7 +19,7 @@ except Exception as e:
 
 rho = 1000
 mu = 0.001
-u_in = 1
+u_in = 0.0001
 D = 1
 L = 2
 
@@ -110,7 +109,7 @@ plt.ylabel("Y")
 plt.show()
 
 # Defining the model
-net = dde.maps.FNN([2] + [64]*5 + [3], "tanh", "Glorot uniform")                     # Network starts with 2 neurons -> x,y. 5 hidden layers with 64 neurons. Last layer with 3 neurons -> u,v,p.
+net = dde.maps.FNN([2] + [40]*8 + [3], "tanh", "Glorot uniform")                     # Network starts with 2 neurons -> x,y. 5 hidden layers with 64 neurons. Last layer with 3 neurons -> u,v,p.
 
 model = dde.Model(data, net)
 

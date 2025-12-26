@@ -13,12 +13,12 @@ class Evaluate(Visualizer):
 
     def sampling_line(self, n_points:int):
         self.geometry.sampling_line(n_points)
-        self.geometry.process_coordinates()
+        self.geometry.process_coordinates("cpu")
         self.postprocess()
 
     def sampling_area(self, x_res:int, y_res:int):
         self.geometry.sampling_area([x_res, y_res])
-        self.geometry.process_coordinates()
+        self.geometry.process_coordinates("cpu")
         self.postprocess()
 
     def postprocess(self):
@@ -63,3 +63,9 @@ class Evaluate(Visualizer):
         # store in self.data_dict
         self.data_dict = data_dict
         return data_dict
+    
+    def __getitem__(self, key):
+        return self.data_dict[key]
+    
+    def __setitem__(self, key, value):
+        self.data_dict[key] = value

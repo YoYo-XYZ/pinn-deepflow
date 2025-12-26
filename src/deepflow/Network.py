@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import copy
+from .Utility import get_device
 
 
 class PINN(nn.Module):
@@ -118,8 +119,8 @@ class PINN(nn.Module):
             loss_hist_dict[key].append(val)
         return loss_hist_dict
 
-    def train_adam(self, learning_rate, epochs, calc_loss, print_every=50, threshold_loss=None, device='cpu'):
-        model = copy.deepcopy(self.to(device))
+    def train_adam(self, learning_rate, epochs, calc_loss, print_every=50, threshold_loss=None):
+        model = copy.deepcopy(self.to(get_device()))
 
         optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
         try:
@@ -142,12 +143,11 @@ class PINN(nn.Module):
                     break
         except KeyboardInterrupt:
             print('Training interrupted by user.')
-            return model.to(device)
-        return model.to(device)
+            return model
+        return model
     
-    def train_lbfgs(self, epochs, calc_loss, print_every=50, threshold_loss=None, device='cpu'):
-        model = copy.deepcopy(self.to(device))
-
+    def train_lbfgs(self, epochs, calc_loss, print_every=50, threshold_loss=None):
+        model = copy.deepcopy(self.to(get_device()))
         optimizer = torch.optim.LBFGS(model.parameters(), history_size=100, max_iter=20, line_search_fn="strong_wolfe")
         try:
             for epoch in range(epochs):
@@ -180,7 +180,7 @@ class PINN(nn.Module):
                     break
         except KeyboardInterrupt:
             print('Training interrupted by user.')
-            return model.to(device)
+            return model
         return model
 #-----------------------------------------------------------------------------------------------
 class HardConstraint():

@@ -1,5 +1,12 @@
 import torch
 
+device = 'cpu' if not torch.cuda.is_available() else 'cuda'
+
+def get_device():
+    global device
+    return device
+
+
 def calc_grad(y, x):
     """
     Calculates the gradient of a tensor y with respect to a tensor x.
