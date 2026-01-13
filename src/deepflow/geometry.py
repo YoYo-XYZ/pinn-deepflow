@@ -4,7 +4,7 @@ from typing import List, Tuple, Callable, Optional, Union, Dict
 import torch
 
 from .utility import *
-from .physicsInformedAttach import PhysicsAttach
+from .physicsinformed import PhysicsAttach
 
 # Constants for numerical stability
 EPS = 1e-6

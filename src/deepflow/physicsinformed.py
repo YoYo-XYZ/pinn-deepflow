@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 
 # Assuming these modules exist in your package structure
-from .network import HardConstraint
-from .physics import PDE
+from .neuralnetwork import HardConstraint
+from .pde import PDE
 from .utility import calc_grad, get_device
 
 class PhysicsAttach:
@@ -275,5 +275,5 @@ class PhysicsAttach:
 
     def evaluate(self, model: nn.Module):
         """Initialize evaluation module."""
-        from .Evaluation import Evaluate # Import inside method to avoid circular dependency if Evaluation imports PhysicsAttach
+        from .evaluation import Evaluate # Import inside method to avoid circular dependency if Evaluation imports PhysicsAttach
         return Evaluate(model, self)
