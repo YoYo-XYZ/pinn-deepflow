@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-![DeepFlow Logo](examples/logo_name_deepflow.svg)
+![DeepFlow Logo](static/logo_name_deepflow.svg)
 
 DeepFlow is a user-friendly framework for solving partial differential equations (PDEs), such as the Navier-Stokes equations, using **Physics-Informed Neural Networks (PINNs)**. It provides a CFD-solver-style workflow to make PINN-based simulations accessible and straightforward.
 
@@ -60,63 +60,35 @@ This example demonstrates how to simulate steady channel flow. We recommend usin
 First, define the geometries of your domain. Then, attach the boundary conditions and the governing PDE to the geometric entities.
 
 ```python
-from deepflow import PINN, Geometry, Physics, NetworkTrainer, Evaluate, ProblemDomain
+import deepflow as df
 
 # Define the area and bounds
-rectangle = Geometry.rectangle([0, 5], [0, 1])
-
-domain = ProblemDomain(bound_list=rectangle.bound_list, area_list=[rectangle], device='cpu')
+rectangle = df.geometry.rectangle([0, 5], [0, 1])
+domain = df.domain(rectangle)
 
 # Define the physics at the geometry
 domain.bound_list[0].define_bc({'u': 0, 'v': 0})
 domain.bound_list[1].define_bc({'u': 0, 'v': 0})
 domain.bound_list[2].define_bc({'u': 1, 'v': 0})
 domain.bound_list[3].define_bc({'p': 0})
-domain.area_list[0].define_pde(Physics.NVS_nondimensional(U=0.0001, L=1, mu=0.001, rho=1000))
+domain.area_list[0].define_pde(Physics.NavierStokes(U=0.0001, L=1, mu=0.001, rho=1000))
 ```
 ![alt text](examples/quickstart/setup.png)
 
-Next, sample the initial collocation points. This will automatically create training data according to the defined physics.
+Next, sample the collocation points. This will automatically create training data according to the defined physics.
 ```python
 # Sampling initial collocation points
-domain.sampling_random_r([100, 100, 200, 100], [5000])
+domain.sampling_random([100, 100, 200, 100], [5000])
 domain.show_coordinates(display_conditions=True)  # display
 ```
 ![alt text](examples/quickstart/collocation_points.png)
 ### 2. Define the Model and Loss
 
-Create the PINN model and a function to calculate the loss. This function handles the random sampling of points for each training step.
+Create the PINN model
 
 ```python
 # Initialize the PINN model
 model0 = PINN(width=40, length=4)
-
-# Design the steps to calculate loss
-iterations = 0
-def calc_loss(model):
-    global iterations
-    iterations += 1
-
-    # Add collocation points based on residual
-    if iterations % 500 == 0:
-        domain.sampling_RAR([40, 40, 80, 40], [1000], model)
-
-    # BC Loss
-    bc_loss = 0.0
-    for bound in domain.bound_list:
-        bc_loss += bound.calc_loss(model)
-
-    # PDE Loss
-    pde_loss = 0.0
-    for area in domain.area_list:
-        pde_loss += area.calc_loss(model)
-
-    # Total Loss
-    total_loss = bc_loss + pde_loss
-
-    return {"bc_loss": bc_loss, "pde_loss": pde_loss, "total_loss": total_loss}  # MUST RETURN IN THIS FORMAT
-```
-
 ### 3. Train the Model
 
 Train the model using the Adam optimizer.
@@ -125,12 +97,11 @@ Train the model using the Adam optimizer.
 # Train the model
 model1 = NetworkTrainer.train_adam(
     model=model0,
-    calc_loss=calc_loss,
+    calc_loss=df.calc_loss_simple(domain),
     learning_rate=0.001,
     epochs=2000,
     print_every=250,
-    threshold_loss=0.05,
-    device='cpu'
+    threshold_loss=0.01,
 )
 ```
 
@@ -139,7 +110,7 @@ model1 = NetworkTrainer.train_adam(
 After training, you can easily visualize the flow field and training history.
 
 ```python
-area_eval = Evaluate(model1, domain.area_list[0])
+area_eval = domain.area_list[0].eval(model1)
 area_eval.sampling_area(500, 100)
 colorplot_area_2d = area_eval.plot_data_on_geometry({'u': 'rainbow'})
 loss_history = area_eval.plot_loss_curve(log_scale=True)

@@ -20,6 +20,7 @@ def domain(*geometries):
             bound_list.append(geometry)
         elif isinstance(geometry, Area):
             area_list.append(geometry)
+            bound_list+=geometry.bound_list
         else:
             raise TypeError(f"Expected Bound or Area, got {type(geometry)}")
     return ProblemDomain(bound_list, area_list)
