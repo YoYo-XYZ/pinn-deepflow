@@ -38,6 +38,9 @@ class Visualizer:
             else:
                 print(f"Warning: Key '{k}' not found in data_dict. Skipping.")
         
+        if len(valid_items) == 0:
+            print("Warning: No valid keys found to plot.")
+        
         return valid_items
 
     def _create_subplots(self, n_plots: int, orientation: str = 'vertical', subplot_kw: Optional[Dict] = None) -> Tuple[plt.Figure, List[plt.Axes]]:
@@ -72,10 +75,6 @@ class Visualizer:
 
         items = self._normalize_args(keys)
 
-        if len(items) == 0:
-            print("Warning: No valid keys to plot.")
-            return plt.figure()
-
         fig, axes = self._create_subplots(len(items), orientation)
 
         for ax, (key, cmap) in zip(axes, items):
@@ -104,10 +103,6 @@ class Visualizer:
         
         is_3d = (axis == 'xy')
         subplot_kw = {'projection': '3d'} if is_3d else {}
-        
-        if len(items) == 0:
-            print("Warning: No valid keys to plot.")
-            return plt.figure()
         
         # Default orientation vertical for consistency with old behavior
         fig, axes = self._create_subplots(len(items), 'vertical', subplot_kw=subplot_kw)
