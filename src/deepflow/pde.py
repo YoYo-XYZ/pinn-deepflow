@@ -9,6 +9,7 @@ class PDE(ABC):
     Base class for Physics-Informed Differential Equations.
     """
     def __init__(self):
+        self.var = {}
         pass
 
     @abstractmethod
@@ -92,15 +93,19 @@ class NavierStokes(PDE):
         v_yy = calc_grad(v_y, y)
 
         # 1. Continuity Equation (Mass Conservation)
-        mass_residual = u_x + v_y
+        continuity_residual = u_x + v_y
 
         # 2. X-Momentum Equation
-        x_momentum = (u_t + (u * u_x) + (v * u_y)) + p_x - ((u_xx + u_yy) / self.Re)
+        x_momentum_residual = (u_t + (u * u_x) + (v * u_y)) + p_x - ((u_xx + u_yy) / self.Re)
 
         # 3. Y-Momentum Equation
-        y_momentum = (v_t + (u * v_x) + (v * v_y)) + p_y - ((v_xx + v_yy) / self.Re)
+        y_momentum_residual = (v_t + (u * v_x) + (v * v_y)) + p_y - ((v_xx + v_yy) / self.Re)
 
-        self.residual_fields = (mass_residual, x_momentum, y_momentum)
+        self.residual_fields = (continuity_residual, x_momentum_residual, y_momentum_residual)
+
+        self.var.update(x= x, y=y, u=u, v=v, p=p, u_x=u_x, u_y=u_y, v_x=v_x, v_y=v_y, p_x=p_x, p_y=p_y,
+                        continuity_residual=continuity_residual, x_momentum_residual=x_momentum_residual, y_momentum_residual=y_momentum_residual)
+        
         return self.residual_fields
 
     def nondimensionalize_inputs(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:

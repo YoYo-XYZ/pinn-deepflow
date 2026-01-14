@@ -4,7 +4,6 @@ from typing import List, Dict, Callable, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 
-from .geometry import Bound
 from .utility import get_device
 
 class HardConstraint:
@@ -118,7 +117,7 @@ class PINN(nn.Module):
 
         return output_dict
 
-    def apply_hard_constraints(self, bound_list: List[Bound]):
+    def apply_hard_constraints(self, bound_list: list):
         """
         Configures hard constraints based on a list of boundary conditions.
         """
@@ -154,9 +153,9 @@ class PINN(nn.Module):
             value_to_store = val.detach().item() if isinstance(val, torch.Tensor) else val
             if key in self.loss_history: self.loss_history[key].append(value_to_store)
 
-    def print_status(self, epoch: int):
+    def print_status(self):
         """Prints the current training status."""
-        string_parts = [f"Epoch: {epoch}"]
+        string_parts = [f"Epoch: {len(self.loss_history['total_loss'])}"]
         for k, v in self.loss_history.items():
             string_parts.append(f"{k}: {v[-1]:.5f}")
         print(", ".join(string_parts))
@@ -172,13 +171,13 @@ class PINN(nn.Module):
         scheduler_config: Optional[Dict] = None, 
         print_every: int = 200, 
         threshold_loss: Optional[float] = None
-    )-> 'PINN':
+    )-> tuple['PINN', 'PINN']:
         """
         Trains the model using the Adam optimizer.
         """
         model = copy.deepcopy(self.to(get_device()))
         model.train() # Set to training mode
-        
+                
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         
         scheduler = None
@@ -187,8 +186,8 @@ class PINN(nn.Module):
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer, mode='min', factor=0.5, patience=100, min_lr=1e-4
             )
-        
-        best_loss = 0.0
+
+        best_loss = float('inf')
         try:
             for epoch in range(1,epochs+1):
                 optimizer.zero_grad(set_to_none=True)
@@ -213,14 +212,14 @@ class PINN(nn.Module):
                         print(f"Stop: Loss {best_loss:.5f} < Threshold {threshold_loss}")
                         break
 
-                if epoch % print_every == 0:
-                    model.print_status(epoch)
+                if epoch % print_every == 0 or epoch == 1:
+                    model.print_status()
 
         except KeyboardInterrupt:
             print('Training interrupted by user.')
             return model, best_model
             
-        return self.loss_history
+        return model, best_model
 
     def train_lbfgs(
         self, 
@@ -250,7 +249,7 @@ class PINN(nn.Module):
 
                 def closure():
                     optimizer.zero_grad(set_to_none=True)
-                    loss_dict = calc_loss(self)
+                    loss_dict = calc_loss(model)
                     total_loss = loss_dict['total_loss']
                     total_loss.backward()
                     
@@ -264,7 +263,7 @@ class PINN(nn.Module):
                 total_loss_num = loss_dict_container['total_loss'].item()
 
                 if epoch % print_every == 0:
-                    model.print_status(epoch)
+                    model.print_status()
                 
                 if threshold_loss and total_loss_num < threshold_loss:
                      print(f"Stop: Loss {total_loss_num:.5f} < Threshold {threshold_loss}")
@@ -275,3 +274,15 @@ class PINN(nn.Module):
             return model
 
         return model
+    
+    def save_as_pickle(self, file_name: str) -> None:
+        """Saves the model as a pickle file."""
+        import pickle
+        with open(file_name, 'wb') as f:
+            pickle.dump(self, f)
+    
+    def load_from_file(self, file_name: str) -> None:
+        """Loads the model from a pickle file."""
+        import pickle
+        with open(file_name, 'rb') as f:
+            self = pickle.load(f)

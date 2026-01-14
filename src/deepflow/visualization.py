@@ -4,165 +4,160 @@ import matplotlib.pyplot as plt
 import matplotlib.axes
 import numpy as np
 
-class VisualizeTemplate:
-    """
-    Base class containing static methods for specific plot types.
-    """
-    
-    @staticmethod
-    def scatterplot(x: np.ndarray, y: np.ndarray, data: np.ndarray, 
-                  ax: matplotlib.axes.Axes, title: Optional[str] = None, 
-                  cmap: str = 'viridis', s: int = 1) -> matplotlib.axes.Axes:
-        """Generates a scatter plot with color mapping."""
-        im = ax.scatter(x, y, s=s, c=data, cmap=cmap, marker='s')
-        
-        if title:
-            ax.set_title(title, fontweight='medium', pad=10, fontsize=13)
-            
-        ax.set_xlabel('x', fontstyle='italic', labelpad=0)
-        ax.set_ylabel('y', fontstyle='italic', labelpad=0)
-
-        # Access the figure from the axes to add colorbar
-        if ax.figure:
-            ax.figure.colorbar(im, ax=ax, pad=0.03, shrink=1.2)
-
-        ax.set_aspect('equal', adjustable='box')
-        return ax
-
-    @staticmethod
-    def lineplot(x: np.ndarray, data: np.ndarray, ax: matplotlib.axes.Axes, 
-                 xlabel: str, ylabel: str, color: str = 'navy') -> matplotlib.axes.Axes:
-        """Generates a standard line plot."""
-        ax.plot(x, data, linewidth=2.0, color=color)
-        ax.grid(True, linestyle="-", linewidth=0.5, alpha=0.7)
-        ax.set_xlabel(xlabel, fontsize=10)
-        ax.set_ylabel(ylabel, fontsize=10)
-        return ax
-
-    @staticmethod
-    def histplot(data: np.ndarray, ax: matplotlib.axes.Axes, 
-                 title: Optional[str] =  None, bins: Union[str, int] = 'fd') -> matplotlib.axes.Axes:
-        """Generates a histogram."""
-        ax.hist(data, bins=bins, density=True, alpha=0.7, color="steelblue", edgecolor="black")
-        if title:
-            ax.set_title(title)
-        return ax
-
-    @staticmethod
-    def surfaceplot(X: np.ndarray, Y: np.ndarray, Z: np.ndarray, 
-                     ax: matplotlib.axes.Axes, title: Optional[str] = None, 
-                     cmap: str = 'viridis') -> matplotlib.axes.Axes:
-        """Generates a 3D surface plot."""
-        surf = ax.plot_surface(X, Y, Z, cmap=cmap, edgecolor='none')
-        if title:
-            ax.set_title(title)
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
-        ax.figure.colorbar(surf, ax=ax, pad=0.1)
-        return ax
-
-class Visualizer():
+class Visualizer:
     """
     Main visualization class for processing data dictionaries.
+    Refactored for simplicity and maintainability.
     """
     def __init__(self, data_dict: Dict[str, np.ndarray]):
-        # Error handling: Ensure required keys exist
-        if 'x' not in data_dict or 'y' not in data_dict:
-            raise KeyError("data_dict must contain keys 'x' and 'y'")
-
         self.data_dict = data_dict
-        self.X = data_dict['x']
-        self.Y = data_dict['y']
-        
-        # Calculate bounds once
-        self.X_min, self.X_max = self.X.min(), self.X.max()
-        self.Y_min, self.Y_max = self.Y.min(), self.Y.max()
-        self.length = self.X_max - self.X_min
-        self.width = self.Y_max - self.Y_min
+        # Cache coordinates for convenience, if they exist
+        self.X = data_dict.get('x')
+        self.Y = data_dict.get('y')
 
-    def _plot_format(self, plot_func, key_cmap_dict: Union[Dict, List, str], 
-                              orientation: str = 'vertical', default_cmap: str = 'viridis') -> plt.Figure:
-        
-        processed_dict, num_plots = self._keycmap_dict_process(key_cmap_dict, default_cmap=default_cmap)
-
-        if orientation == 'vertical': rows, cols = num_plots, 1
-        else: rows, cols = 1, num_plots
-
-        fig, axes = plt.subplots(rows, cols, constrained_layout=True)
-
-        # Ensure axes is iterable even if it's a single plot
-        if num_plots == 1:
-            axes = [axes]
-
-        for ax, (key, cmap) in zip(axes, processed_dict.items()):
-            if key not in self.data_dict:
-                print(f"Warning: Key '{key}' not found in data_dict. Skipping.")
-                continue
-
-            plot_func(ax=ax, key=key, cmap=cmap)
-        
-        return fig
-
-
-    def plot_color(self, datakey_cmap_dict: Union[Dict, List, str], 
-                              s: int = 10, orientation: str = 'vertical') -> plt.Figure:
-        
-        def func(**kwargs):
-            ax:plt.Axes = kwargs['ax']
-            key = kwargs['key']
-            cmap = kwargs['cmap']
-
-            im = ax.scatter(self.X, self.Y, self.data_dict[key], s=s, c=self.data_dict[key], cmap=cmap, marker='s')
+    def _normalize_args(self, keys: Union[str, List[str], Dict[str, str]], default_cmap: str = 'viridis') -> List[Tuple[str, str]]:
+        """
+        Normalizes input keys to a list of (key, colormap) tuples.
+        Supports str, list of str, or dict {key: cmap}.
+        Filters out keys that are not present in data_dict.
+        """
+        if isinstance(keys, str):
+            items = [(keys, default_cmap)]
+        elif isinstance(keys, (list, tuple)):
+            items = [(k, default_cmap) for k in keys]
+        elif isinstance(keys, dict):
+            items = [(k, v if v is not None else default_cmap) for k, v in keys.items()]
+        else:
+            raise TypeError("Input must be a string, list, or dictionary.")
             
+        # Filter keys
+        valid_items = []
+        for k, cmap in items:
+            if k in self.data_dict:
+                valid_items.append((k, cmap))
+            else:
+                print(f"Warning: Key '{k}' not found in data_dict. Skipping.")
+        
+        return valid_items
+
+    def _create_subplots(self, n_plots: int, orientation: str = 'vertical', subplot_kw: Optional[Dict] = None) -> Tuple[plt.Figure, List[plt.Axes]]:
+        """
+        Creates a figure and a list of axes based on the number of plots and orientation.
+        """
+        rows, cols = (n_plots, 1) if orientation == 'vertical' else (1, n_plots)
+        
+        # Auto-size figure: ~4 inches per plot vertically, or ~4 inches per plot horizontally
+        figsize = None
+        if orientation == 'vertical':
+            figsize = (6, 4 * n_plots)
+        else:
+            figsize = (4 * n_plots, 5)
+
+        fig, axes = plt.subplots(rows, cols, figsize=figsize, constrained_layout=True, subplot_kw=subplot_kw)
+        
+        if n_plots == 1:
+            axes = [axes]
+        else:
+            axes = axes.flatten()
+            
+        return fig, axes
+
+
+    def plot_color(self, keys: Union[str, List[str], Dict], s: int = 10, orientation: str = 'vertical') -> plt.Figure:
+        """
+        Creates scatter plots (heatmap style) for the specified keys.
+        """
+        if self.X is None or self.Y is None:
+            raise ValueError("Data dictionary must contain 'x' and 'y' for scatter plots.")
+
+        items = self._normalize_args(keys)
+
+        if len(items) == 0:
+            print("Warning: No valid keys to plot.")
+            return plt.figure()
+
+        fig, axes = self._create_subplots(len(items), orientation)
+
+        for ax, (key, cmap) in zip(axes, items):
+            # Plot
+            im = ax.scatter(self.X, self.Y, s=s, c=self.data_dict[key], cmap=cmap, marker='s')
+            
+            # Styling
             ax.set_title(key, fontweight='medium', pad=10, fontsize=13)    
             ax.set_xlabel('x', fontstyle='italic', labelpad=0)
             ax.set_ylabel('y', fontstyle='italic', labelpad=0)
-            ax.figure.colorbar(im, ax=ax, pad=0.03, shrink=1.2)
+            ax.set_aspect('equal')
+            fig.colorbar(im, ax=ax, pad=0.03)
 
-            ax.set_aspect('equal', adjustable='box')
-
-        fig = self._plot_format(func, datakey_cmap_dict, orientation)
         return fig
+    
+    # Modern alias
+    plot_scatter = plot_color
 
-    def plot(self, datakey_cmap_dict: Union[Dict, List, str], axis: str = 'xy') -> plt.Figure:
+    def plot(self, keys: Union[str, List[str], Dict], axis: str = 'xy') -> plt.Figure:
+        """
+        General plotting method.
+        If axis='xy': 3D surface plot.
+        If axis='x' or 'y': 1D line plot against that axis.
+        """
+        items = self._normalize_args(keys, default_cmap='viridis' if axis == 'xy' else None)
         
-        def func(**kwargs):
-            ax:plt.Axes = kwargs['ax']
-            key = kwargs['key']
-            cmap = kwargs['cmap']
+        is_3d = (axis == 'xy')
+        subplot_kw = {'projection': '3d'} if is_3d else {}
+        
+        if len(items) == 0:
+            print("Warning: No valid keys to plot.")
+            return plt.figure()
+        
+        # Default orientation vertical for consistency with old behavior
+        fig, axes = self._create_subplots(len(items), 'vertical', subplot_kw=subplot_kw)
 
-            if axis in ['x', 'y']:
-                ax.plot(self.data_dict[axis], self.data_dict[key], linewidth=2.0, color=cmap)
+        for ax, (key, color) in zip(axes, items):
+            if is_3d:
+                # 3D Scatter Plot
+                scatter = ax.scatter(self.X, self.Y, self.data_dict[key], c=self.data_dict[key], cmap=color, s=2)
+                ax.set(xlabel='x', ylabel='y')
+                ax.set_title(f'3D Scatter Plot of {key}')
+                fig.colorbar(scatter, ax=ax, shrink=0.5, aspect=10)
+            
+            elif axis in ['x', 'y']:
+                # Line Plot
+                ax.plot(self.data_dict[axis], self.data_dict[key], linewidth=2.0, color=color)
                 ax.grid(True, linestyle="-", linewidth=0.5, alpha=0.7)
                 ax.set_xlabel(axis, fontsize=10)
                 ax.set_ylabel(key, fontsize=10)
             
-            elif axis == 'xy':
-                scatter = ax.plot_surface(self.X, self.Y, self.data_dict[key], cmap=cmap, cmap=cmap, marker='.')
-                ax.set(xlabel='x', ylabel='y')
-                ax.set_title(f'Surface Plot of {key}')
-                ax.figure.colorbar(scatter, ax=ax, shrink=0.5, aspect=10)
-
             else:
                 raise ValueError("axis must be 'x', 'y', or 'xy'")
 
-        fig = self._plot_format(func, datakey_cmap_dict, default_cmap='viridis')
         return fig
 
-    def plot_distribution(self, key: str, bins: Union[str, int] = 'fd') -> plt.Figure:
-        fig, ax = plt.subplots()
-        ax.hist(self.data_dict[key], bins=bins, density=True, alpha=0.7, color="steelblue", edgecolor="black")
-        ax.set_title(f"{key} distribution")
+    def plot_distribution(self, keys: Union[str, List[str]], bins: Union[str, int] = 'fd') -> plt.Figure:
+        """
+        Plots histograms for the specified keys.
+        """
+        if isinstance(keys, str): keys = [keys]
+        
+        fig, axes = self._create_subplots(len(keys), 'vertical')
+
+        for ax, key in zip(axes, keys):
+            if key in self.data_dict:
+                ax.hist(self.data_dict[key], bins=bins, density=True, alpha=0.7, color="steelblue", edgecolor="black")
+                ax.set_title(f"{key} distribution")
+        
         return fig
 
     def plot_loss_curve(self, log_scale: bool = False, linewidth: float = 0.5, 
-                        start: int = 0, end: Optional[int] = None, keys: list[str] = ['total_loss', 'bc_loss', 'pde_loss']) -> plt.Figure:
-        
+                        start: int = 0, end: Optional[int] = None, 
+                        keys: List[str] = ['total_loss', 'bc_loss', 'pde_loss']) -> plt.Figure:
+        """
+        Plots loss per iteration.
+        """
         fig, ax = plt.subplots()
 
         for key in keys:
-            ax.plot(self.data_dict[key][start:end], label=key, linewidth=linewidth)
+            if key in self.data_dict:
+                ax.plot(self.data_dict[key][start:end], label=key, linewidth=linewidth)
 
         if log_scale:
             ax.set_yscale("log")
@@ -174,34 +169,5 @@ class Visualizer():
         
         return fig
 
-    @staticmethod
-    def _keycmap_dict_process(key_input: Union[Dict, List, Tuple, str], 
-                              default_cmap: str = 'viridis') -> Tuple[Dict, int]:
-        """
-        Normalizes input into a dictionary of {key: colormap}.
-        """
-        if isinstance(key_input, dict):
-            # Fill None values with default
-            return {k: (v if v is not None else default_cmap) for k, v in key_input.items()}, len(key_input)
-        
-        if isinstance(key_input, (list, tuple)):
-            return {k: default_cmap for k in key_input}, len(key_input)
 
-        if isinstance(key_input, str):
-            return {key_input: default_cmap}, 1
-
-        raise TypeError("key_cmap_dict must be a dict, list, tuple, or string.")
     
-    def _handle_limit(self, ax, range_x=None, range_y=None):
-        # Handle Limits
-        if range_x:
-            ax.set_xlim(range_x[0], range_x[1])
-        else:
-            margin_x = 0.2 * self.width if self.length < 0.001 else 0
-            ax.set_xlim(self.X_min - margin_x, self.X_max + margin_x)
-
-        if range_y:
-            ax.set_ylim(range_y[0], range_y[1])
-        else:
-            margin_y = 0.2 * self.length if self.width < 0.001 else 0
-            ax.set_ylim(self.Y_min - margin_y, self.Y_max + margin_y)

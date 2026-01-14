@@ -30,13 +30,13 @@ class Evaluator(Visualizer):
         # or handle the parent init carefully.
         # super().__init__({}) 
 
-    def sample_line(self, n_points: int) -> None:
+    def sampling_line(self, n_points: int) -> None:
         """Samples points along a line within the geometry."""
         self.geometry.sampling_line(n_points)
         self.geometry.process_coordinates()
         self.postprocess()
 
-    def sample_area(self, res_list: List[int]) -> None:
+    def sampling_area(self, res_list: List[int]) -> None:
         """Samples points within the area of the geometry."""
         self.geometry.sampling_area(res_list)
         self.geometry.process_coordinates()
@@ -65,8 +65,8 @@ class Evaluator(Visualizer):
         # 2. Physics Residuals
         if self.geometry.physics_type == 'PDE':
             # Use .update() for dictionary merging (compatible with older python)
-            data_dict.update(self.geometry.PDE.var)
             data_dict[f"{self.geometry.physics_type} residual"] = self.geometry.calc_loss_field(self.model)
+            data_dict.update(self.geometry.PDE.var)
         
         elif self.geometry.physics_type in ('BC', 'IC'):
             data_dict[f"{self.geometry.physics_type} residual"] = self.geometry.calc_loss_field(self.model)
@@ -76,7 +76,7 @@ class Evaluator(Visualizer):
         data_dict['y'] = self.geometry.Y
 
         # 5. Training History
-        data_dict.update(self.model.loss_history_dict)
+        data_dict.update(self.model.loss_history)
 
         # 6. Normalize to NumPy
         self.data_dict = self._convert_to_numpy(data_dict)

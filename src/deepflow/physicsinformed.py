@@ -143,6 +143,7 @@ class PhysicsAttach:
 
     def _prepare_target_outputs(self, device: torch.device) -> None:
         """Internal helper to prepare target tensors for BC/IC."""
+        from .neuralnetwork import HardConstraint
         target_output_tensor_dict = {}
 
         for key, condition in self.condition_dict.items():
@@ -271,9 +272,9 @@ class PhysicsAttach:
         
     def process_pde(self) -> None:
         """Pass model inputs and outputs to the PDE engine."""
-        self.PDE.calc(inputs_dict = self.model_inputs | self.model_outputs)
+        self.PDE.compute_residuals(inputs_dict = self.model_inputs | self.model_outputs)
 
     def evaluate(self, model: nn.Module):
         """Initialize evaluation module."""
-        from .evaluation import Evaluate # Import inside method to avoid circular dependency if Evaluation imports PhysicsAttach
-        return Evaluate(model, self)
+        from .evaluation import Evaluator # Import inside method to avoid circular dependency if Evaluation imports PhysicsAttach
+        return Evaluator(model, self)
