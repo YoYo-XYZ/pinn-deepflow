@@ -1,8 +1,8 @@
-from .Geometry import Area, Bound
+from .geometry import Area, Bound
 import matplotlib.pyplot as plt
 import torch
 import sympy as sp
-from .Network import HardConstraint
+from .neuralnetwork import HardConstraint
 
 def domain(*geometries):
     bound_list = []
@@ -24,7 +24,7 @@ def domain(*geometries):
     return ProblemDomain(bound_list, area_list)
 
 class ProblemDomain():
-    def __init__(self, bound_list, area_list):
+    def __init__(self, bound_list:list[Bound], area_list:list[Area]):
         self.bound_list = bound_list
         self.area_list = area_list
         self.sampling_option = None
@@ -42,8 +42,8 @@ class ProblemDomain():
             self.area_list[i].sampling_area(res)
             self.area_list[i].process_coordinates()
 
-    def sampling_random_r(self, bound_sampling_res:list=[], area_sampling_res:list=[]):
-        self.sampling_option = 'random_r'
+    def sampling_random(self, bound_sampling_res:list=[], area_sampling_res:list=[]):
+        self.sampling_option = 'random'
         for i, res in enumerate(bound_sampling_res):
             self.bound_list[i].sampling_line(res, random=True)
             self.bound_list[i].process_coordinates()
@@ -51,7 +51,7 @@ class ProblemDomain():
             self.area_list[i].sampling_area(res, random=True)
             self.area_list[i].process_coordinates()
 
-    def sampling_RAR(self, bound_top_k_list:list, area_top_k_list:list, model, bound_candidates_num_list:list=None, area_candidates_num_list:list=None):
+    def sampling_RAR(self, model, bound_top_k_list:list, area_top_k_list:list, bound_candidates_num_list:list=None, area_candidates_num_list:list=None):
         self.sampling_option = self.sampling_option + ' + RAR'
         for i, bound in enumerate(self.bound_list):
             if bound_candidates_num_list is None:
@@ -111,18 +111,18 @@ class ProblemDomain():
         return ""
     
     def save_coordinates(self):
-        for i, area in enumerate(self.area_list):
+        for area in self.area_list:
             area.saved_X = area.X.clone()
             area.saved_Y = area.Y.clone()
-        for i, bound in enumerate(self.bound_list):
+        for bound in self.bound_list:
             bound.saved_X = bound.X.clone()
             bound.saved_Y = bound.Y.clone()
     
     def load_coordinates(self):
-        for i, area in enumerate(self.area_list):
+        for area in self.area_list:
             area.X = area.saved_X.clone()
             area.Y = area.saved_Y.clone()
-        for i, bound in enumerate(self.bound_list):
+        for bound in self.bound_list:
             bound.X = bound.saved_X.clone()
             bound.Y = bound.saved_Y.clone()
     
@@ -142,13 +142,13 @@ class ProblemDomain():
         plt.figure(figsize=(10,10))
         
         self._plot_items(self.area_list, "Area", lambda o, i: (o.X, o.Y),
-            {'s': 5, 'color': 'black', 'alpha': 0.3},
+            {'s': 2, 'color': 'black', 'alpha': 0.3},
             {'fontsize': 20, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
              'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)},
             show_label=display_conditions)
             
         self._plot_items(self.bound_list, "Bound", lambda o, i: (o.X, o.Y),
-            {'s': 10, 'color': 'red', 'alpha': 0.5},
+            {'s': 2, 'color': 'red', 'alpha': 0.5},
             {'fontsize': 16, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
              'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)},
             show_label=display_conditions)

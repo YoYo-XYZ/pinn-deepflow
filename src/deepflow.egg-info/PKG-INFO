@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: deepflow
-Version: 0.0.1
+Version: 0.1.0
 Summary: Physics-Informed Neural Networks for Fluid Dynamics
 Author-email: Thammatorn Jamraschai <thammatorn.j@gmail.com>
 License-Expression: MIT
@@ -21,7 +21,7 @@ Dynamic: license-file
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-![DeepFlow Logo](examples/logo_name_deepflow_d0jn2w1s269cpsiibh89_23%20(3)%20(1).svg)
+![DeepFlow Logo](examples/logo_name_deepflow.svg)
 
 DeepFlow is a user-friendly framework for solving partial differential equations (PDEs), such as the Navier-Stokes equations, using **Physics-Informed Neural Networks (PINNs)**. It provides a CFD-solver-style workflow to make PINN-based simulations accessible and straightforward.
 
