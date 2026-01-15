@@ -384,5 +384,5 @@ def polygon(*pos: List[float]) -> Area:
         bound_list.append(line(pos[i], pos[i-1]))
     return Area(bound_list)
 
-def curve(range_val: List[float], *func, ref_axis='x') -> Bound:
+def curve_function(range_val: List[float], *func, ref_axis='x') -> Bound:
     return Bound(range_val, *func, ref_axis=ref_axis)

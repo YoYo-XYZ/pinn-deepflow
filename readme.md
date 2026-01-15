@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-![DeepFlow Logo](examples/logo_name_deepflow_d0jn2w1s269cpsiibh89_23%20(3)%20(1).svg)
+![DeepFlow Logo](static/logo_name_deepflow.svg)
 
 DeepFlow is a user-friendly framework for solving partial differential equations (PDEs), such as the Navier-Stokes equations, using **Physics-Informed Neural Networks (PINNs)**. It provides a CFD-solver-style workflow to make PINN-based simulations accessible and straightforward.
 
@@ -21,11 +21,12 @@ DeepFlow is a user-friendly framework for solving partial differential equations
 
 ## Features
 
-- **CFD-Solver Style**: Straightforward workflow similar to commercial CFD software.
-- **Physics-Attached Geometry**: Explicitly attach physics and PINN models to geometries.
-- **Built-in Visualization**: Tools to evaluate and plot results.
+- 🔧 **CFD-Solver Style**: Straightforward workflow similar to commercial CFD software.
+
+- 📊 **Built-in Visualization**: Tools to evaluate and plot results.
+- 🚀 **GPU Acceleration**: Enable GPU for faster training.
 - **Flexible Domain Definition**: Easily define complex geometries.
-- **GPU Acceleration**: Enable GPU for faster training.
+- **Physics-Attached Geometry**: Explicitly attach physics and PINN models to geometries.
 
 ## Installation
 
@@ -53,125 +54,90 @@ pip install -e .
 
 ## Quick Start
 
-This example demonstrates how to simulate steady channel flow. We recommend using a Python notebook (`.ipynb`) for an interactive experience.
+This example demonstrates how to simulate steady channel flow under 20 lines of code! We recommend using a Python notebook (`.ipynb`) for an interactive experience.
 
 ### 1. Define the Geometry and Physics
 
-First, define the geometries of your domain. Then, attach the boundary conditions and the governing PDE to the geometric entities.
-
 ```python
-from deepflow import PINN, Geometry, Physics, NetworkTrainer, Evaluate, ProblemDomain
+import deepflow as df
 
 # Define the area and bounds
-rectangle = Geometry.rectangle([0, 5], [0, 1])
+rectangle = df.geometry.rectangle([0, 5], [0, 1])
+domain = df.domain(rectangle)
 
-domain = ProblemDomain(bound_list=rectangle.bound_list, area_list=[rectangle], device='cpu')
-
-# Define the physics at the geometry
-domain.bound_list[0].define_bc({'u': 0, 'v': 0})
-domain.bound_list[1].define_bc({'u': 0, 'v': 0})
-domain.bound_list[2].define_bc({'u': 1, 'v': 0})
-domain.bound_list[3].define_bc({'p': 0})
-domain.area_list[0].define_pde(Physics.NVS_nondimensional(U=0.0001, L=1, mu=0.001, rho=1000))
+domain.show_setup() # Display the domain setup
 ```
-![alt text](examples/quickstart/setup.png)
-
-Next, sample the initial collocation points. This will automatically create training data according to the defined physics.
+![alt text](static/quickstart/setup_show.png)
 ```python
-# Sampling initial collocation points
-domain.sampling_random_r([100, 100, 200, 100], [5000])
-domain.show_coordinates(display_conditions=True)  # display
-```
-![alt text](examples/quickstart/collocation_points.png)
-### 2. Define the Model and Loss
+# Define Boundary Conditions
+domain.bound_list[0].define_bc({'u': 1, 'v': 0})  # Inflow: u=1
+domain.bound_list[1].define_bc({'u': 0, 'v': 0})  # Wall: No slip
+domain.bound_list[2].define_bc({'p': 0})          # Outflow: p=0
+domain.bound_list[3].define_bc({'u': 0, 'v': 0})  # Wall: No slip
 
-Create the PINN model and a function to calculate the loss. This function handles the random sampling of points for each training step.
+# Define PDE (Navier-Stokes)
+domain.area_list[0].define_pde(df.pde.NavierStokes(U=0.0001, L=1, mu=0.001, rho=1000))
+
+domain.show_setup() # Display the domain setup
+```
+![alt text](static/quickstart/cond_show.png)
+
+```python
+# Sample points: [Left, Bottom, Right, Top], [Interior]
+domain.sampling_random([200, 400, 200, 400], [5000])
+domain.show_coordinates(display_conditions=True)
+```
+![alt text](static/quickstart/coord_show.png)
+### 2. Create and Train the model
+
 
 ```python
 # Initialize the PINN model
-model0 = PINN(width=40, length=4)
-
-# Design the steps to calculate loss
-iterations = 0
-def calc_loss(model):
-    global iterations
-    iterations += 1
-
-    # Add collocation points based on residual
-    if iterations % 500 == 0:
-        domain.sampling_RAR([40, 40, 80, 40], [1000], model)
-
-    # BC Loss
-    bc_loss = 0.0
-    for bound in domain.bound_list:
-        bc_loss += bound.calc_loss(model)
-
-    # PDE Loss
-    pde_loss = 0.0
-    for area in domain.area_list:
-        pde_loss += area.calc_loss(model)
-
-    # Total Loss
-    total_loss = bc_loss + pde_loss
-
-    return {"bc_loss": bc_loss, "pde_loss": pde_loss, "total_loss": total_loss}  # MUST RETURN IN THIS FORMAT
+model0 = df.PINN(width=40, length=4)
 ```
-
-### 3. Train the Model
-
-Train the model using the Adam optimizer.
-
 ```python
-# Train the model
+# Train the model using Adam Optimizer
 model1 = NetworkTrainer.train_adam(
     model=model0,
-    calc_loss=calc_loss,
+    calc_loss=df.calc_loss_simple(domain),
     learning_rate=0.001,
     epochs=2000,
-    print_every=250,
-    threshold_loss=0.05,
-    device='cpu'
-)
+    print_every=250)
 ```
 
-### 4. Visualize the Results
-
-After training, you can easily visualize the flow field and training history.
-
+### 3. Visualize Results
 ```python
-area_eval = Evaluate(model1, domain.area_list[0])
-area_eval.sampling_area(500, 100)
-colorplot_area_2d = area_eval.plot_data_on_geometry({'u': 'rainbow'})
-loss_history = area_eval.plot_loss_curve(log_scale=True)
-```
-![alt text](examples/quickstart/flow_field.png)
-![alt text](examples/quickstart/loss_curve.png)
+# Evaluate the best model
+prediction = domain.area_list[0].evaluate(model1_best)
+prediction.sampling_area([500, 100])
 
-This will produce a visual representation of the steady-state channel flow and the loss curve of the trained PINN.
+# Plot Velocity Field
+_ = prediction.plot_color({'u': 'rainbow'})
+
+# Plot Training Loss
+_ =prediction.plot_loss_curve(log_scale=True)
+```
+![alt text](static/quickstart/flow_field.png)
+![alt text](static/quickstart/loss_curve.png)
 
 ## Examples
 
-Explore the `examples/` directory for real-world use cases, including:
+Explore the [examples](examples)
+ directory for real-world use cases, including:
 
-- Steady channel flow
-- Steady cylinder flow
-- Parabolic flows (BFS and channel)
-- Quickstart guide
+- [Steady cylinder flow](examples/steady_cylinder_flow/steady_cylinder_flow.ipynb)
 
 Each example includes Jupyter notebooks and data files.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Feel free to submit a Pull Request. For major changes, open an issue first to discuss the proposed changes.
 
 ## DeepFlow Milestones
 
 1. Complete support for **time-dependent solutions**
-2. Enhanced customization options in **visualization tools**
-3. Integration with the **PennyLane quantum machine learning** framework
-4. Support for **hard boundary and hard initial conditions**
-5. Implementation of **RAD sampling methods**
-6. Ability to define **custom PDEs** (partial differential equations)
+2. Ability to define **custom PDEs**
+3. Enhanced customization options in **visualization tools**
 
 ## License
 

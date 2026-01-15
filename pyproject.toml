@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deepflow"
-version = "0.0.1"
+version = "0.1.0"
 description = "Physics-Informed Neural Networks for Fluid Dynamics"
 authors = [{ name = "Thammatorn Jamraschai", email = "thammatorn.j@gmail.com" }]
 readme = "README.md"
