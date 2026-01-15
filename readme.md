@@ -54,7 +54,7 @@ pip install -e .
 
 ## Quick Start
 
-This example demonstrates how to simulate steady channel flow ~under 20 lines of code!~ We recommend using a Python notebook (`.ipynb`) for an interactive experience.
+This example demonstrates how to simulate steady channel flow under 20 lines of code! We recommend using a Python notebook (`.ipynb`) for an interactive experience.
 
 ### 1. Define the Geometry and Physics
 
@@ -68,12 +68,13 @@ domain = df.domain(rectangle)
 # Create a 5x1 rectangle
 rectangle = df.geometry.rectangle([0, 5], [0, 1])
 domain = df.domain(rectangle)
+
 domain.show_setup() # Display the domain setup
 ```
 ![alt text](static/quickstart/setup_show.png)
 ```python
 # Define Boundary Conditions
-domain.bound_list[0].define_bc({'u': 1, 'v': 0})   # Inflow: u=1
+domain.bound_list[0].define_bc({'u': 1, 'v': 0})  # Inflow: u=1
 domain.bound_list[1].define_bc({'u': 0, 'v': 0})  # Wall: No slip
 domain.bound_list[2].define_bc({'p': 0})          # Outflow: p=0
 domain.bound_list[3].define_bc({'u': 0, 'v': 0})  # Wall: No slip
@@ -125,18 +126,16 @@ _ =prediction.plot_loss_curve(log_scale=True)
 
 ## Examples
 
-Explore the `examples/` directory for real-world use cases, including:
+Explore the [examples](examples)
+ directory for real-world use cases, including:
 
-- Steady channel flow
-- Steady cylinder flow
-- Parabolic flows (BFS and channel)
-- Quickstart
+- [Steady cylinder flow](examples/steady_cylinder_flow/steady_cylinder_flow.ipynb)
 
 Each example includes Jupyter notebooks and data files.
 
 ## Contributing
 
-Feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+Feel free to submit a Pull Request. For major changes, open an issue first to discuss the proposed changes.
 
 ## DeepFlow Milestones
 
