@@ -1,4 +1,3 @@
-from xml.parsers.expat import model
 from .geometry import Area, Bound
 import matplotlib.pyplot as plt
 import torch
