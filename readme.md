@@ -19,14 +19,21 @@ DeepFlow is a user-friendly framework for solving partial differential equations
 - [License](#license)
 - [**DeepFlow Milestones**](#future-milestones)
 
-## Features
+## Key Features
 
-- 🔧 **CFD-Solver Style**: Straightforward workflow similar to commercial CFD software.
-
+- 🔧 **CFD-Solver Style**: Straightforward workflow similar to CFD software.
+- ⟁ **Physics-Attached Geometry**: *AUTO GENERATE TRAINING DATA* by explicitly attach physics and NN models to geometries.
 - 📊 **Built-in Visualization**: Tools to evaluate and plot results.
 - 🚀 **GPU Acceleration**: Enable GPU for faster training.
-- **Flexible Domain Definition**: Easily define complex geometries.
-- **Physics-Attached Geometry**: Explicitly attach physics and PINN models to geometries.
+- **Flexible Domain Definition**: Easily define complex 2D geometries.
+![](static/deepflow_workflow.svg)
+
+## Current Implementations
+- **PDEs**: 2D Steady-state Navier-Stokes equations for incompressible flows.
+- **Sampling methods**: Uniform, Random, and Residual-based(RAR)
+- **2D Geometries**: Rectangle, Circle, Polygon, and combinations & Subtractions.
+- **Hard Boundary Conditions**: Automatic Hard BC w.r.t. to geometry.
+
 
 ## Installation
 
