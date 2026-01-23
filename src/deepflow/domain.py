@@ -192,11 +192,13 @@ class ProblemDomain():
 def calc_loss_simple(domain: ProblemDomain) -> callable:
     """Returns a simple loss calculation for the given domain for PINN training."""
     def calc_loss_function(model):
-        loss_dict = {"total_loss": 0.0}
+        loss_dict = {"bc_loss": 0.0, "pde_loss": 0.0}
+        if domain.area_list[0].range_t: loss_dict['ic_loss'] = 0.0
+
         for geometry in domain:
-            if geometry.is_multi_phy:
-                loss_dict['total_loss'] += sum(geometry.calc_loss(model))
-            else:
-                loss_dict['total_loss'] += geometry.calc_loss(model)
+                loss_dict[f'{geometry.physics_type.lower()}_loss'] += geometry.calc_loss(model)
+        loss_dict["total_loss"] = sum(value for key, value in loss_dict.items() if key != "total_loss")
+        
         return loss_dict
+    
     return calc_loss_function

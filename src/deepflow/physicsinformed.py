@@ -57,8 +57,7 @@ class PhysicsAttach:
         """
         self.condition_dict = condition_dict
         self.condition_num = len(condition_dict)
-        self.physics_type.append("BC")
-        self.is_multi_phy = len(self.physics_type) > 1
+        self.physics_type = "BC"
     
     def define_ic(self, condition_dict: Dict[str, Any]) -> None:
         """
@@ -69,8 +68,7 @@ class PhysicsAttach:
         """
         self.condition_dict = condition_dict
         self.condition_num = len(condition_dict)
-        self.physics_type.append("IC")
-        self.is_multi_phy = len(self.physics_type) > 1
+        self.physics_type = "IC"
     
     def define_pde(self, pde_class: PDE) -> None:
         """
@@ -80,8 +78,7 @@ class PhysicsAttach:
             pde_class: Instance or class of the PDE physics module.
         """
         self.PDE = pde_class
-        self.physics_type.append("PDE")
-        self.is_multi_phy = len(self.physics_type) > 1        
+        self.physics_type = "PDE"
 
     # --------------------------------------------------------------------------
     # Data Preparation & Coordinate Processing
@@ -123,10 +120,9 @@ class PhysicsAttach:
         elif self.range_t is None:
             raise ValueError("Time range must be defined before sampling time coordinates.")
 
-        if 'IC' in self.physics_type:
+        if self.physics_type == "IC":
             # For IC, time is always zero
             self.t = torch.zeros_like(self.X_, device=device)
-            
         self.T = self.t
         self.T_ = self.t.to(device).requires_grad_()
         self.inputs_tensor_dict['t'] = self.T_
@@ -151,7 +147,7 @@ class PhysicsAttach:
         self.inputs_tensor_dict['y'] = self.Y_
 
         # Pre-calculate target values for BC/IC
-        if "BC" in self.physics_type or "IC" in self.physics_type:
+        if self.physics_type == "BC" or self.physics_type == "IC":
             self._prepare_target_outputs(device)
 
         return self.inputs_tensor_dict
@@ -206,8 +202,8 @@ class PhysicsAttach:
         """
         Calculate the total loss for the current physics type.
         """
-        if "BC" in self.physics_type or "IC" in self.physics_type:
-            c_loss = 0.0
+        if self.physics_type in ["BC", "IC"]:
+            loss = 0.0
             # If all conditions are HardConstraints, the loss is structurally zero
             if all(isinstance(cond, HardConstraint) for cond in self.condition_dict.values()):
                 return
@@ -215,43 +211,32 @@ class PhysicsAttach:
             pred_dict = self.calc_output(model)
             
             for key in pred_dict:
-                c_loss += loss_fn(pred_dict[key], self.target_output_tensor_dict[key])
-        
-            if not self.is_multi_phy: return c_loss
+                loss += loss_fn(pred_dict[key], self.target_output_tensor_dict[key])
 
-        if "PDE" in self.physics_type:
+        elif self.physics_type == "PDE":
             # PDE Loss
             self.process_model(model)
             self.process_pde()
-            pde_loss = self.PDE.calc_loss()
-            # If both condition and PDE losses exist, return both
-            if self.is_multi_phy:
-                return c_loss, pde_loss
-            else:
-                return pde_loss
-
+            loss = self.PDE.calc_loss()
+        return loss
+        
     def calc_loss_field(self, model: nn.Module) -> Union[int, torch.Tensor]:
         """
         Calculate the element-wise loss field (absolute error or residual).
         """
-        c_loss_field = 0
+        loss_field = 0
 
-        if "BC" in self.physics_type or "IC" in self.physics_type:
+        if self.physics_type in ["BC", "IC"]:
             pred_dict = self.calc_output(model)
             for key in pred_dict:
-                c_loss_field += torch.abs(pred_dict[key] - self.target_output_tensor_dict[key])
+                loss_field += torch.abs(pred_dict[key] - self.target_output_tensor_dict[key])
 
-            if not self.is_multi_phy: return c_loss_field
-        
         if "PDE" in self.physics_type:
             self.process_model(model)
             self.process_pde()
-            pde_loss_field = self.PDE.calc_residual_field()
-            # If both condition and PDE losses exist, return both
-            if self.is_multi_phy:
-                return c_loss_field, pde_loss_field
-            else:
-                return pde_loss_field
+            loss_field = self.PDE.calc_residual_field()
+        
+        return loss_field
 
     def set_threshold(self, loss: float = None, top_k_loss: float = None) -> None:
         """Set loss thresholds for adaptive sampling or convergence checks."""
