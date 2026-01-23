@@ -93,27 +93,42 @@ class PhysicsAttach:
         """
         self.X = x
         self.Y = y
+    
+    def define_time_range(self, range_t: Union[Tuple[float, float], int, float]) -> None:
+        """
+        Define the time range.
+        """
+        self.range_t = range_t
 
-    def sampling_time(self, range_t: Optional[Tuple[float, float]] = None, init_scheme: str = "Uniform", expo_scaling = True) -> None:
+    def sampling_time(self, range_t: Optional[Tuple[float, float]] = None, init_scheme: str = "uniform", expo_scaling = False) -> None:
         """
         Generate time coordinates based on the defined time range.
         """
         n_points = len(self.X)
-        self.range_t = range_t
-        if self.range_t is None:
-            self.t = None
-            return
+        device = get_device()
+        if range_t is not None: self.range_t = range_t
 
-        if init_scheme == "uniform":
-            self.t = torch.linspace(self.range_t[0], self.range_t[1], n_points)
-        elif init_scheme == "random":
-            self.t = torch.empty(n_points).uniform_(self.range_t[0], self.range_t[1])
-        
-        if expo_scaling:
-            T = self.range_t[1]
-            self.t = (1 + self.t)**(self.t/T) - 1 
+        if isinstance(self.range_t, (tuple, list)):
 
-        self.T_ = self.t.to(get_device()).requires_grad_()
+            if init_scheme == "uniform":
+                self.t = torch.linspace(self.range_t[0], self.range_t[1], n_points)
+            elif init_scheme == "random":
+                self.t = torch.empty(n_points).uniform_(self.range_t[0], self.range_t[1])
+            
+            if expo_scaling:
+                T1 = self.range_t[1]
+                self.t = (1 + self.t)**(self.t/T1) - 1
+        elif isinstance(self.range_t, (int, float)):
+            self.t = torch.ones_like(self.X_, device=device) * self.range_t
+        elif self.range_t is None:
+            raise ValueError("Time range must be defined before sampling time coordinates.")
+
+        if 'IC' in self.physics_type:
+            # For IC, time is always zero
+            self.t = torch.zeros_like(self.X_, device=device)
+            
+        self.T = self.t
+        self.T_ = self.t.to(device).requires_grad_()
         self.inputs_tensor_dict['t'] = self.T_
 
     def process_coordinates(self, device: Optional[torch.device] = None) -> Dict[str, Optional[torch.Tensor]]:

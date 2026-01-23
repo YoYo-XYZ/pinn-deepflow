@@ -33,13 +33,11 @@ class Evaluator(Visualizer):
     def sampling_line(self, n_points: int) -> None:
         """Samples points along a line within the geometry."""
         self.geometry.sampling_line(n_points)
-        self.geometry.process_coordinates()
         self.postprocess()
 
     def sampling_area(self, res_list: List[int]) -> None:
         """Samples points within the area of the geometry."""
         self.geometry.sampling_area(res_list)
-        self.geometry.process_coordinates()
         self.postprocess()
 
     def postprocess(self) -> None:
@@ -47,6 +45,10 @@ class Evaluator(Visualizer):
         Aggregates model predictions, residuals, and coordinates, 
         then converts them to NumPy for visualization.
         """
+        self.geometry.process_coordinates()
+        if self.geometry.range_t:
+            self.geometry.sampling_time(init_scheme="uniform", expo_scaling=False)
+
         self._create_data_dict()
         print(f"Available data keys: {tuple(self.data_dict.keys())}")
         self.is_postprocessed = True
@@ -74,6 +76,8 @@ class Evaluator(Visualizer):
         # 4. Coordinates
         data_dict['x'] = self.geometry.X
         data_dict['y'] = self.geometry.Y
+        if self.geometry.range_t:
+            data_dict['t'] = self.geometry.T
 
         # 5. Training History
         data_dict.update(self.model.loss_history)

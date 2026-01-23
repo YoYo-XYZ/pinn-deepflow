@@ -314,6 +314,11 @@ class Area(PhysicsAttach):
         
         plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
+        
+    @property
+    def area_list(self) -> List['Area']:
+        """Returns the list of Area objects in the domain."""
+        return [self]
 
 # --- Factory Functions ---
 
