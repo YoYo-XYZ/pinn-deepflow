@@ -22,7 +22,7 @@ DeepFlow is a user-friendly framework for solving partial differential equations
 ## Key Features
 
 - 🔧 **CFD-Solver Style**: Straightforward workflow similar to CFD software.
-- ⟁ **Physics-Attached Geometry**: *AUTO GENERATE TRAINING DATA* by explicitly attach physics and NN models to geometries.
+- ⟁ **Physics-Attached Geometry**: *AUTO GENERATE TRAINING DATA* by explicitly attach physics and NN model to geometries.
 - 📊 **Built-in Visualization**: Tools to evaluate and plot results.
 - 🚀 **GPU Acceleration**: Enable GPU for faster training.
 - **Flexible Domain Definition**: Easily define complex 2D geometries.
@@ -31,8 +31,9 @@ DeepFlow is a user-friendly framework for solving partial differential equations
 ## Current Implementations
 - **PDEs**: 2D Steady-state Navier-Stokes equations for incompressible flows.
 - **Sampling methods**: Uniform, Random, and Residual-based(RAR)
-- **2D Geometries**: Rectangle, Circle, Polygon, and combinations & Subtractions.
+- **2D Geometries**: Rectangle, Circle, Polygon, and combinations & subtractions.
 - **Hard Boundary Conditions**: Automatic Hard BC w.r.t. to geometry.
+- **Neural Network Architectures**: Fully connected feedforward networks (FNN).
 
 
 ## Installation
@@ -61,7 +62,7 @@ pip install -e .
 
 ## Quick Start
 
-This example demonstrates how to simulate steady channel flow under 20 lines of code! We recommend using a Python notebook (`.ipynb`) for an interactive experience.
+This example demonstrates how to simulate Steady channel flow **under 20 lines of code!** We recommend using a Python notebook (`.ipynb`) for interactive experience.
 
 ### 1. Define the Geometry and Physics
 
@@ -130,7 +131,7 @@ _ =prediction.plot_loss_curve(log_scale=True)
 Explore the [examples](examples)
  directory for real-world use cases, including:
 
-- [Steady cylinder flow](examples/steady_cylinder_flow/steady_cylinder_flow.ipynb)
+- [Steady cylinder flow](examples/cylinder_flow)
 
 Each example includes Jupyter notebooks and data files.
 
