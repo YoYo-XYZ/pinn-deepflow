@@ -157,7 +157,8 @@ class PINN(nn.Module):
         """Prints the current training status."""
         string_parts = [f"Epoch: {len(self.loss_history['total_loss'])}"]
         for k, v in self.loss_history.items():
-            string_parts.append(f"{k}: {v[-1]:.5f}")
+            if v:
+                string_parts.append(f"{k}: {v[-1]:.5f}")
         print(", ".join(string_parts))
     # ------------------------------------------------------------------
     # Training Methods

@@ -16,7 +16,7 @@ class PhysicsAttach:
 
     def __init__(self):
         self.is_sampled: bool = False
-        self.physics_type: Optional[str] = None
+        self.physics_type: Optional[list[str]] = []
         self.range_t: Optional[Union[Tuple[float, float], torch.Tensor]] = None
         self.is_converged: bool = False
         
@@ -57,20 +57,20 @@ class PhysicsAttach:
         """
         self.condition_dict = condition_dict
         self.condition_num = len(condition_dict)
-        self.physics_type = "BC"
+        self.physics_type.append("BC")
+        self.is_multi_phy = len(self.physics_type) > 1
     
-    def define_ic(self, condition_dict: Dict[str, Any], range_t: Optional[Tuple[float, float]] = None) -> None:
+    def define_ic(self, condition_dict: Dict[str, Any]) -> None:
         """
         Define Initial Conditions (IC).
 
         Args:
             condition_dict: Dictionary mapping variable names to conditions.
-            range_t: Tuple of (min_t, max_t) or None.
         """
         self.condition_dict = condition_dict
         self.condition_num = len(condition_dict)
-        self.range_t = range_t
-        self.physics_type = "IC"
+        self.physics_type.append("IC")
+        self.is_multi_phy = len(self.physics_type) > 1
     
     def define_pde(self, pde_class: PDE) -> None:
         """
@@ -80,7 +80,8 @@ class PhysicsAttach:
             pde_class: Instance or class of the PDE physics module.
         """
         self.PDE = pde_class
-        self.physics_type = "PDE"
+        self.physics_type.append("PDE")
+        self.is_multi_phy = len(self.physics_type) > 1        
 
     # --------------------------------------------------------------------------
     # Data Preparation & Coordinate Processing
@@ -93,10 +94,12 @@ class PhysicsAttach:
         self.X = x
         self.Y = y
 
-    def sampling_time(self, n_points: int, init_scheme: str = "Uniform", expo_scaling = True) -> None:
+    def sampling_time(self, range_t: Optional[Tuple[float, float]] = None, init_scheme: str = "Uniform", expo_scaling = True) -> None:
         """
         Generate time coordinates based on the defined time range.
         """
+        n_points = len(self.X)
+        self.range_t = range_t
         if self.range_t is None:
             self.t = None
             return
@@ -109,6 +112,9 @@ class PhysicsAttach:
         if expo_scaling:
             T = self.range_t[1]
             self.t = (1 + self.t)**(self.t/T) - 1 
+
+        self.T_ = self.t.to(get_device()).requires_grad_()
+        self.inputs_tensor_dict['t'] = self.T_
 
     def process_coordinates(self, device: Optional[torch.device] = None) -> Dict[str, Optional[torch.Tensor]]:
         """
@@ -126,17 +132,11 @@ class PhysicsAttach:
         self.X_ = self.X.to(device).requires_grad_()
         self.Y_ = self.Y.to(device).requires_grad_()
 
-        self.inputs_tensor_dict = {'x': self.X_, 'y': self.Y_}
-
-        # Handle time coordinate if applicable
-        if self.range_t:
-            if self.t is None:
-                raise ValueError("Time range is set but time 't' has not been sampled.")
-            self.T_ = self.t.to(device).requires_grad_()
-            self.inputs_tensor_dict['t'] = self.T_
+        self.inputs_tensor_dict['x'] = self.X_
+        self.inputs_tensor_dict['y'] = self.Y_
 
         # Pre-calculate target values for BC/IC
-        if self.physics_type in ["IC", "BC"]:
+        if "BC" in self.physics_type or "IC" in self.physics_type:
             self._prepare_target_outputs(device)
 
         return self.inputs_tensor_dict
@@ -191,8 +191,8 @@ class PhysicsAttach:
         """
         Calculate the total loss for the current physics type.
         """
-        if self.physics_type in ["IC", "BC"]:
-            loss = 0.0
+        if "BC" in self.physics_type or "IC" in self.physics_type:
+            c_loss = 0.0
             # If all conditions are HardConstraints, the loss is structurally zero
             if all(isinstance(cond, HardConstraint) for cond in self.condition_dict.values()):
                 return
@@ -200,33 +200,43 @@ class PhysicsAttach:
             pred_dict = self.calc_output(model)
             
             for key in pred_dict:
-                loss += loss_fn(pred_dict[key], self.target_output_tensor_dict[key])
-            return loss
+                c_loss += loss_fn(pred_dict[key], self.target_output_tensor_dict[key])
         
-        else:
+            if not self.is_multi_phy: return c_loss
+
+        if "PDE" in self.physics_type:
             # PDE Loss
             self.process_model(model)
             self.process_pde()
-            return self.PDE.calc_loss()
+            pde_loss = self.PDE.calc_loss()
+            # If both condition and PDE losses exist, return both
+            if self.is_multi_phy:
+                return c_loss, pde_loss
+            else:
+                return pde_loss
 
     def calc_loss_field(self, model: nn.Module) -> Union[int, torch.Tensor]:
         """
         Calculate the element-wise loss field (absolute error or residual).
         """
-        loss_field = 0
+        c_loss_field = 0
 
-        if self.physics_type in ["IC", "BC"]:
+        if "BC" in self.physics_type or "IC" in self.physics_type:
             pred_dict = self.calc_output(model)
             for key in pred_dict:
-                loss_field += torch.abs(pred_dict[key] - self.target_output_tensor_dict[key])
+                c_loss_field += torch.abs(pred_dict[key] - self.target_output_tensor_dict[key])
+
+            if not self.is_multi_phy: return c_loss_field
         
-        elif self.physics_type == "PDE":
+        if "PDE" in self.physics_type:
             self.process_model(model)
             self.process_pde()
-            loss_field = self.PDE.calc_residual_field()
-
-        self.loss_field = loss_field
-        return loss_field
+            pde_loss_field = self.PDE.calc_residual_field()
+            # If both condition and PDE losses exist, return both
+            if self.is_multi_phy:
+                return c_loss_field, pde_loss_field
+            else:
+                return pde_loss_field
 
     def set_threshold(self, loss: float = None, top_k_loss: float = None) -> None:
         """Set loss thresholds for adaptive sampling or convergence checks."""

@@ -185,11 +185,18 @@ class ProblemDomain():
     def __getitem__(self, key):
         return
     
+    def __iter__(self):
+        for geometry in self.bound_list + self.area_list:
+            yield geometry
+    
 def calc_loss_simple(domain: ProblemDomain) -> callable:
     """Returns a simple loss calculation for the given domain for PINN training."""
     def calc_loss_function(model):
-        bc_loss = sum(b.calc_loss(model) for b in domain.bound_list)
-        pde_loss = sum(a.calc_loss(model) for a in domain.area_list)
-        total_loss = bc_loss + pde_loss
-        return {"bc_loss": bc_loss, "pde_loss": pde_loss, "total_loss": total_loss}
+        loss_dict = {"total_loss": 0.0}
+        for geometry in domain:
+            if geometry.is_multi_phy:
+                loss_dict['total_loss'] += sum(geometry.calc_loss(model))
+            else:
+                loss_dict['total_loss'] += geometry.calc_loss(model)
+        return loss_dict
     return calc_loss_function
