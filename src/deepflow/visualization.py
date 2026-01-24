@@ -74,20 +74,20 @@ class Visualizer:
         return fig, axes
 
 
-    def plot_color(self, keys: Union[str, List[str], Dict], s: Union[int, float] = 2, orientation: str = 'vertical') -> plt.Figure:
+    def plot_color(self, color_axis: Union[str, List[str], Dict], x_axis='x', y_axis='y', s: Union[int, float] = 2, orientation: str = 'vertical') -> plt.Figure:
         """
         Creates scatter plots (heatmap style) for the specified keys.
         """
         if self.X is None or self.Y is None:
             raise ValueError("Data dictionary must contain 'x' and 'y' for scatter plots.")
 
-        items = self._normalize_args(keys)
+        items = self._normalize_args(color_axis)
 
         fig, axes = self._create_subplots(len(items), orientation)
 
         for ax, (key, cmap) in zip(axes, items):
             # Plot
-            im = ax.scatter(self.X, self.Y, s=s, c=self.data_dict[key], cmap=cmap, marker='s')
+            im = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], s=s, c=self.data_dict[key], cmap=cmap, marker='s')
             
             # Styling
             ax.set_title(key, fontweight='medium', pad=10, fontsize=13)    
@@ -101,15 +101,15 @@ class Visualizer:
     # Modern alias
     plot_scatter = plot_color
 
-    def plot(self, keys: Union[str, List[str], Dict], axis: str = 'xy') -> plt.Figure:
+    def plot(self, z_axis: Union[str, List[str], Dict], x_axis = 'x', y_axis = 'y') -> plt.Figure:
         """
         General plotting method.
         If axis='xy': 3D surface plot.
         If axis='x' or 'y': 1D line plot against that axis.
         """
-        items = self._normalize_args(keys, default_cmap='viridis' if axis == 'xy' else None)
+        items = self._normalize_args(z_axis, default_cmap='viridis' if axis == 'xy' else None)
         
-        is_3d = (axis == 'xy')
+        is_3d = (z_axis is not None)
         subplot_kw = {'projection': '3d'} if is_3d else {}
         
         # Default orientation vertical for consistency with old behavior
@@ -118,8 +118,8 @@ class Visualizer:
         for ax, (key, color) in zip(axes, items):
             if is_3d:
                 # 3D Scatter Plot
-                scatter = ax.scatter(self.X, self.Y, self.data_dict[key], c=self.data_dict[key], cmap=color, s=2)
-                ax.set(xlabel='x', ylabel='y')
+                scatter = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], self.data_dict[key], c=self.data_dict[key], cmap=color, s=2)
+                ax.set(xlabel={x_axis}, ylabel={y_axis})
                 ax.set_title(f'3D Scatter Plot of {key}')
                 ax.dist = 8 # Compact view
                 fig.colorbar(scatter, ax=ax, shrink=0.5, aspect=10)

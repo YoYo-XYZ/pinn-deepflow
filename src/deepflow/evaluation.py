@@ -67,12 +67,11 @@ class Evaluator(Visualizer):
         # 2. Physics Residuals
         if self.geometry.physics_type == 'PDE':
             # Use .update() for dictionary merging (compatible with older python)
-            data_dict[f"{self.geometry.physics_type} residual"] = self.geometry.calc_loss_field(self.model)
+            data_dict[f"{self.geometry.physics_type}".lower() + "_residual"] = self.geometry.calc_loss_field(self.model)
             data_dict.update(self.geometry.PDE.var)
         
-        elif self.geometry.physics_type in ('BC', 'IC'):
-            data_dict[f"{self.geometry.physics_type} residual"] = self.geometry.calc_loss_field(self.model)
-
+        elif self.geometry.physics_type in ['BC', 'IC']:
+            data_dict[f"{self.geometry.physics_type}".lower() + "_residual"] = self.geometry.calc_loss_field(self.model)
         # 4. Coordinates
         data_dict['x'] = self.geometry.X
         data_dict['y'] = self.geometry.Y

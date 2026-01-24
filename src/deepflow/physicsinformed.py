@@ -97,32 +97,41 @@ class PhysicsAttach:
         """
         self.range_t = range_t
 
-    def sampling_time(self, range_t: Optional[Tuple[float, float]] = None, init_scheme: str = "uniform", expo_scaling = False) -> None:
+    def sampling_time(self, range_t: Optional[Tuple[float, float]] = None, scheme: str = None, expo_scaling = False) -> None:
         """
         Generate time coordinates based on the defined time range.
         """
         n_points = len(self.X)
         device = get_device()
+
+        # Handle args
         if range_t is not None: self.range_t = range_t
+        elif self.range_t is None:
+            raise ValueError("Time range must be defined before sampling time coordinates.")
+        
+        if scheme is not None: self.scheme = scheme
+        elif self.scheme is None: self.scheme = "uniform"
 
-        if isinstance(self.range_t, (tuple, list)):
+        if expo_scaling is not None: self.expo_scaling = expo_scaling
+        elif self.expo_scaling is None: self.expo_scaling = False
 
-            if init_scheme == "uniform":
+        # Generate time coordinates
+        if self.physics_type == "IC":
+            # For IC, time is always zero
+            self.t = self.range_t[0] * torch.ones_like(self.X_, device=device)
+        elif isinstance(self.range_t, (tuple, list)):
+            if self.scheme == "uniform":
                 self.t = torch.linspace(self.range_t[0], self.range_t[1], n_points)
-            elif init_scheme == "random":
+            elif self.scheme == "random":
                 self.t = torch.empty(n_points).uniform_(self.range_t[0], self.range_t[1])
-            
-            if expo_scaling:
+            if self.expo_scaling:
                 T1 = self.range_t[1]
                 self.t = (1 + self.t)**(self.t/T1) - 1
         elif isinstance(self.range_t, (int, float)):
-            self.t = torch.ones_like(self.X_, device=device) * self.range_t
+            self.t =  self.range_t * torch.ones_like(self.X_, device=device)
         elif self.range_t is None:
             raise ValueError("Time range must be defined before sampling time coordinates.")
 
-        if self.physics_type == "IC":
-            # For IC, time is always zero
-            self.t = torch.zeros_like(self.X_, device=device)
         self.T = self.t
         self.T_ = self.t.to(device).requires_grad_()
         self.inputs_tensor_dict['t'] = self.T_
@@ -247,7 +256,7 @@ class PhysicsAttach:
         """
         Adaptive sampling: Add points where the residual loss is highest.
         """
-        # Calculate loss field (Consider caching this if called repeatedly in one step)
+        # Calculate loss field
         self.calc_loss_field(model)
         
         if isinstance(self.loss_field, (int, float)): 
@@ -261,7 +270,7 @@ class PhysicsAttach:
         top_k_index = top_k_index.flatten().cpu()
         
         # Append new points to existing dataset
-        # Note: This increases dataset size indefinitely; consider memory management
+        # Note: This increases dataset size; need optimizing
         new_X = self.X[top_k_index]
         new_Y = self.Y[top_k_index]
         
