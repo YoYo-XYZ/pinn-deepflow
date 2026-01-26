@@ -22,7 +22,7 @@ class PhysicsAttach:
         self.is_converged: bool = False
         
         # Internal state placeholders
-        self.condition_dict: Dict = {}
+        self.condition_dict: Optional[Dict] = None
         self.condition_num: int = 0
         self.t: Optional[torch.Tensor] = None
         self.PDE: Optional[PDE] = None
@@ -71,14 +71,14 @@ class PhysicsAttach:
         self.condition_num = len(condition_dict)
         self.physics_type = "IC"
     
-    def define_pde(self, pde_class: PDE) -> None:
+    def define_pde(self, pde: PDE) -> None:
         """
         Define the Partial Differential Equation (PDE) to enforce.
 
         Args:
             pde_class: Instance or class of the PDE physics module.
         """
-        self.PDE = pde_class
+        self.PDE = pde
         self.physics_type = "PDE"
 
     # --------------------------------------------------------------------------

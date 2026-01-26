@@ -141,7 +141,7 @@ class Evaluator(Visualizer):
         fig, ax = plt.subplots()
 
         # Initialize figure
-        scatter = ax.scatter(x, y, c=color_list[0], cmap=cmap, vmin=min_val, vmax=max_val, s=1)
+        scatter = ax.scatter(x, y, c=color_list[0], cmap=cmap, vmin=min_val, vmax=max_val, s=0.1)
         title = ax.set_title(f'{key} - Time: {time_list[0]:.3f}')
         ax.set_xlabel(x_axis)
         ax.set_ylabel(y_axis)

@@ -96,11 +96,11 @@ class ProblemDomain():
             v = func_list
             return f"${str(sp.latex(v[1](sp.symbols(v[0]))))}$"
 
-        if hasattr(obj, 'condition_dict'):
-            conditions = ', '.join([f"{k}={(str(v) if isinstance(v,(float,int,HardConstraint)) else func_to_latex(v))}" for k, v in obj.condition_dict.items()])
+        if hasattr(obj, 'condition_dict') and obj.condition_dict is not None:
+            conditions = f'{obj.physics_type}: ' + ', '.join([f"{k}={(str(v) if isinstance(v,(float,int,HardConstraint)) else func_to_latex(v))}" for k, v in obj.condition_dict.items()])
             return conditions
-        elif hasattr(obj, 'PDE'):
-            return f"PDE: {obj.PDE.__class__.__name__}"
+        elif hasattr(obj, 'PDE') and obj.PDE is not None:
+            return f'{obj.physics_type}: ' + f'{obj.PDE.__class__.__name__}'
         return ""
     
     def save_coordinates(self):
@@ -136,13 +136,13 @@ class ProblemDomain():
         
         self._plot_items(self.area_list, "Area", lambda o, i: (o.X, o.Y),
             {'s': 2, 'color': 'black', 'alpha': 0.3},
-            {'fontsize': 20, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+            {'fontsize': 15, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
              'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)},
             show_label=display_conditions)
             
         self._plot_items(self.bound_list, "Bound", lambda o, i: (o.X, o.Y),
             {'s': 2, 'color': 'red', 'alpha': 0.5},
-            {'fontsize': 16, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+            {'fontsize': 12, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
              'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)},
             show_label=display_conditions)
             
@@ -169,11 +169,11 @@ class ProblemDomain():
 
         self._plot_items(self.area_list, "Area", get_area_xy,
             {'s': 5, 'color': 'lightgrey', 'alpha': 1, 'marker': 's'},
-            {'fontsize': 20, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+            {'fontsize': 15, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
              'bbox': dict(facecolor='white', alpha=0.2, edgecolor='none', pad=1)})
         self._plot_items(self.bound_list, "Bound", get_bound_xy,
             {'s':5, 'color': 'red', 'alpha': 0.2},
-            {'fontsize': 16, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+            {'fontsize': 12, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
              'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)})
              
         plt.gca().set_aspect('equal', adjustable='box')
@@ -196,7 +196,10 @@ def calc_loss_simple(domain: ProblemDomain) -> callable:
         if domain.area_list[0].range_t: loss_dict['ic_loss'] = 0.0
 
         for geometry in domain:
-                loss_dict[f'{geometry.physics_type.lower()}_loss'] += geometry.calc_loss(model)
+                try:
+                    loss_dict[f'{geometry.physics_type.lower()}_loss'] += geometry.calc_loss(model)
+                except Exception:
+                    pass
         loss_dict["total_loss"] = sum(value for key, value in loss_dict.items() if key != "total_loss")
         
         return loss_dict

@@ -73,7 +73,6 @@ class Visualizer:
             
         return fig, axes
 
-
     def plot_color(self, color_axis: Union[str, List[str], Dict], x_axis:str = 'x', y_axis:str = 'y', s: Union[int, float] = 2, orientation: str = 'vertical') -> plt.Figure:
         """
         Creates scatter plots (heatmap style) for the specified keys.
@@ -87,14 +86,14 @@ class Visualizer:
 
         for ax, (key, cmap) in zip(axes, items):
             # Plot
-            im = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], s=s, c=self.data_dict[key], cmap=cmap, marker='s')
+            scatter = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], s=s, c=self.data_dict[key], cmap=cmap, marker='s')
             
             # Styling
             ax.set_title(color_axis, fontweight='medium', pad=10, fontsize=13)    
             ax.set_xlabel(x_axis, fontstyle='italic', labelpad=0)
             ax.set_ylabel(y_axis, fontstyle='italic', labelpad=0)
             ax.set_aspect('equal')
-            fig.colorbar(im, ax=ax, pad=0.03)
+            fig.colorbar(scatter, ax=ax, pad=0.03)
 
         return fig
     
@@ -125,11 +124,11 @@ class Visualizer:
                 ax.set(xlabel={x_axis}, ylabel={y_axis})
                 ax.set_title(f'3D Scatter Plot of {key}')
                 ax.dist = 8 # Compact view
-                fig.colorbar(scatter, ax=ax, shrink=0.5, aspect=10)
+                colorbar = fig.colorbar(scatter, ax=ax, shrink=0.5, aspect=10)
             
             elif y_axis is not None and x_axis is not None:
                 # Line Plot
-                ax.plot(self.data_dict[x_axis], self.data_dict[key], linewidth=2.0, color=color)
+                plot = ax.plot(self.data_dict[x_axis], self.data_dict[key], linewidth=2.0, color=color)
                 ax.grid(True, linestyle="-", linewidth=0.5, alpha=0.7)
                 ax.set_xlabel(x_axis, fontsize=10)
                 ax.set_ylabel(y_axis, fontsize=10)
@@ -175,7 +174,3 @@ class Visualizer:
         ax.legend()  
         
         return fig
-
-
-
-    
