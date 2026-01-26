@@ -171,7 +171,8 @@ class PINN(nn.Module):
         calc_loss: Callable, 
         scheduler_config: Optional[Dict] = None, 
         print_every: int = 200, 
-        threshold_loss: Optional[float] = None
+        threshold_loss: Optional[float] = None,
+        do_between_epochs: Optional[Callable] = None
     )-> tuple['PINN', 'PINN']:
         """
         Trains the model using the Adam optimizer.
@@ -191,6 +192,7 @@ class PINN(nn.Module):
         best_loss = float('inf')
         try:
             for epoch in range(1,epochs+1):
+                if do_between_epochs: do_between_epochs(epoch, model)
                 optimizer.zero_grad(set_to_none=True)
                 
                 loss_dict = calc_loss(model)
@@ -227,7 +229,8 @@ class PINN(nn.Module):
         epochs: int, 
         calc_loss: Callable, 
         print_every: int = 50, 
-        threshold_loss: Optional[float] = None
+        threshold_loss: Optional[float] = None,
+        do_between_epochs: Optional[Callable] = None
     ) -> 'PINN':
         """
         Trains the model using the L-BFGS optimizer.
@@ -245,6 +248,7 @@ class PINN(nn.Module):
 
         try:
             for epoch in range(epochs):
+                do_between_epochs(epoch, model) if do_between_epochs else None
                 # Container to extract loss from closure
                 loss_dict_container = {}
 

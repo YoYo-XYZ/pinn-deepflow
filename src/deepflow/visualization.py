@@ -91,7 +91,7 @@ class Visualizer:
             # Styling
             ax.set_title(color_axis, fontweight='medium', pad=10, fontsize=13)    
             ax.set_xlabel(x_axis, fontstyle='italic', labelpad=0)
-            ax.set_ylabel(y_axis, fontstyle='italic', labelpad=0)
+            ax.set_ylabel(key, fontstyle='italic', labelpad=0)
             ax.set_aspect('equal')
             fig.colorbar(scatter, ax=ax, pad=0.03)
 

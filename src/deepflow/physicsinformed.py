@@ -252,7 +252,9 @@ class PhysicsAttach:
             self.process_pde()
             loss_field = self.PDE.calc_residual_field()
         
-        return loss_field
+        self.loss_field = loss_field
+        
+        return self.loss_field
 
     def set_threshold(self, loss: float = None, top_k_loss: float = None) -> None:
         """Set loss thresholds for adaptive sampling or convergence checks."""
@@ -267,6 +269,7 @@ class PhysicsAttach:
         self.calc_loss_field(model)
         
         if isinstance(self.loss_field, (int, float)): 
+            print("fdsdfs")
             # Loss field not calculated or zero
             return torch.tensor([]), torch.tensor([])
 
@@ -283,6 +286,7 @@ class PhysicsAttach:
         
         self.X = torch.cat([self.X, new_X])
         self.Y = torch.cat([self.Y, new_Y])
+
 
         return new_X, new_Y
 
