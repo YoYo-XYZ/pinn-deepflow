@@ -94,7 +94,10 @@ class ProblemDomain():
 
         def func_to_latex(func_list):
             v = func_list
-            return f"${str(sp.latex(v[1](sp.symbols(v[0]))))}$"
+            try:
+                return f"${str(sp.latex(v[1](sp.symbols(v[0]))))}$"
+            except Exception:
+                return f"Function({v[0]})"
 
         if hasattr(obj, 'condition_dict') and obj.condition_dict is not None:
             conditions = f'{obj.physics_type}: ' + ', '.join([f"{k}={(str(v) if isinstance(v,(float,int,HardConstraint)) else func_to_latex(v))}" for k, v in obj.condition_dict.items()])
@@ -193,7 +196,8 @@ def calc_loss_simple(domain: ProblemDomain) -> callable:
     """Returns a simple loss calculation for the given domain for PINN training."""
     def calc_loss_function(model):
         loss_dict = {"bc_loss": 0.0, "pde_loss": 0.0}
-        if domain.area_list[0].range_t: loss_dict['ic_loss'] = 0.0
+        for geometry in domain:
+            if geometry.range_t: loss_dict['ic_loss'] = 0.0
 
         for geometry in domain:
                 try:

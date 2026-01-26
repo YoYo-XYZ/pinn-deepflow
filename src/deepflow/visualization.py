@@ -128,7 +128,7 @@ class Visualizer:
             
             elif y_axis is not None and x_axis is not None:
                 # Line Plot
-                plot = ax.plot(self.data_dict[x_axis], self.data_dict[key], linewidth=2.0, color=color)
+                plot = ax.scatter(self.data_dict[x_axis], self.data_dict[key], c=color, s=1)
                 ax.grid(True, linestyle="-", linewidth=0.5, alpha=0.7)
                 ax.set_xlabel(x_axis, fontsize=10)
                 ax.set_ylabel(y_axis, fontsize=10)

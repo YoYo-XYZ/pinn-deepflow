@@ -391,3 +391,7 @@ def polygon(*pos: List[float]) -> Area:
 
 def curve(range_val: List[float], *func, ref_axis='x') -> Bound:
     return Bound(range_val, *func, ref_axis=ref_axis)
+
+def point(x, y) -> Bound:
+    """Creates a point boundary (degenerate case)."""
+    return line_horizontal(y, [x-EPS, x+EPS])

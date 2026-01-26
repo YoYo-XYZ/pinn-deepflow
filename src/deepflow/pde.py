@@ -175,8 +175,8 @@ class WaveEquation(PDE):
 
         self.residual_fields = (wave_residual,)
         return self.residual_fields
-    
-class BurgersEquation1d(PDE):
+
+class BurgersEquation1D(PDE):
     """
     1D Burgers' Equation: u_t + u * u_x = nu * u_xx
     """
