@@ -29,12 +29,14 @@ DeepFlow is a user-friendly framework for solving partial differential equations
 ![](static/deepflow_workflow.svg)
 
 ## Current Implementations
-- **PDEs**: 2D Imcompressible Navier-Stokes equations.
-- **Sampling methods**: Uniform, Random, RAR-G, R3
+- **Supported problems**: solving **forward** partial differential equations (PDEs)
+    - 2D imcompressible Navier-Stokes equations, 2D Fourier Heat equation
+- **Sampling methods**: Uniform, Random, RAR-G [[0]](https://arxiv.org/abs/2207.10289), R3 [[1]](https://arxiv.org/abs/2207.02338)
 - **2D Geometries**: Customs, Rectangle, Circle, Polygon, and combinations & subtractions.
 - **Hard Boundary Conditions**: Automatic Hard BC w.r.t. to geometry.
 - **Neural Network Architectures**: Fully connected feedforward networks (FNN).
-
+- **Optimizers**: Adam, L-BFGS
+- **Backend**: PyTorch
 
 ## Installation
 
