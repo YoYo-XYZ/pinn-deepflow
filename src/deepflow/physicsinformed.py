@@ -203,7 +203,7 @@ class PhysicsAttach:
         Post-process the model's output to match target conditions.
         Handles derivative constraints (e.g., if key is 'u_x').
         """
-        prediction_dict = model(self.inputs_tensor_dict)
+        prediction_dict = self.model_outputs
         pred_dict = {}
         
         for key in self.target_output_tensor_dict:
@@ -222,31 +222,29 @@ class PhysicsAttach:
         """
         Calculate the total loss for the current physics type.
         """
-        residual_field = self.calc_residual_field(model)
-        self.loss = torch.mean(residual_field**2)
+        self.calc_residual_field(model)
+        self.loss = torch.mean(self.residual_field_raw.square().sum(dim=0))
         return self.loss
 
     def calc_residual_field(self, model: nn.Module) -> Union[int, torch.Tensor]:
         """
         Calculate the element-wise loss field (absolute error or residual).
         """
-        residual_field = 0.0
-
+        self.process_model(model)
+        
         if self.physics_type in ["BC", "IC"]:
             # If all conditions are HardConstraints, the loss is structurally zero
             if all(isinstance(cond, HardConstraint) for cond in self.condition_dict.values()):
                 return
 
             pred_dict = self.calc_output(model)
-            for key in pred_dict:
-                residual_field += torch.abs(pred_dict[key] - self.target_output_tensor_dict[key])
+            self.residual_field_raw = torch.stack(tuple(pred_dict[key] - self.target_output_tensor_dict[key] for key in pred_dict), dim = 0)
 
         if "PDE" in self.physics_type:
-            self.process_model(model)
             self.process_pde()
-            residual_field = self.PDE.calc_residual_field()
+            self.residual_field_raw = self.PDE.calc_residual_field_raw()
         
-        self.residual_field = residual_field
+        self.residual_field = self.residual_field_raw.abs().sum(dim=0)
         return self.residual_field
 
     def set_threshold(self, loss: float = None, top_k_loss: float = None) -> None:

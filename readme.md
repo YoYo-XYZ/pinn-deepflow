@@ -21,8 +21,8 @@ DeepFlow is a user-friendly framework for solving partial differential equations
 
 ## Key Features
 
+- ⟁ **Physics-Attached Geometry**: **AUTO GENERATE TRAINING DATA** by explicitly attach physics and NN model to geometries.
 - 🔧 **CFD-Solver Style**: Straightforward workflow similar to CFD software.
-- ⟁ **Physics-Attached Geometry**: *AUTO GENERATE TRAINING DATA* by explicitly attach physics and NN model to geometries.
 - 📊 **Built-in Visualization**: Tools to evaluate and plot results.
 - 🚀 **GPU Acceleration**: Enable GPU for faster training.
 - **Flexible Domain Definition**: Easily define complex 2D geometries.
@@ -31,8 +31,8 @@ DeepFlow is a user-friendly framework for solving partial differential equations
 ## Current Implementations
 - **Supported problems**: solving **forward** partial differential equations (PDEs)
     - 2D imcompressible Navier-Stokes equations, 2D Fourier Heat equation
-- **Sampling methods**: Uniform, Random, RAR-G [[0]](https://arxiv.org/abs/2207.10289), R3 [[1]](https://arxiv.org/abs/2207.02338)
-- **2D Geometries**: Customs, Rectangle, Circle, Polygon, and combinations & subtractions.
+- **Sampling methods**: Uniform, Random, Latin Hypercube Sampling (LHS), RAR-G [[0]](https://arxiv.org/abs/2207.10289), R3 [[1]](https://arxiv.org/abs/2207.02338)
+- **2D Geometries**: Custom functions, Rectangle, Circle, Polygon, and combinations & subtractions.
 - **Hard Boundary Conditions**: Automatic Hard BC w.r.t. to geometry.
 - **Neural Network Architectures**: Fully connected feedforward networks (FNN).
 - **Optimizers**: Adam, L-BFGS

@@ -23,9 +23,13 @@ class PDE(ABC):
         """Calculates the absolute residuals field."""
         return torch.stack(self.residual_fields, dim=0).abs().sum(dim=0)
     
+    def calc_residual_field_raw(self)-> torch.Tensor:
+        """Calculates the absolute residuals field."""
+        return torch.stack(self.residual_fields, dim=0)
+    
     def calc_residuals(self)-> torch.Tensor:
         """
-        Calculates the Mean Absolute Error (MAE) of the residuals.
+        Calculates the Mean Absolute Error (L1) of the residuals.
         """
         return torch.mean(torch.stack(self.residual_fields, dim=0).abs().sum(dim=0))
 

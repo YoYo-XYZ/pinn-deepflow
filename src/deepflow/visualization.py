@@ -44,15 +44,23 @@ class Visualizer:
         
         return valid_items
 
-    def _create_subplots(self, n_plots: int, orientation: str = 'vertical', subplot_kw: Optional[Dict] = None) -> Tuple[plt.Figure, List[plt.Axes]]:
+    def _get_ratio(self, X:str='x', Y:str='y') -> float:
+        # Determine the ratio of layout based from X and Y ranges
+        X = self.data_dict.get(X)
+        Y = self.data_dict.get(Y)
+        try: ratio = np.ptp(Y) / np.ptp(X)
+        except Exception: pass
+        if ratio == 0: ratio = 0.4/np.ptp(X)
+        elif ratio > 1e5: ratio = 0.4*np.ptp(Y)
+        return ratio
+
+    def _create_subplots(self, n_plots: int, orientation: str = 'vertical', subplot_kw: Optional[Dict] = None, ratio=None) -> Tuple[plt.Figure, List[plt.Axes]]:
         """
         Creates a figure and a list of axes based on the number of plots and orientation.
         """
         # Determine the ratio of layout based from X and Y ranges
-        try: ratio = np.ptp(self.Y) / np.ptp(self.X)
-        except Exception: pass
-        if ratio == 0: ratio = 0.4/np.ptp(self.X)
-        elif ratio > 1e5: ratio = 0.4*np.ptp(self.Y)
+        if ratio is None:
+            ratio  = self._get_ratio()
 
         #Determine size of the plots based from ration and area per plot
         rows, cols = (n_plots, 1) if orientation == 'vertical' else (1, n_plots)
@@ -100,6 +108,30 @@ class Visualizer:
     # Modern alias
     plot_scatter = plot_color
 
+    def plot_vector(self, u:str, v:str, x_axis:str = 'x', y_axis:str = 'y', s: Union[int, float] = 2, cmap:str = 'viridis', scale = 20, orientation: str = 'vertical') -> plt.Figure:
+        """
+        Creates scatter plots (heatmap style) for the specified keys.
+        """
+        if self.X is None or self.Y is None:
+            raise ValueError("Data dictionary must contain 'x' and 'y' for scatter plots.")
+
+        fig, axes = self._create_subplots(1, orientation)
+
+        for ax in axes:
+            # Plot
+            c = (self.data_dict[u]**2 + self.data_dict[v]**2)**0.5
+            scatter = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], s=s, c=c, cmap=cmap, marker='s')
+            arrow = ax.quiver(self.data_dict[x_axis][10::11], self.data_dict[y_axis][10::11], self.data_dict[u][10::11], self.data_dict[v][10::11], color='k', scale=scale)
+            
+            # Styling
+            ax.set_title(f"Vector magnitude of {u} and {v}", fontweight='medium', pad=10, fontsize=13)    
+            ax.set_xlabel(x_axis, fontstyle='italic', labelpad=0)
+            ax.set_ylabel(y_axis, fontstyle='italic', labelpad=0)
+            ax.set_aspect('equal')
+            fig.colorbar(scatter, ax=ax, pad=0.03)
+
+        return fig
+
     def plot(self, z_axis: Union[str, List[str], Dict] = None, x_axis:str = 'x', y_axis: Union[str, List[str], Dict] = 'y') -> plt.Figure:
         """
         General plotting method.
@@ -112,10 +144,10 @@ class Visualizer:
         if is_3d:
             items = self._normalize_args(z_axis, default_cmap='viridis')
         else:
-            items = self._normalize_args(y_axis, default_cmap='viridis')
+            items = self._normalize_args(y_axis, default_cmap='black')
 
         # Default orientation vertical for consistency with old behavior
-        fig, axes = self._create_subplots(len(items), 'vertical', subplot_kw=subplot_kw)
+        fig, axes = self._create_subplots(len(items), 'vertical', subplot_kw=subplot_kw, ratio=1)
 
         for ax, (key, color) in zip(axes, items):
             if is_3d:
@@ -128,10 +160,10 @@ class Visualizer:
             
             elif y_axis is not None and x_axis is not None:
                 # Line Plot
-                plot = ax.scatter(self.data_dict[x_axis], self.data_dict[key], c=color, s=1)
+                plot = ax.plot(self.data_dict[x_axis], self.data_dict[key], color=color)
                 ax.grid(True, linestyle="-", linewidth=0.5, alpha=0.7)
                 ax.set_xlabel(x_axis, fontsize=10)
-                ax.set_ylabel(y_axis, fontsize=10)
+                ax.set_ylabel(key, fontsize=10)
             
             else:
                 raise ValueError("must has atleast 2 axis")

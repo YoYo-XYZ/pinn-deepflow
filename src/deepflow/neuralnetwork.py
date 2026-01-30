@@ -194,7 +194,6 @@ class PINN(nn.Module):
         best_loss = float('inf')
         try:
             for epoch in range(1,epochs+1):
-                if do_between_epochs: do_between_epochs(epoch, model)
                 optimizer.zero_grad(set_to_none=True)
                 
                 loss_dict = calc_loss(model)
@@ -219,6 +218,8 @@ class PINN(nn.Module):
 
                 if epoch % print_every == 0 or epoch == 1:
                     model.print_status()
+                
+                if do_between_epochs: do_between_epochs(epoch, model)
 
         except KeyboardInterrupt:
             print('Training interrupted by user.')
@@ -250,7 +251,6 @@ class PINN(nn.Module):
 
         try:
             for epoch in range(epochs):
-                do_between_epochs(epoch, model) if do_between_epochs else None
                 # Container to extract loss from closure
                 loss_dict_container = {}
 
@@ -275,6 +275,8 @@ class PINN(nn.Module):
                 if threshold_loss and total_loss_num < threshold_loss:
                      print(f"Stop: Loss {total_loss_num:.5f} < Threshold {threshold_loss}")
                      break
+                
+                do_between_epochs(epoch, model) if do_between_epochs else None
 
         except KeyboardInterrupt:
             print('Training interrupted by user.')
