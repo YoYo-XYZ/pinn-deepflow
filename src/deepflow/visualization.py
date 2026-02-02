@@ -12,9 +12,9 @@ class Visualizer:
     Main visualization class for processing data dictionaries.
     Refactored for simplicity and maintainability.
     """
-    refwidth_default = 7
+    refwidth_default = 6
     cmap_default = 'viridis'
-    color_default = 'black'
+    color_default = 'blue'
 
     def __init__(self, data_dict: Dict[str, np.ndarray]):
         self.data_dict = data_dict
@@ -64,7 +64,7 @@ class Visualizer:
         else:
             fig, ax = plt.subplot(refwidth = self.refwidth_default, proj = '3d')
             # 3D Scatter Plot
-            scatter = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], self.data_dict[z_axis], c=self.data_dict[z_axis], cmap=self.cmap_default, s=2)
+            scatter = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], self.data_dict[z_axis], c=self.data_dict[z_axis], cmap=self.cmap_default, s=3)
             ax.set(xlabel=x_axis, ylabel=y_axis)
             ax.set_title(f'3D Scatter Plot of {z_axis}')
             colorbar = fig.colorbar(scatter, ax=ax)
