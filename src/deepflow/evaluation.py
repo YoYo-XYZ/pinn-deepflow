@@ -2,7 +2,10 @@ from typing import List, Union, Dict, Any, Optional
 
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
+try:
+    import ultraplot as plt
+except ImportError:
+    import matplotlib.pyplot as plt
 
 # Explicit imports are better for open source
 from .neuralnetwork import PINN 
@@ -117,45 +120,45 @@ class Evaluator(Visualizer):
 
     def __str__(self):
         return f"Available data keys: {tuple(self.data_dict.keys())}"
-
-    def plot_animate(self, color_axis: Union[str, Dict], x_axis: str = 'x', y_axis: str = 'y', range_t=None, dt=None, frame_interval = 10):
+    
+    def plot_animate(self, color_axis:str, x_axis: str = 'x', y_axis: str = 'y', cmap = 'viridis', range_t=None, dt=None, frame_interval = 10, plot_type: str = 'scatter', s = 6) -> Any:
         """
         Creates an animation over time for the specified key(s).
         """
         import matplotlib.animation as animation
 
-        key, cmap = self._normalize_args(color_axis)[0]
+        fig, ax = plt.subplot(refwidth = 4, grid=False)
 
         # Prepare data to animate
-        x = self.data_dict[x_axis]
-        y = self.data_dict[y_axis]
         color_list = []
         time_list = list(np.arange(range_t[0], range_t[1], dt))
         for t in time_list:
             self.define_time(t)
-            color_list.append(self.data_dict[key])
+            color_list.append(self.data_dict[color_axis])
         max_val = np.max([np.max(c) for c in color_list])
         min_val = np.min([np.min(c) for c in color_list])
 
-        fig, ax = plt.subplots()
-
         # Initialize figure
-        scatter = ax.scatter(x, y, c=color_list[0], cmap=cmap, vmin=min_val, vmax=max_val, s=0.1)
-        title = ax.set_title(f'{key} - Time: {time_list[0]:.3f}')
+        if plot_type == 'scatter':
+            plot = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], c=color_list[0], cmap=cmap, vmin=min_val, vmax=max_val, marker='s', s = s)
+        elif plot_type == 'tripcolor':
+            plot = ax.tripcolor(self.data_dict[x_axis], self.data_dict[y_axis], color_list[0], cmap=cmap, vmin=min_val, vmax=max_val, shading = 'gouraud')
+        elif plot_type == 'contourf':
+            plot = ax.tricontourf(self.data_dict[x_axis], self.data_dict[y_axis], color_list[0], cmap=cmap, vmin=min_val, vmax=max_val, levels=100)
+
+        title = ax.set_title(f'{color_axis} - Time: {time_list[0]:.3f}')
         ax.set_xlabel(x_axis)
         ax.set_ylabel(y_axis)
         ax.set_aspect('equal')
         
         # Add colorbar
-        cbar = fig.colorbar(scatter, ax=ax)
-        cbar.set_label(key)
+        ax.colorbar(plot, ax=ax)
         
         def animate(frame):
-            scatter.set_array(color_list[frame])
-            title.set_text(f'{key} - Time: {time_list[frame]:.3f}')
-            return scatter, title
+            plot.set_array(color_list[frame].ravel())
+            title.set_text(f'{color_axis} - Time: {time_list[frame]:.3f}')
+            return plot, title
 
         ani = animation.FuncAnimation(fig, animate, frames=len(time_list), interval=frame_interval, blit=True)
         plt.show()
         return ani
-    

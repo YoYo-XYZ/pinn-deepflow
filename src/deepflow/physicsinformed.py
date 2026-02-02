@@ -37,6 +37,10 @@ class PhysicsAttach:
         self.X_residual_container: list[torch.Tensor] = []
         self.Y_residual_container: list[torch.Tensor] = []
         self._amounts_before_add: int = 0
+
+        # Time
+        self.expo_scaling = None
+        self.scheme = None
         
         # Data dictionaries
         self.inputs_tensor_dict: Dict[str, Optional[torch.Tensor]] = {}

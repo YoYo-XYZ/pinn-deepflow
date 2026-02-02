@@ -1,5 +1,8 @@
 from .geometry import Area, Bound
-import matplotlib.pyplot as plt
+try:
+    import ultraplot as plt
+except ImportError:
+    import matplotlib.pyplot as plt
 import torch
 import sympy as sp
 from .neuralnetwork import HardConstraint
@@ -140,39 +143,38 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             bound.Y = bound.saved_Y.clone()
     
 #-------------------------------------------------------------------------------------------------
-    def _plot_items(self, items, name, get_xy, scatter_kw, text_kw, show_label=True):
+    def _plot_items(self, ax, items, name, get_xy, scatter_kw, text_kw, show_label=True):
         for i, obj in enumerate(items):
             x, y = get_xy(obj, i)
             if hasattr(x, 'detach'): x = x.detach().cpu().numpy()
             if hasattr(y, 'detach'): y = y.detach().cpu().numpy()
-            plt.scatter(x, y, **scatter_kw)
+            ax.scatter(x, y, **scatter_kw)
             if show_label:
                 cond = self._format_condition_dict(obj, name)
                 lbl = f"{name} {i}\n{cond}" if cond else f"{name} {i}"
-                plt.text(obj.centers[0], obj.centers[1], lbl, ha='center', va='center', **text_kw)
-
+                ax.text(obj.centers[0], obj.centers[1], lbl, ha='center', va='center', **text_kw)
     def show_coordinates(self, display_physics = False, xlim=None, ylim=None):
-        plt.figure(figsize=(10,10))
+        fig, ax = plt.subplots(refwidth=7)
         
-        self._plot_items(self.area_list, "Area", lambda o, i: (o.X, o.Y),
+        self._plot_items(ax, self.area_list, "Area", lambda o, i: (o.X, o.Y),
             {'s': 2, 'color': 'black', 'alpha': 0.3},
-            {'fontsize': 15, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+            {'fontsize': 10, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
              'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)},
             show_label=display_physics)
             
-        self._plot_items(self.bound_list, "Bound", lambda o, i: (o.X, o.Y),
+        self._plot_items(ax, self.bound_list, "Bound", lambda o, i: (o.X, o.Y),
             {'s': 2, 'color': 'red', 'alpha': 0.5},
-            {'fontsize': 12, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+            {'fontsize': 10, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
              'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)},
             show_label=display_physics)
             
-        plt.gca().set_aspect('equal', adjustable='box')
-        if xlim: plt.xlim(xlim)
-        if ylim: plt.ylim(ylim)
+        ax.set_aspect('equal', adjustable='box')
+        if xlim: ax.set_xlim(xlim)
+        if ylim: ax.set_ylim(ylim)
         plt.show()
 
     def show_setup(self, bound_sampling_res:list=None, area_sampling_res:list=None, xlim=None, ylim=None):
-        plt.figure(figsize=(10,10))
+        fig, ax = plt.subplots(refwidth=7, grid = False)
         
         if bound_sampling_res is None:
             bound_sampling_res = [int(800*(b.ranges[b.ax][1] - b.ranges[b.ax][0])) for b in self.bound_list]
@@ -187,18 +189,18 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             bound.sampling_line(bound_sampling_res[i])
             return bound.X, bound.Y
 
-        self._plot_items(self.area_list, "Area", get_area_xy,
+        self._plot_items(ax, self.area_list, "Area", get_area_xy,
             {'s': 5, 'color': 'lightgrey', 'alpha': 1, 'marker': 's'},
-            {'fontsize': 15, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+            {'fontsize': 10, 'color': 'navy', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
              'bbox': dict(facecolor='white', alpha=0.2, edgecolor='none', pad=1)})
-        self._plot_items(self.bound_list, "Bound", get_bound_xy,
+        self._plot_items(ax, self.bound_list, "Bound", get_bound_xy,
             {'s':5, 'color': 'red', 'alpha': 0.2},
-            {'fontsize': 12, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
+            {'fontsize': 10, 'color': 'darkgreen', 'fontstyle': 'italic', 'fontweight': 'bold', 'family': 'serif', 
              'bbox': dict(facecolor='white', alpha=0.4, edgecolor='none', pad=1)})
              
-        plt.gca().set_aspect('equal', adjustable='box')
-        if xlim: plt.xlim(xlim)
-        if ylim: plt.ylim(ylim)
+        ax.set_aspect('equal', adjustable='box')
+        if xlim: ax.set_xlim(xlim)
+        if ylim: ax.set_ylim(ylim)
         plt.show()
 
 #-------------------------------------------------------------------------------------------------
