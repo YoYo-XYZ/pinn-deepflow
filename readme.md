@@ -30,8 +30,8 @@ DeepFlow is a user-friendly framework for solving partial differential equations
 
 ## Current Implementations
 - **Supported problems**: solving **forward** partial differential equations (PDEs)
-    - 2D imcompressible Navier-Stokes equations, 2D Fourier Heat equation
-- **Sampling methods**: Uniform, Random, Latin Hypercube Sampling (LHS), RAR-G [[0]](https://arxiv.org/abs/2207.10289), R3 [[1]](https://arxiv.org/abs/2207.02338)
+    - transient & steady 2D imcompressible Navier-Stokes equations, 2D Fourier Heat equation, Burgers' equation
+- **Sampling methods**: Uniform, Random, Latin Hypercube Sampling, RAR-G [[0]](https://arxiv.org/abs/2207.10289), R3 [[1]](https://arxiv.org/abs/2207.02338)
 - **2D Geometries**: Custom functions, Rectangle, Circle, Polygon, and combinations & subtractions.
 - **Hard Boundary Conditions**: Automatic Hard BC w.r.t. to geometry.
 - **Neural Network Architectures**: Fully connected feedforward networks (FNN).
@@ -61,6 +61,8 @@ pip install -e .
 - NumPy >= 1.19.0
 - Matplotlib >= 3.3.0
 - SymPy >= 1.5.0
+- SciPy >= 1.5.0
+- Ultrplot >= 1.0.0
 
 ## Quick Start
 
@@ -131,10 +133,12 @@ _ =prediction.plot_loss_curve(log_scale=True)
 ## Examples
 
 Explore the [examples](examples)
- directory for real-world use cases, including:
+ directory for real use cases, including:
 
+- [Steady flow around a cylinder](examples/cylinder_flow_steady)
+- [Lid-driven cavity flow](examples/cavity_flow_steady)
 - [Burgers' Equation](examples/burgers_eq)
-- [Steady cylinder flow](examples/cylinder_flow)
+- [Time-dependent Fourier Heat Equation](examples/heat_eq)
 
 Each example includes Jupyter notebooks and data files.
 
