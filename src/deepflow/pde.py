@@ -23,9 +23,13 @@ class PDE(ABC):
         """Calculates the absolute residuals field."""
         return torch.stack(self.residual_fields, dim=0).abs().sum(dim=0)
     
+    def calc_residual_field_raw(self)-> torch.Tensor:
+        """Calculates the absolute residuals field."""
+        return torch.stack(self.residual_fields, dim=0)
+    
     def calc_residuals(self)-> torch.Tensor:
         """
-        Calculates the Mean Absolute Error (MAE) of the residuals.
+        Calculates the Mean Absolute Error (L1) of the residuals.
         """
         return torch.mean(torch.stack(self.residual_fields, dim=0).abs().sum(dim=0))
 
@@ -146,4 +150,57 @@ class HeatEquation(PDE):
         heat_residual = u_t - self.alpha * (u_xx + u_yy)
 
         self.residual_fields = (heat_residual,)
+        return self.residual_fields
+    
+class WaveEquation(PDE):
+    """
+    2D Wave Equation: u_tt = c^2 * (u_xx + u_yy)
+    """
+    def __init__(self, c: float):
+        super().__init__()
+        self.c = c
+
+    def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor]:
+        x = inputs_dict['x']
+        y = inputs_dict['y']
+        t = inputs_dict['t']
+        u = inputs_dict['u']
+
+        # First derivatives
+        u_x, u_y, u_t = calc_grads(u, (x, y, t))
+
+        # Second derivatives
+        u_xx = calc_grad(u_x, x)
+        u_yy = calc_grad(u_y, y)
+        u_tt = calc_grad(u_t, t)
+
+        # Residual
+        wave_residual = u_tt - self.c**2 * (u_xx + u_yy)
+
+        self.residual_fields = (wave_residual,)
+        return self.residual_fields
+
+class BurgersEquation1D(PDE):
+    """
+    1D Burgers' Equation: u_t + u * u_x = nu * u_xx
+    """
+    def __init__(self, nu: float):
+        super().__init__()
+        self.nu = nu
+
+    def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor]:
+        x = inputs_dict['x']
+        y = inputs_dict['y']
+        u = inputs_dict['u']
+
+        # First derivatives
+        u_x, u_y = calc_grads(u, (x, y))
+
+        # Second derivative
+        u_xx = calc_grad(u_x, x)
+
+        # Residual
+        burgers_residual = u_y + u * u_x - self.nu * u_xx
+
+        self.residual_fields = (burgers_residual,)
         return self.residual_fields

@@ -20,3 +20,5 @@ dist/
 
 # Logs
 *.log
+
+EXPERIMENTS/

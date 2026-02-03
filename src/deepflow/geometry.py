@@ -70,7 +70,7 @@ class Bound(PhysicsAttach):
     def _postprocess(self):
         """Calculates lengths and centers after definition."""
         # Preliminary sampling to determine bounds of dependent axes
-        self.sampling_line(10000, random=False)
+        self.sampling_line(10000, scheme='uniform')
         self.lengths = {}
         self.centers = {}
         
@@ -81,20 +81,23 @@ class Bound(PhysicsAttach):
             self.lengths[ax] = self.ranges[ax][1] - self.ranges[ax][0]
             self.centers[ax] = self.ranges[ax][0] + self.lengths[ax] / 2
 
-    def sampling_line(self, n_points: int, random: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+    def sampling_line(self, n_points: int, scheme = 'uniform') -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Generates points along the boundary.
 
         Args:
             n_points: Number of points to generate.
-            random: If True, samples uniformly; otherwise, uses linspace.
+            scheme: Sampling scheme ('uniform' or 'random' or 'lhs'for Latin Hypercube Sampling).
         """
         ax = 2 if self.parameterized else self.ax
         self.coords = {}
         
-        if random:
+
+        if scheme == 'random':
             self.coords[ax] = torch.empty(n_points).uniform_(self.ranges[ax][0], self.ranges[ax][1])
-        else:
+        elif scheme == 'lhs':
+            self.coords[ax] = latin_hypercube_sampling(n_points, 1, [self.ranges[ax][0]], [self.ranges[ax][1]]).squeeze()
+        elif scheme == 'uniform':
             self.coords[ax] = torch.linspace(self.ranges[ax][0], self.ranges[ax][1], n_points)
 
         if self.parameterized:
@@ -214,16 +217,19 @@ class Area(PhysicsAttach):
                     else:
                         bound.reject_above = True
 
-    def sampling_area(self, n_points_square: Union[int, List[int]], random: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+    def sampling_area(self, n_points_square: Union[int, List[int]], scheme = 'uniform') -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Samples points within the area.
         """
-        if random:
+        if scheme == 'random':
             points = torch.empty(n_points_square, 2)
             points[:, 0].uniform_(self.ranges[0][0], self.ranges[0][1])
             points[:, 1].uniform_(self.ranges[1][0], self.ranges[1][1])
             X, Y = points[:, 0], points[:, 1]
-        else:
+        elif scheme == 'lhs':
+            samples = latin_hypercube_sampling(n_points_square, 2, [self.ranges[0][0], self.ranges[1][0]], [self.ranges[0][1], self.ranges[1][1]])
+            X, Y = samples[:, 0], samples[:, 1]
+        elif scheme == 'uniform':
             if isinstance(n_points_square, (list, tuple)):
                 nx, ny = n_points_square[0], n_points_square[1]
             else:
@@ -255,7 +261,7 @@ class Area(PhysicsAttach):
         self.sampled_area = (self.X, self.Y)
         return self.X, self.Y
 
-    def sampling_lines(self, *n_points_per_line, random: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
+    def sampling_lines(self, *n_points_per_line, scheme = 'random') -> Tuple[torch.Tensor, torch.Tensor]:
         output_x = []
         output_y = []
         
@@ -265,7 +271,7 @@ class Area(PhysicsAttach):
             
         for i, bound in enumerate(self.bound_list):
             num_pts = pts_list[i] if i < len(pts_list) else pts_list[0]
-            X, Y = bound.sampling_line(num_pts, random=random)
+            X, Y = bound.sampling_line(num_pts, scheme=scheme)
             output_x.append(X)
             output_y.append(Y)
             
@@ -314,6 +320,11 @@ class Area(PhysicsAttach):
         
         plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
+        
+    @property
+    def area_list(self) -> List['Area']:
+        """Returns the list of Area objects in the domain."""
+        return [self]
 
 # --- Factory Functions ---
 
@@ -386,3 +397,7 @@ def polygon(*pos: List[float]) -> Area:
 
 def curve(range_val: List[float], *func, ref_axis='x') -> Bound:
     return Bound(range_val, *func, ref_axis=ref_axis)
+
+def point(x, y) -> Bound:
+    """Creates a point boundary (degenerate case)."""
+    return line_horizontal(y, [x-EPS, x+EPS])

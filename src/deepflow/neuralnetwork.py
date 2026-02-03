@@ -110,6 +110,8 @@ class PINN(nn.Module):
             
             # Apply hard constraints if they exist for this variable
             if self.hard_constraints and key in self.hard_constraints:
+                inputs_dict[0] = inputs_dict.get("x")
+                inputs_dict[1] = inputs_dict.get("y")
                 constraint_mod = self.hard_constraints[key](inputs_dict)
                 val = constraint_mod * val + self.hard_constants[key]
                 
@@ -157,7 +159,8 @@ class PINN(nn.Module):
         """Prints the current training status."""
         string_parts = [f"Epoch: {len(self.loss_history['total_loss'])}"]
         for k, v in self.loss_history.items():
-            string_parts.append(f"{k}: {v[-1]:.5f}")
+            if v:
+                string_parts.append(f"{k}: {v[-1]:.5f}")
         print(", ".join(string_parts))
     # ------------------------------------------------------------------
     # Training Methods
@@ -170,7 +173,8 @@ class PINN(nn.Module):
         calc_loss: Callable, 
         scheduler_config: Optional[Dict] = None, 
         print_every: int = 200, 
-        threshold_loss: Optional[float] = None
+        threshold_loss: Optional[float] = None,
+        do_between_epochs: Optional[Callable] = None
     )-> tuple['PINN', 'PINN']:
         """
         Trains the model using the Adam optimizer.
@@ -214,6 +218,8 @@ class PINN(nn.Module):
 
                 if epoch % print_every == 0 or epoch == 1:
                     model.print_status()
+                
+                if do_between_epochs: do_between_epochs(epoch, model)
 
         except KeyboardInterrupt:
             print('Training interrupted by user.')
@@ -225,8 +231,9 @@ class PINN(nn.Module):
         self, 
         epochs: int, 
         calc_loss: Callable, 
-        print_every: int = 200, 
-        threshold_loss: Optional[float] = None
+        print_every: int = 50, 
+        threshold_loss: Optional[float] = None,
+        do_between_epochs: Optional[Callable] = None
     ) -> 'PINN':
         """
         Trains the model using the L-BFGS optimizer.
@@ -268,6 +275,8 @@ class PINN(nn.Module):
                 if threshold_loss and total_loss_num < threshold_loss:
                      print(f"Stop: Loss {total_loss_num:.5f} < Threshold {threshold_loss}")
                      break
+                
+                do_between_epochs(epoch, model) if do_between_epochs else None
 
         except KeyboardInterrupt:
             print('Training interrupted by user.')
@@ -282,9 +291,10 @@ class PINN(nn.Module):
         with open(file_name, 'wb') as f:
             pickle.dump(self, f)
     
-    def load_from_pickle(self, file_name: str) -> None:
-        """Loads the model from a pickle file."""
-        import pickle
-        if file_name[-4:] != '.pkl': file_name += '.pkl'
-        with open(file_name, 'rb') as f:
-            self = pickle.load(f)
+
+def load_from_pickle(file_name: str) -> None:
+    """Loads the model from a pickle file."""
+    import pickle
+    if file_name[-4:] != '.pkl': file_name += '.pkl'
+    with open(file_name, 'rb') as f:
+        return pickle.load(f)

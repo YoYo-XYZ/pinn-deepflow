@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deepflow"
-version = "0.1.1"
+version = "0.1.2"
 description = "Physics-Informed Neural Networks for Fluid Dynamics"
 authors = [{ name = "Thammatorn Jamraschai", email = "thammatorn.j@gmail.com" }]
 readme = "README.md"
@@ -16,7 +16,9 @@ dependencies = [
     "torch>=1.7.0",
     "numpy>=1.19.0",
     "matplotlib>=3.3.0",
-    "sympy>=1.5.0"
+    "sympy>=1.5.0",
+    "ultraplot>=1.0.0",
+    "scipy>=1.5.0"
 ]
 
 [tool.setuptools.packages.find]

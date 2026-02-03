@@ -1,5 +1,16 @@
 import torch
+import scipy
 from typing import Tuple, List, Union, Generator
+
+def latin_hypercube_sampling(n_samples: int, n_dimensions: int, lower_lim:list, upper_lim:list) -> torch.Tensor:
+    """
+    Generates Latin Hypercube Samples in the unit hypercube [0,1]^n_dimensions.
+    """
+    # Generate LHS using scipy
+    lhs = scipy.stats.qmc.LatinHypercube(d=n_dimensions, strength=1)
+    sample = lhs.random(n=n_samples)
+    sample = scipy.stats.qmc.scale(sample, lower_lim, upper_lim)
+    return torch.tensor(sample, dtype=torch.float32)
 
 device = 'cpu' if not torch.cuda.is_available() else 'cuda'
 def get_device():
