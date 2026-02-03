@@ -150,7 +150,11 @@ Feel free to submit a Pull Request. For major changes, open an issue first to di
 
 ## DeepFlow Milestones
 
-1. Define **custom PDEs**
+1. Define custom PDE
+2. Inverse problems PDE
+3. 3D Geometries
+4. More sampling methods
+5. More neural network architectures (e.g., CNN, RNN)
 
 ## License
 
