@@ -1,1 +1,31 @@
-site_name: My Docs
+site_name: DeepFlow   # Change to your project name
+repo_url: https://github.com/YoYo-XYZ/deepflow
+repo_name: GitHub
+edit_uri: edit/main/docs/    # Lets people click "Edit on GitHub"
+
+theme:
+  name: material             # The beautiful theme
+  features:
+    - content.code.copy      # Copy button on code blocks
+    - navigation.tabs        # Top tabs if you want
+    - navigation.sections
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.arithmatex:     # Math support: $$ equation $$
+      generic: true
+  - admonition               # Callouts: !!! note "Title"
+  - attr_list
+  - md_in_html
+
+nav:                           # Your menu structure – edit as you add pages
+  - Home: index.md
+  - Quick Start: quickstart.md
+  - Examples: examples.md
+  - API: reference.md
