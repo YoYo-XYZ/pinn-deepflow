@@ -10,7 +10,8 @@ DeepFlow is a user-friendly framework for solving partial differential equations
 
 ## Table of Contents
 
-- [**Features**](#features)
+- [**Key Features**](#features)
+- [Current Implementations](#current-implementations)
 - [**Installation**](#installation)
 - [Requirements](#requirements)
 - [**Quick Start**](#quick-start)
@@ -21,12 +22,13 @@ DeepFlow is a user-friendly framework for solving partial differential equations
 
 ## Key Features
 
-- ⟁ **Physics-Attached Geometry**: **AUTO GENERATE TRAINING DATA** by explicitly attach physics and NN model to geometries.
+![promo](static/promo.png)
+
+- ⟁ **Physics-Attached Geometry**: **AUTO GENERATE TRAINING DATA** by explicitly attach physics and neural network to geometries.
 - 🔧 **CFD-Solver Style**: Straightforward workflow similar to CFD software.
 - 📊 **Built-in Visualization**: Tools to evaluate and plot results.
 - 🚀 **GPU Acceleration**: Enable GPU for faster training.
 - **Flexible Domain Definition**: Easily define complex 2D geometries.
-![](static/deepflow_workflow.svg)
 
 ## Current Implementations
 - **Supported problems**: solving **forward** partial differential equations (PDEs)
@@ -65,7 +67,7 @@ pip install -e .
 - Ultrplot >= 1.0.0
 
 ## Quick Start
-
+![](static/deepflow_workflow.svg)
 This example demonstrates how to simulate Steady channel flow **under 20 lines of code!** We recommend using a Python notebook (`.ipynb`) for interactive experience.
 
 ### 1. Define the Geometry and Physics
@@ -148,9 +150,7 @@ Feel free to submit a Pull Request. For major changes, open an issue first to di
 
 ## DeepFlow Milestones
 
-1. Complete support for **time-dependent solutions**
-2. Ability to define **custom PDEs**
-3. Enhanced customization options in **visualization tools**
+1. Define **custom PDEs**
 
 ## License
 
