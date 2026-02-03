@@ -2,7 +2,7 @@ name: Deploy MkDocs to GitHub Pages
 
 on:
   push:
-    branches: [main]    
+    branches: [dev]    
     paths:
       - 'docs/**'             # Only trigger when docs change
       - 'mkdocs.yml'
