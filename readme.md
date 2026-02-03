@@ -124,7 +124,7 @@ prediction = domain.area_list[0].evaluate(model1_best)
 prediction.sampling_area([500, 100])
 
 # Plot Velocity Field
-_ = prediction.plot_color('u')
+_ = prediction.plot_color('u', cmap='jet')
 
 # Plot Training Loss
 _ =prediction.plot_loss_curve()
