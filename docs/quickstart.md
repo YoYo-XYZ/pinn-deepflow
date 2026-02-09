@@ -1,6 +1,8 @@
+# Quick Start
+
 This example demonstrates how to simulate Steady channel flow **under 20 lines of code!** We recommend using a Python notebook (`.ipynb`) for interactive experience.
 
-# 1. Define the Geometry and Physics
+## 1. Define the Geometry and Physics
 
 ```python
 import deepflow as df
@@ -11,7 +13,7 @@ domain = df.domain(rectangle)
 
 domain.show_setup() # Display the domain setup
 ```
-![alt text](static/quickstart/setup_show.png)
+![alt text](img/static/quickstart/setup_show.png)
 ```python
 # Define Boundary Conditions
 domain.bound_list[0].define_bc({'u': 1, 'v': 0})  # Inflow: u=1
@@ -24,14 +26,14 @@ domain.area_list[0].define_pde(df.pde.NavierStokes(U=0.0001, L=1, mu=0.001, rho=
 
 domain.show_setup() # Display the domain setup
 ```
-![alt text](static/quickstart/cond_show.png)
+![alt text](img/static/quickstart/cond_show.png)
 
 ```python
 # Sample points: [Left, Bottom, Right, Top], [Interior]
 domain.sampling_random([200, 400, 200, 400], [5000])
 domain.show_coordinates(display_physics=True)
 ```
-![alt text](static/quickstart/coord_show.png)
+![alt text](img/static/quickstart/coord_show.png)
 # 2. Create and Train the model
 
 
