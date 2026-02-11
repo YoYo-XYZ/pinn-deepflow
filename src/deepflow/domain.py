@@ -92,20 +92,20 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
     def sampling_R3(self, bound_sampling_res:list=None, area_sampling_res:list=None):
         self.sampling_option = self.sampling_option + ' + R3'
         if bound_sampling_res:
-            for i, bound in enumerate(self.bound_list):
+            for i, res in enumerate(bound_sampling_res):
                 # Sample new candidates
-                bound.get_residual_based_points_threshold()
-                bound.sampling_line(bound_sampling_res[i], scheme='lhs')
-                bound.apply_residual_based_points()
-                bound.process_coordinates()
+                self.bound_list[i].get_residual_based_points_threshold()
+                self.bound_list[i].sampling_line(res, scheme='lhs')
+                self.bound_list[i].apply_residual_based_points()
+                self.bound_list[i].process_coordinates()
                 # Add RAR point to saved points
         if area_sampling_res:
-            for i, area in enumerate(self.area_list):
+            for i, res in enumerate(area_sampling_res):
                 # Sample new candidates
-                area.get_residual_based_points_threshold()
-                area.sampling_area(area_sampling_res[i], scheme='lhs')
-                area.apply_residual_based_points()
-                area.process_coordinates()
+                self.area_list[i].get_residual_based_points_threshold()
+                self.area_list[i].sampling_area(res, scheme='lhs')
+                self.area_list[i].apply_residual_based_points()
+                self.area_list[i].process_coordinates()
                 # Add RAR point to saved points
 
 #------------------------------------------------------------------------------------------------
