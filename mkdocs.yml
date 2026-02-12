@@ -42,9 +42,9 @@ nav:                           # Your menu structure – edit as you add pages
   - Examples:
     - Overview: examples.md
     - 1D Burgers Equation: burgers_eq.md
-    - Steady Cavity Flow: cavity_flow.md
-    - Steady Cylinder Flow: cylinder_flow.md
-    - Steady BFS Flow: BFS_flow.md
+    - Steady Cavity Flow: cavity_flow_steady.md
+    - Steady Cylinder Flow: cylinder_flow_steady.md
+    - Steady BFS Flow: BFS_flow_steady.md
     - Transient Channel Flow: channel_flow_transient.md
     - 2D Heat Equation: heat_eq.md
   - API: reference.md

@@ -27,7 +27,7 @@ domain.show_setup()
 
 
     
-![png](img/examples/burgers_eq/burgers_eq_4_0.png)
+![png](img/examples/burgers_eq_files/burgers_eq_4_0.png)
     
 
 
@@ -57,7 +57,7 @@ domain.show_coordinates(display_physics=True)
 
 
     
-![png](img/examples/burgers_eq/burgers_eq_9_0.png)
+![png](img/examples/burgers_eq_files/burgers_eq_9_0.png)
     
 
 
@@ -147,7 +147,7 @@ domain.show_coordinates(display_physics=False)
 
 
     
-![png](img/examples/burgers_eq/burgers_eq_16_0.png)
+![png](img/examples/burgers_eq_files/burgers_eq_16_0.png)
     
 
 
@@ -172,29 +172,35 @@ _ = prediction.plot('pde_residual')
 _ = prediction.plot_loss_curve(log_scale=True)
 ```
 
+    C:\Users\thamm\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\IPython\core\events.py:82: UltraPlotWarning: Tick label sharing not implemented for <class 'ultraplot.axes.three.ThreeAxes'> subplots.
+      func(*args, **kwargs)
     
 
 
     
-![png](img/examples/burgers_eq/burgers_eq_20_1.png)
-    
-
-
-
-    
-![png](img/examples/burgers_eq/burgers_eq_20_2.png)
+![png](img/examples/burgers_eq_files/burgers_eq_20_1.png)
     
 
 
 
     
-![png](img/examples/burgers_eq/burgers_eq_20_4.png)
+![png](img/examples/burgers_eq_files/burgers_eq_20_2.png)
+    
+
+
+    C:\Users\thamm\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\IPython\core\pylabtools.py:170: UltraPlotWarning: Tick label sharing not implemented for <class 'ultraplot.axes.three.ThreeAxes'> subplots.
+      fig.canvas.print_figure(bytes_io, **kw)
+    
+
+
+    
+![png](img/examples/burgers_eq_files/burgers_eq_20_4.png)
     
 
 
 
     
-![png](img/examples/burgers_eq/burgers_eq_20_5.png)
+![png](img/examples/burgers_eq_files/burgers_eq_20_5.png)
     
 
 
@@ -210,6 +216,6 @@ _ = prediction.plot(y_axis = 'u')
 
 
     
-![png](img/examples/burgers_eq/burgers_eq_22_0.png)
+![png](img/examples/burgers_eq_files/burgers_eq_22_0.png)
     
 
