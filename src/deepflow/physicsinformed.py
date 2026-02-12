@@ -341,3 +341,12 @@ class PhysicsAttach:
         """Initialize evaluation module."""
         from .evaluation import Evaluator # Import inside method to avoid circular dependency if Evaluation imports PhysicsAttach
         return Evaluator(model, self)
+    
+def function(input_key: str, function: Callable) -> Callable:
+    return [input_key, function]
+func = function
+
+
+def parabolic_func(input_key: str, width, max_val, center_distance = 0) -> Callable:
+    return [input_key, lambda x: (-4*max_val/width**2)*(x - center_distance)**2 + max_val]
+parabolic = parabolic_func
