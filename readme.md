@@ -136,14 +136,17 @@ _ =prediction.plot_loss_curve()
 ## Examples
 
 Explore the [examples](examples)
- directory for real use cases, including:
+ directory for real use cases, including
 
+Steady-state:
 - [Steady flow around a cylinder](examples/cylinder_flow_steady)
 - [Lid-driven cavity flow](examples/cavity_flow_steady)
+- [Backward-facing step flow](examples/BFS_flow_steady)
 - [Burgers' Equation](examples/burgers_eq)
-- [Time-dependent Fourier Heat Equation](examples/heat_eq)
 
-Each example includes Jupyter notebooks and data files.
+Time-dependent:
+- [Transient channel flow](examples/channel_flow_transient)
+- [Fourier Heat Equation](examples/heat_eq)
 
 ## Contributing
 
