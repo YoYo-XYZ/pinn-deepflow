@@ -121,13 +121,13 @@ class Evaluator(Visualizer):
     def __str__(self):
         return f"Available data keys: {tuple(self.data_dict.keys())}"
     
-    def plot_animate(self, color_axis:str, x_axis: str = 'x', y_axis: str = 'y', cmap = 'viridis', range_t=None, dt=None, frame_interval = 10, plot_type: str = 'scatter', s = 6) -> Any:
+    def plot_animate(self, color_axis:str, x_axis: str = 'x', y_axis: str = 'y', cmap = 'viridis', range_t=None, dt=None, frame_interval = 10, plot_type: str = 'scatter', s = 6, color_range:list=None) -> Any:
         """
         Creates an animation over time for the specified key(s).
         """
         import matplotlib.animation as animation
 
-        fig, ax = plt.subplot(refwidth = 4, grid=False)
+        fig, ax = plt.subplot(refwidth = Visualizer.refwidth_default, grid=False)
 
         # Prepare data to animate
         color_list = []
@@ -135,8 +135,11 @@ class Evaluator(Visualizer):
         for t in time_list:
             self.define_time(t)
             color_list.append(self.data_dict[color_axis])
-        max_val = np.max([np.max(c) for c in color_list])
-        min_val = np.min([np.min(c) for c in color_list])
+        if color_range:
+            min_val, max_val = color_range
+        else:
+            max_val = np.max([np.max(c) for c in color_list])
+            min_val = np.min([np.min(c) for c in color_list])
 
         # Initialize figure
         if plot_type == 'scatter':

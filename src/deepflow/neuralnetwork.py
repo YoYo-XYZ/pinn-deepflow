@@ -225,6 +225,7 @@ class PINN(nn.Module):
             print('Training interrupted by user.')
             return model, best_model
             
+        model.print_status()
         return model, best_model
 
     def train_lbfgs(
@@ -258,22 +259,16 @@ class PINN(nn.Module):
                     optimizer.zero_grad(set_to_none=True)
                     loss_dict = calc_loss(model)
                     total_loss = loss_dict['total_loss']
-                    if torch.isnan(total_loss):
-                        return torch.tensor(0).to(total_loss.device)
                     total_loss.backward()
                     
                     loss_dict_container.update(loss_dict) # Store loss_dict in the container
                     return total_loss
-
+                
                 optimizer.step(closure)
                 
-                # if not loss_dict_container:
-                #     print("NaN loss encountered. Stopping training.")
-                #     break
-                
                 # Record loss after the step
-                model._record_loss(loss_dict_container)
                 total_loss_num = loss_dict_container['total_loss'].item()
+                model._record_loss(loss_dict_container)
 
                 if epoch % print_every == 0:
                     model.print_status()
@@ -284,10 +279,11 @@ class PINN(nn.Module):
                 
                 if do_between_epochs: do_between_epochs(epoch, model)
 
-        except:
+        except KeyboardInterrupt:
             print('Training interrupted by user.')
             return model
-
+        
+        model.print_status()
         return model
     
     def save_as_pickle(self, file_name: str = "model.pkl") -> None:

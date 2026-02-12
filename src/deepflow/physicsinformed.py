@@ -228,6 +228,9 @@ class PhysicsAttach:
         """
         self.calc_residual_field(model)
         self.loss = torch.mean(self.residual_field_raw.square().sum(dim=0))
+        if torch.isnan(self.loss):
+            print("Warning: NaN loss encountered. Check model outputs and conditions.")
+            print(self.residual_field_raw.square().sum(dim=0))
         return self.loss
 
     def calc_residual_field(self, model: nn.Module) -> Union[int, torch.Tensor]:

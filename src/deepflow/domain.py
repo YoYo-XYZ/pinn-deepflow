@@ -213,14 +213,13 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
     
 def calc_loss_simple(domain: ProblemDomain) -> callable:
     """Returns a simple loss calculation for the given domain for PINN training."""
+    import traceback
     def calc_loss_function(model):
         loss_dict = {"pde_loss": 0.0, "bc_loss": 0.0, "ic_loss": 0.0}
 
         for geometry in domain:
-                try:
-                    loss_dict[f'{geometry.physics_type.lower()}_loss'] += geometry.calc_loss(model)
-                except Exception:
-                    pass
+                loss_dict[f'{geometry.physics_type.lower()}_loss'] += geometry.calc_loss(model)
+        
         loss_dict["total_loss"] = sum(value for key, value in loss_dict.items() if key != "total_loss")
         return loss_dict
     
