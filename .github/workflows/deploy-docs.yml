@@ -32,6 +32,11 @@ jobs:
           pip install -r requirements-docs.txt
           pip install -e .
 
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Build and deploy
         run: mkdocs gh-deploy --force --clean
         # --force overwrites old gh-pages safely

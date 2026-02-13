@@ -11,7 +11,7 @@ theme:
     - navigation.sections
     - search.suggest
     - search.highlight
-
+    
 plugins:
   - search
   - mkdocstrings:
