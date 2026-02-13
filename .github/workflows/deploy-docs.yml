@@ -28,8 +28,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install mkdocs mkdocs-material pymdown-extensions
-          # Add any other plugins you use, e.g. pip install mkdocstrings[python]
+          pip install -r requirements.txt
+          pip install -r requirements-docs.txt
+          pip install -e .
 
       - name: Build and deploy
         run: mkdocs gh-deploy --force --clean
