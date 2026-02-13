@@ -46,6 +46,8 @@
       
     
     
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -487,7 +489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cavity_flow/" class="md-nav__link">
+      <a href="../cavity_flow_steady/" class="md-nav__link">
         
   
   
@@ -515,7 +517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cylinder_flow/" class="md-nav__link">
+      <a href="../cylinder_flow_steady/" class="md-nav__link">
         
   
   
@@ -523,6 +525,62 @@
     
   
     Steady Cylinder Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../BFS_flow_steady/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Steady BFS Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../channel_flow_transient/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transient Channel Flow
   
 
     
@@ -640,9 +698,11 @@
 <p>DeepFlow comes with several examples to help you get started.</p>
 <ul>
 <li><a href="../burgers_eq/">One-dimensional Burgers Equation</a></li>
-<li><a href="../cavity_flow/">Steady Channel Flow (Cavity)</a> - <em>Coming soon</em></li>
-<li><a href="../cylinder_flow/">Steady Cylinder Flow</a> - <em>Coming soon</em></li>
-<li><a href="../heat_eq/">2D Heat Equation</a> - <em>Coming soon</em></li>
+<li><a href="../cavity_flow_steady/">Steady Channel Flow (Cavity)</a></li>
+<li><a href="../cylinder_flow_steady/">Steady Cylinder Flow</a></li>
+<li><a href="../BFS_flow_steady/">Steady BFS Flow</a></li>
+<li><a href="../channel_flow_transient/">Transient Channel Flow</a></li>
+<li><a href="../heat_eq/">2D Heat Equation</a></li>
 </ul>
 <p>You can find the source notebooks in the <code>examples/</code> directory of the repository.</p>
 
@@ -698,6 +758,12 @@
     
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

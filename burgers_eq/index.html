@@ -12,7 +12,7 @@
         <link rel="prev" href="../examples/">
       
       
-        <link rel="next" href="../cavity_flow/">
+        <link rel="next" href="../cavity_flow_steady/">
       
       
         
@@ -45,6 +45,8 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -613,7 +615,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cavity_flow/" class="md-nav__link">
+      <a href="../cavity_flow_steady/" class="md-nav__link">
         
   
   
@@ -641,7 +643,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cylinder_flow/" class="md-nav__link">
+      <a href="../cylinder_flow_steady/" class="md-nav__link">
         
   
   
@@ -649,6 +651,62 @@
     
   
     Steady Cylinder Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../BFS_flow_steady/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Steady BFS Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../channel_flow_transient/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transient Channel Flow
   
 
     
@@ -876,7 +934,7 @@
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">domain</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">domain</span><span class="p">(</span><span class="n">area</span><span class="o">.</span><span class="n">area_list</span><span class="p">,</span> <span class="n">line_ic</span><span class="p">,</span> <span class="n">line_bc1</span><span class="p">,</span> <span class="n">line_bc2</span><span class="p">)</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_setup</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="png" src="../img/examples/burgers_eq/burgers_eq_4_0.png" /></p>
+<p><img alt="png" src="../img/examples/burgers_eq_files/burgers_eq_4_0.png" /></p>
 <h2 id="2-define-physics">2. Define Physics</h2>
 <p>Define the Burgers eq (spatial version) apply boundary conditions.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Define PDE</span>
@@ -892,7 +950,7 @@
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">domain</span><span class="o">.</span><span class="n">sampling_lhs</span><span class="p">([</span><span class="mi">2000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">],</span> <span class="p">[</span><span class="mi">4000</span><span class="p">])</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_coordinates</span><span class="p">(</span><span class="n">display_physics</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
-<p><img alt="png" src="../img/examples/burgers_eq/burgers_eq_9_0.png" /></p>
+<p><img alt="png" src="../img/examples/burgers_eq_files/burgers_eq_9_0.png" /></p>
 <h3 id="3-train-the-model">3. Train the Model</h3>
 <p>Define the resampling scheme during training. <a href="https://arxiv.org/abs/2207.02338">R3</a> scheme is recommended.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">do_in_adam</span><span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
@@ -960,7 +1018,7 @@ Training interrupted by user.
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_coordinates</span><span class="p">(</span><span class="n">display_physics</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </code></pre></div>
-<p><img alt="png" src="../img/examples/burgers_eq/burgers_eq_16_0.png" /></p>
+<p><img alt="png" src="../img/examples/burgers_eq_files/burgers_eq_16_0.png" /></p>
 <h2 id="4-visualization">4. Visualization</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Evaluate the best model</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">prediction</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model2</span><span class="p">)</span>
@@ -974,17 +1032,23 @@ Training interrupted by user.
 <a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">_</span> <span class="o">=</span> <span class="n">prediction</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;pde_residual&#39;</span><span class="p">)</span>
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">_</span> <span class="o">=</span> <span class="n">prediction</span><span class="o">.</span><span class="n">plot_loss_curve</span><span class="p">(</span><span class="n">log_scale</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
-<p><img alt="png" src="../img/examples/burgers_eq/burgers_eq_20_1.png" /></p>
-<p><img alt="png" src="../img/examples/burgers_eq/burgers_eq_20_2.png" /></p>
-<p><img alt="png" src="../img/examples/burgers_eq/burgers_eq_20_4.png" /></p>
-<p><img alt="png" src="../img/examples/burgers_eq/burgers_eq_20_5.png" /></p>
+<div class="highlight"><pre><span></span><code>C:\Users\thamm\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\IPython\core\events.py:82: UltraPlotWarning: Tick label sharing not implemented for &lt;class &#39;ultraplot.axes.three.ThreeAxes&#39;&gt; subplots.
+  func(*args, **kwargs)
+</code></pre></div>
+<p><img alt="png" src="../img/examples/burgers_eq_files/burgers_eq_20_1.png" /></p>
+<p><img alt="png" src="../img/examples/burgers_eq_files/burgers_eq_20_2.png" /></p>
+<div class="highlight"><pre><span></span><code>C:\Users\thamm\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\IPython\core\pylabtools.py:170: UltraPlotWarning: Tick label sharing not implemented for &lt;class &#39;ultraplot.axes.three.ThreeAxes&#39;&gt; subplots.
+  fig.canvas.print_figure(bytes_io, **kw)
+</code></pre></div>
+<p><img alt="png" src="../img/examples/burgers_eq_files/burgers_eq_20_4.png" /></p>
+<p><img alt="png" src="../img/examples/burgers_eq_files/burgers_eq_20_5.png" /></p>
 <h3 id="42-visualize-u-at-y-075">4.2 Visualize u at y = 0.75</h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">line</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">line_horizontal</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="mf">0.75</span><span class="p">,</span> <span class="n">range_x</span><span class="o">=</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">prediction</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model2</span><span class="p">)</span>
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">prediction</span><span class="o">.</span><span class="n">sampling_line</span><span class="p">(</span><span class="mi">500</span><span class="p">)</span>
 <a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">_</span> <span class="o">=</span> <span class="n">prediction</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">y_axis</span> <span class="o">=</span> <span class="s1">&#39;u&#39;</span><span class="p">)</span>
 </code></pre></div>
-<p><img alt="png" src="../img/examples/burgers_eq/burgers_eq_22_0.png" /></p>
+<p><img alt="png" src="../img/examples/burgers_eq_files/burgers_eq_22_0.png" /></p>
 
 
 
@@ -1038,6 +1102,12 @@ Training interrupted by user.
     
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../javascripts/mathjax.js"></script>
+      
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>
