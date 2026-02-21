@@ -1,5 +1,6 @@
 import copy
 from typing import List, Dict, Callable, Optional, Tuple, Union
+from abc import ABC, abstractmethod
 
 import torch
 import torch.nn as nn
@@ -24,7 +25,7 @@ class HardConstraint:
 
 hard_constraint = lambda constant = 0: HardConstraint(constant)
 
-class PINN(nn.Module):
+class NN(ABC, nn.Module):
     """
     Physics-Informed Neural Network (PINN) model.
 
@@ -34,20 +35,14 @@ class PINN(nn.Module):
     """
 
     def __init__(
-        self, 
-        width: int, 
-        length: int, 
+        self,
         input_vars: Optional[List[str]] = None, 
         output_vars: Optional[List[str]] = None,
-        activation: nn.Module = nn.Tanh()
     ):
         """
         Args:
-            width (int): Number of neurons per hidden layer.
-            length (int): Number of hidden layers.
             input_vars (list): List of input variable names (e.g., ['x', 'y']).
             output_vars (list): List of output variable names (e.g., ['u']).
-            activation (nn.Module): Activation function class (default: nn.Tanh()).
         """
         super().__init__()
         
@@ -58,30 +53,17 @@ class PINN(nn.Module):
         self.input_num = len(self.input_keys)
         self.output_num = len(self.output_keys)
         
-        self.activation = activation
-        
         # Hard constraint containers
         self.hard_constraints: Optional[Dict] = None
         self.hard_constants: Optional[Dict] = None
 
         self._init_history()
-        self._build_network(width, length)
+        self._build_network()
 
-    def _build_network(self, width: int, length: int):
-        layers = []
-        # Input layer
-        layers.append(nn.Linear(self.input_num, width))
-        layers.append(self.activation)
-        
-        # Hidden layers
-        for _ in range(length):
-            layers.append(nn.Linear(width, width))
-            layers.append(self.activation)
-        
-        # Output layer
-        layers.append(nn.Linear(width, self.output_num))
-        
-        self.net = nn.Sequential(*layers)
+    @abstractmethod
+    def _build_network(self):
+        """Define the network architecture in subclasses."""
+        pass
 
     def _init_history(self):
         """Initializes the loss history dictionary."""
@@ -175,7 +157,7 @@ class PINN(nn.Module):
         print_every: int = 200, 
         threshold_loss: Optional[float] = None,
         do_between_epochs: Optional[Callable] = None
-    )-> tuple['PINN', 'PINN']:
+    )-> tuple['NN', 'NN']:
         """
         Trains the model using the Adam optimizer.
         """
@@ -235,7 +217,7 @@ class PINN(nn.Module):
         print_every: int = 50, 
         threshold_loss: Optional[float] = None,
         do_between_epochs: Optional[Callable] = None
-    ) -> 'PINN':
+    ) -> 'NN':
         """
         Trains the model using the L-BFGS optimizer.
         """
@@ -300,3 +282,80 @@ def load_from_pickle(file_name: str) -> None:
     if file_name[-4:] != '.pkl': file_name += '.pkl'
     with open(file_name, 'rb') as f:
         return pickle.load(f)
+    
+class FNN(NN):
+    def __init__(
+        self,
+        input_vars: Optional[List[str]] = None, 
+        output_vars: Optional[List[str]] = None,
+        hidden_layer: List[int] = [50, 50, 50, 50],
+        activation: nn.Module = nn.Tanh()
+    ):
+        self.hidden_layer = hidden_layer
+        super().__init__(input_vars, output_vars, activation)
+
+    def _build_network(self) -> None:
+        """Builds the feedforward neural network architecture."""
+        self.layer_list = [self.input_num] + self.hidden_layer + [self.output_num]
+
+        layers = []
+        for i in range(len(self.layer_list)-1):
+            layers.append(nn.Linear(self.layer_list[i], self.layer_list[i+1]))
+            layers.append(self.activation)
+
+        self.net = nn.Sequential(*layers)
+
+from pennylane import qml
+class QNN(NN):
+    def __init__(
+        self,
+        input_vars: Optional[List[str]] = None, 
+        output_vars: Optional[List[str]] = None,
+        nqubits: Optional[int] = 2,
+        q_depth: int = 4,
+        hidden_layer_pre: Optional[List[int]] = None,
+        hidden_layer_post: Optional[List[int]] = None,
+        activation: nn.Module = nn.Tanh()
+    ):
+        self.nqubits = nqubits
+        self.q_depth = q_depth
+        self.hidden_layer_pre = hidden_layer_pre if hidden_layer_pre is not None else []
+        self.hidden_layer_post = hidden_layer_post if hidden_layer_post is not None else []
+        self.activation = activation
+        super().__init__(input_vars, output_vars, activation)
+    def _qnn_setup(self):
+
+        qml_device = qml.device("default.qubit", wires=self.nqubits)
+
+        @qml.qnode(qml_device, interface="torch")
+        def _qnn_layer(inputs, weights):
+            qml.AngleEmbedding(inputs, wires=range(self.nqubits), rotation="Y")
+            qml.BasicEntanglerLayers(weights, wires=range(self.nqubits))
+
+            return [qml.expval(qml.PauliZ(i)) for i in range(self.nqubits)]
+
+        
+        qlayer = qml.qnn.TorchLayer(_qnn_layer, weight_shapes={"weights":(self.q_depth,self.nqubits)})
+        return qlayer
+
+    def _build_network(self):
+        layers = []
+
+        # Pre-processing layers
+        iter_layers = [self.input_num] + self.hidden_layer_pre + [self.nqubits]
+        for i in range(len(iter_layers) - 1):
+            layers.append(nn.Linear(iter_layers[i], iter_layers[i+1]))
+            layers.append(self.activation)
+        
+        q_layer = self._qnn_setup()
+        # Quantum layers
+        layers.append(q_layer)
+        layers.append(self.activation)
+        
+        # Post-processing layers
+        iter_layers = [self.nqubits] + self.hidden_layer_post + [self.output_num]
+        for i in range(len(iter_layers) - 1):
+            layers.append(nn.Linear(iter_layers[i], iter_layers[i+1]))
+            layers.append(self.activation)
+        
+        self.net = nn.Sequential(*layers)
