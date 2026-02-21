@@ -324,7 +324,7 @@ class QNN(NN):
         self,
         input_vars: Optional[List[str]] = None, 
         output_vars: Optional[List[str]] = None,
-        nqubits: Optional[int] = 2,
+        nqubits: Optional[int] = 4,
         q_depth: int = 4,
         hidden_layer_pre: Optional[List[int]] = None,
         hidden_layer_post: Optional[List[int]] = None,
