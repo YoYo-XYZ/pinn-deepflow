@@ -163,11 +163,7 @@ class NN(ABC, nn.Module):
         Trains the model using the Adam optimizer.
         """
         model = copy.deepcopy(self.to(get_device()))
-        
-        # Apply torch.compile on Linux systems for performance
-        if platform.system() == 'Linux':
-            model = torch.compile(model)
-        
+
         model.train() # Set to training mode
                 
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -228,11 +224,7 @@ class NN(ABC, nn.Module):
         Trains the model using the L-BFGS optimizer.
         """
         model = copy.deepcopy(self.to(get_device()))
-        
-        # Apply torch.compile on Linux systems for performance
-        if platform.system() == 'Linux':
-            model = torch.compile(model)
-        
+
         model.train()
 
         # Strong Wolfe line search is standard for PINNs
