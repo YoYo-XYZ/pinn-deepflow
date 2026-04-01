@@ -5,7 +5,7 @@ except ImportError:
     import matplotlib.pyplot as plt
 import torch
 import sympy as sp
-from .neuralnetwork import HardConstraint
+from .nn import HardConstraint
 
 def domain(*geometries):
     bound_list = []

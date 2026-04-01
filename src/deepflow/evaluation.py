@@ -8,7 +8,7 @@ except ImportError:
     import matplotlib.pyplot as plt
 
 # Explicit imports are better for open source
-from .neuralnetwork import PINN 
+from .nn import PINN 
 from .geometry import Area, Bound
 from .visualization import Visualizer
 

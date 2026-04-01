@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 # Assuming these modules exist in your package structure
-from .neuralnetwork import HardConstraint
+from .nn import HardConstraint
 from .pde import PDE
 from .utility import calc_grad, get_device
 
@@ -178,7 +178,7 @@ class PhysicsAttach:
 
     def _prepare_target_outputs(self, device: torch.device) -> None:
         """Internal helper to prepare target tensors for BC/IC."""
-        from .neuralnetwork import HardConstraint
+        from .nn import HardConstraint
         target_output_tensor_dict = {}
 
         for key, condition in self.condition_dict.items():
