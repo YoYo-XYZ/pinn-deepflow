@@ -182,6 +182,9 @@ class NN(ABC, nn.Module):
                 
                 loss_dict = calc_loss(model)
                 total_loss = loss_dict['total_loss']
+                if torch.isnan(total_loss):
+                    print("Detected NaN in loss. Stop the training.")
+                    break
                 total_loss_num = total_loss.item()
                 
                 total_loss.backward()
@@ -218,7 +221,7 @@ class NN(ABC, nn.Module):
         calc_loss: Callable, 
         print_every: int = 50, 
         threshold_loss: Optional[float] = None,
-        do_between_epochs: Optional[Callable] = None
+        do_between_epochs: Optional[Callable] = None,
     ) -> 'NN':
         """
         Trains the model using the L-BFGS optimizer.
@@ -239,21 +242,34 @@ class NN(ABC, nn.Module):
             for epoch in range(epochs):
                 # Container to extract loss from closure
                 loss_dict_container = {}
+                nan_detected = False
 
                 def closure():
+                    nonlocal nan_detected
                     optimizer.zero_grad(set_to_none=True)
                     loss_dict = calc_loss(model)
                     total_loss = loss_dict['total_loss']
+                    if torch.isnan(total_loss):
+                        print("Detected NaN in loss. Stop the training.")
+                        nan_detected = True
+                        return 0.0
                     total_loss.backward()
                     
                     loss_dict_container.update(loss_dict) # Store loss_dict in the container
                     return total_loss
                 
                 optimizer.step(closure)
-                
-                # Record loss after the step
-                total_loss_num = loss_dict_container['total_loss'].item()
-                model._record_loss(loss_dict_container)
+                if nan_detected:
+                    # Reinitialize LBFGS optimizer with fresh state
+                    optimizer = torch.optim.LBFGS(
+                        model.parameters(),
+                        history_size=100,
+                        max_iter=20,
+                        line_search_fn="strong_wolfe")
+                else:   
+                    # Record loss after the step
+                    total_loss_num = loss_dict_container['total_loss'].item()
+                    model._record_loss(loss_dict_container)
 
                 if epoch % print_every == 0:
                     model.print_status()
@@ -262,7 +278,9 @@ class NN(ABC, nn.Module):
                      print(f"Stop: Loss {total_loss_num:.5f} < Threshold {threshold_loss}")
                      break
                 
-                if do_between_epochs: do_between_epochs(epoch, model)
+                # Call do_between_epochs callback if provided
+                if do_between_epochs: 
+                    do_between_epochs(epoch, model)
 
         except KeyboardInterrupt:
             print('Training interrupted by user.')

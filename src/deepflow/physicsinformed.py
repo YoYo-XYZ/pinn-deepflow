@@ -289,7 +289,7 @@ class PhysicsAttach:
 
         return X_residual, Y_residual
     
-    def get_residual_based_points_threshold(self, threshold: float = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_residual_based_points_threshold(self, threshold: float = None, maintain_points = False) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Adaptive sampling: Add points where the residual loss is highest.
         """
@@ -300,15 +300,15 @@ class PhysicsAttach:
             return torch.tensor([]), torch.tensor([])
         
         mask = (self.residual_field > threshold)
-        if self.X_residual_container:
+        if self.X_residual_container and maintain_points:
             mask[:(self.residual_field.shape[0] - self._amounts_before_add)] = False  # Avoid adding previously added points
         mask = mask.cpu()
 
         X_residual = self.X[mask]
         Y_residual = self.Y[mask]
 
-        self.X_residual_container.append(X_residual)
-        self.Y_residual_container.append(Y_residual)
+        self.X_residual_container = [X_residual]
+        self.Y_residual_container = [Y_residual]
 
         return X_residual, Y_residual
     

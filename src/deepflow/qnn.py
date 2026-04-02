@@ -1,6 +1,5 @@
 from typing import List, Optional
 from .nn import NN
-import platform
 
 from torch import nn
 
@@ -56,13 +55,20 @@ class QPINN(NN):
 
         @qml.qnode(qml_device, interface="torch")
         def hea(weights):
+            qml.RY(weights, wires=range(self.nqubits))
+            qml.strongly_entangling(weights, wires=range(self.nqubits))
+            qml.strongly_entangling(weights, wires=range(self.nqubits))
             qml.strongly_entangling(weights, wires=range(self.nqubits))
 
         @qml.qnode(qml_device, interface="torch")
         def cascade(weights):
-            qml.strongly_entangling(weights, wires=range(self.nqubits))
+            for i in range(self.nqubits):
+                qml.RX(weights[0, i], wires=i)
+                qml.RY(weights[1, i], wires=i)
+            for i in range(self.nqubits): # entanglement
+                qml.CRX(weights[2, i], wires=[i, (i-1) % self.nqubits])
 
-        return {"simple":simple, "hea":hea}
+        return {"simple":simple, "hea":hea, "cascade":cascade}
 
     def _qnn_layer(self, feature_map = "angle", ansatz = "hea", cost_func = "simple"):
         qml_device = qml.device("default.qubit", wires=self.nqubits)
@@ -98,6 +104,8 @@ class QCPINN(NN):
         input_vars: Optional[List[str]] = None, 
         output_vars: Optional[List[str]] = None,
         nqubits: Optional[int] = 4,
+        q_layer_type: str = "cascade",
+        q_layer_iterations: int = 1,
         hidden_layer_pre: Optional[List[int]] = None,
         hidden_layer_post: Optional[List[int]] = None,
         activation: nn.Module = nn.Tanh()
@@ -107,6 +115,8 @@ class QCPINN(NN):
         self.hidden_layer_pre = hidden_layer_pre if hidden_layer_pre is not None else []
         self.hidden_layer_post = hidden_layer_post if hidden_layer_post is not None else []
         self.activation = activation
+        self.q_layer_type = q_layer_type
+        self.q_layer_iterations = q_layer_iterations
         self._build_network()
     
     def _qnn_setup(self):
@@ -117,17 +127,18 @@ class QCPINN(NN):
         def _qnn_layer(inputs, weights):
             qml.AngleEmbedding(inputs, wires=range(self.nqubits), rotation="Y")
 
-            # angle cascade ansatz
-            for i in range(self.nqubits):
-                qml.RX(weights[0, i], wires=i)
-                qml.RY(weights[1, i], wires=i)
-            for i in range(self.nqubits): # entanglement
-                qml.CRX(weights[2, i], wires=[i, (i-1) % self.nqubits])
+            for layer in range(self.q_layer_iterations):
+                # angle cascade ansatz
+                for i in range(self.nqubits):
+                    qml.RX(weights[layer, 0, i], wires=i)
+                    qml.RY(weights[layer, 1, i], wires=i)
+                for i in range(self.nqubits): # entanglement
+                    qml.CRX(weights[layer, 2, i], wires=[i, (i-1) % self.nqubits])
 
             return [qml.expval(qml.PauliZ(i)) for i in range(self.nqubits)]
 
         
-        qlayer = qml.qnn.TorchLayer(_qnn_layer, weight_shapes={"weights":(3, self.nqubits)})
+        qlayer = qml.qnn.TorchLayer(_qnn_layer, weight_shapes={"weights":(self.q_layer_iterations, 3, self.nqubits)})
         return qlayer
 
     def _build_network(self):

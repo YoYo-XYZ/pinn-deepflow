@@ -108,6 +108,26 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 self.area_list[i].process_coordinates()
                 # Add RAR point to saved points
 
+    def sampling_R3_RAR(self, bound_sampling_res:list=None, area_sampling_res:list=None):
+        ### EXPERIMENTAL
+        self.sampling_option = self.sampling_option + ' + R3'
+        if bound_sampling_res:
+            for i, res in enumerate(bound_sampling_res):
+                # Sample new candidates
+                self.bound_list[i].get_residual_based_points_threshold(maintain_points=True)
+                self.bound_list[i].sampling_line(res, scheme='lhs')
+                self.bound_list[i].apply_residual_based_points()
+                self.bound_list[i].process_coordinates()
+                # Add RAR point to saved points
+        if area_sampling_res:
+            for i, res in enumerate(area_sampling_res):
+                # Sample new candidates
+                self.area_list[i].get_residual_based_points_threshold(maintain_points=True)
+                self.area_list[i].sampling_area(res, scheme='lhs')
+                self.area_list[i].apply_residual_based_points()
+                self.area_list[i].process_coordinates()
+                # Add RAR point to saved points
+
 #------------------------------------------------------------------------------------------------
     def _format_condition_dict(self, obj, obj_type='Bound'):
         """Helper function to format condition dictionary for display."""
@@ -221,6 +241,21 @@ def calc_loss_simple(domain: ProblemDomain) -> callable:
                 loss_dict[f'{geometry.physics_type.lower()}_loss'] += geometry.calc_loss(model)
         
         loss_dict["total_loss"] = sum(value for key, value in loss_dict.items() if key != "total_loss")
+        return loss_dict
+    
+    return calc_loss_function
+
+def calc_loss_weighted(domain: ProblemDomain, bc_weights = 1, ic_weights = 1, pde_weights = 1) -> callable:
+    """Returns a simple loss calculation for the given domain for PINN training."""
+    import traceback
+    weight = {"pde_loss": pde_weights, "bc_loss": bc_weights, "ic_loss": ic_weights}
+    def calc_loss_function(model):
+        loss_dict = {"pde_loss": 0.0, "bc_loss": 0.0, "ic_loss": 0.0}
+
+        for geometry in domain:
+                loss_dict[f'{geometry.physics_type.lower()}_loss'] += geometry.calc_loss(model)
+        
+        loss_dict["total_loss"] = sum(weight[key] * value for key, value in loss_dict.items() if key != "total_loss")
         return loss_dict
     
     return calc_loss_function
