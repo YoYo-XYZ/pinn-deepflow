@@ -97,7 +97,7 @@ class NavierStokes(PDE):
         v_yy = calc_grad(v_y, y)
 
         # 1. Continuity Equation (Mass Conservation)
-        continuity_residual = u_x + v_y
+        continuity_residual = (u_x + v_y)
 
         # 2. X-Momentum Equation
         x_momentum_residual = (u_t + (u * u_x) + (v * u_y)) + p_x - ((u_xx + u_yy) / self.Re)

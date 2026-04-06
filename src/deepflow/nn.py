@@ -154,7 +154,7 @@ class NN(ABC, nn.Module):
         learning_rate: float, 
         epochs: int, 
         calc_loss: Callable, 
-        scheduler_config: Optional[Dict] = None, 
+        use_scheduler: Optional[Dict] = None, 
         print_every: int = 200, 
         threshold_loss: Optional[float] = None,
         do_between_epochs: Optional[Callable] = None
@@ -169,11 +169,9 @@ class NN(ABC, nn.Module):
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         
         scheduler = None
-        if scheduler_config:
+        if use_scheduler:
             # Allow custom scheduler config or default
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.5, patience=100, min_lr=1e-4
-            )
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, epochs//20, gamma=0.9)
 
         best_loss = float('inf')
         try:
@@ -190,7 +188,7 @@ class NN(ABC, nn.Module):
                 total_loss.backward()
                 optimizer.step()
                 
-                if scheduler: scheduler.step(total_loss_num)
+                if scheduler: scheduler.step()
                 
                 model._record_loss(loss_dict)
 

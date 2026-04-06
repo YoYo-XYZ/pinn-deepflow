@@ -96,7 +96,7 @@ class Bound(PhysicsAttach):
         if scheme == 'random':
             self.coords[ax] = torch.empty(n_points).uniform_(self.ranges[ax][0], self.ranges[ax][1])
         elif scheme == 'lhs':
-            self.coords[ax] = latin_hypercube_sampling(n_points, 1, [self.ranges[ax][0]], [self.ranges[ax][1]]).squeeze()
+            self.coords[ax] = latin_hypercube_sampling(n_points, 1, [self.ranges[ax][0]], [self.ranges[ax][1]]).squeeze(-1)
         elif scheme == 'uniform':
             self.coords[ax] = torch.linspace(self.ranges[ax][0], self.ranges[ax][1], n_points)
 
@@ -227,7 +227,7 @@ class Area(PhysicsAttach):
             points[:, 1].uniform_(self.ranges[1][0], self.ranges[1][1])
             X, Y = points[:, 0], points[:, 1]
         elif scheme == 'lhs':
-            samples = latin_hypercube_sampling(n_points_square, 2, [self.ranges[0][0], self.ranges[1][0]], [self.ranges[0][1], self.ranges[1][1]])
+            samples = latin_hypercube_sampling(n_points_square, 2, [self.ranges[0][0], self.ranges[1][0]], [self.ranges[0][1], self.ranges[1][1]]).squeeze(-1)
             X, Y = samples[:, 0], samples[:, 1]
         elif scheme == 'uniform':
             if isinstance(n_points_square, (list, tuple)):
