@@ -172,6 +172,7 @@ class PhysicsAttach:
 
         # Pre-calculate target values for BC/IC
         if self.physics_type == "BC" or self.physics_type == "IC":
+            print('b')
             self._prepare_target_outputs(device)
 
         return self.inputs_tensor_dict

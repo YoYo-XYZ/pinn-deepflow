@@ -6,6 +6,7 @@ except ImportError:
 import torch
 import sympy as sp
 from .nn import HardConstraint
+from .geometry import CustomData
 
 def domain(*geometries):
     bound_list = []
@@ -23,6 +24,8 @@ def domain(*geometries):
         elif isinstance(geometry, Area):
             area_list.append(geometry)
             bound_list += geometry.bound_list
+        elif isinstance(geometry, CustomData):
+            area_list.append(geometry)
         else:
             raise TypeError(f"Expected Bound or Area, got {type(geometry)}")
     return ProblemDomain(bound_list, area_list)
@@ -33,6 +36,9 @@ class ProblemDomain():
         self.area_list = area_list
         self.sampling_option = None
         
+        for g in self.bound_list + self.area_list:
+            g.process_coordinates()
+
     def __str__(self):
         return f"""number of bound : {[f'{i}: {len(bound.X)}' for i, bound in enumerate(self.bound_list)]}
 number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list)]}"""
@@ -236,11 +242,13 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             area_sampling_res = [[400, int(400*a.lengths[1]/a.lengths[0])] for a in self.area_list]
 
         def get_area_xy(area, i):
-            area.sampling_area(area_sampling_res[i])
+            if isinstance(area, Area):
+                area.sampling_area(area_sampling_res[i])
             return area.X, area.Y
         
         def get_bound_xy(bound, i):
-            bound.sampling_line(bound_sampling_res[i])
+            if isinstance(bound, Bound):
+                bound.sampling_line(bound_sampling_res[i])
             return bound.X, bound.Y
 
         self._plot_items(ax, self.area_list, "Area", get_area_xy,

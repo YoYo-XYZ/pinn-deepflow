@@ -9,7 +9,7 @@ except ImportError:
 
 # Explicit imports are better for open source
 from .nn import PINN 
-from .geometry import Area, Bound
+from .geometry import Area, Bound, CustomData
 from .visualization import Visualizer
 
 class Evaluator(Visualizer):
@@ -17,19 +17,22 @@ class Evaluator(Visualizer):
     Evaluates a PINN model against a given geometry and prepares data for visualization.
     """
 
-    def __init__(self, pinns_model: PINN, geometry: Area|Bound):
+    def __init__(self, pinns_model: PINN, geometry: Area|Bound|CustomData) -> None:
         """
         Args:
             pinns_model: The physics-informed neural network model.
             geometry: The geometric domain (Area or Bound) to evaluate on.
+            custom_data: Optional custom data to include in the evaluation.
         """
         self.model = pinns_model 
         self.geometry = geometry
-        
+
         # Initialize internal state
         self.data_dict: Dict[str, Any] = {}
         self.is_postprocessed = False
-        
+
+        if isinstance(geometry, CustomData):
+            self.postprocess()
         # If Visualizer requires data_dict immediately, initialize it with empty data
         # or handle the parent init carefully.
         # super().__init__({}) 
@@ -126,6 +129,7 @@ class Evaluator(Visualizer):
         Creates an animation over time for the specified key(s).
         """
         import matplotlib.animation as animation
+        import matplotlib as mpl
 
         fig, ax = plt.subplot(refwidth = Visualizer.refwidth_default, grid=False)
 
@@ -154,14 +158,17 @@ class Evaluator(Visualizer):
         ax.set_ylabel(y_axis)
         ax.set_aspect('equal')
         
-        # Add colorbar
-        ax.colorbar(plot, ax=ax)
+        # Add colorbar after setting up the plot
+        cbar = fig.colorbar(plot, ax=ax)
         
         def animate(frame):
             plot.set_array(color_list[frame].ravel())
             title.set_text(f'{color_axis} - Time: {time_list[frame]:.3f}')
             return plot, title
 
+        # Disable tight layout for animations to prevent empty bboxes error
         ani = animation.FuncAnimation(fig, animate, frames=len(time_list), interval=frame_interval, blit=True)
+        # Set layout adjustments to prevent tight_layout issues during save
+        fig.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
         plt.show()
         return ani

@@ -1,5 +1,5 @@
 import copy
-from typing import List, Tuple, Callable, Optional, Union, Dict
+from typing import List, Tuple, Callable, Optional, Union, Dict, Any
 
 import torch
 
@@ -9,6 +9,37 @@ from .physicsinformed import PhysicsAttach
 # Constants for numerical stability
 EPS = 1e-6
 LARGE_SLOPE = 1e5
+
+def custom_data(data_dict: Dict[str, Any]) -> 'CustomData':
+    """Factory function to create a CustomData object."""
+    return CustomData(data_dict)
+class CustomData(PhysicsAttach):
+    dim = 2
+    axes = list(range(dim))
+    
+    def __init__(self, data_dict: Dict[str, Any]):
+        super().__init__()
+        self.ranges: Dict[int, List[float]] = {}
+        self.axes_sec = list(self.axes)
+        self.X = data_dict.get('x')
+        self.Y = data_dict.get('y')
+        
+        self.data_dict = data_dict
+        self.coords = {i: data_dict.get(ax) for i, ax in enumerate(['x', 'y'])}
+        self._postprocess()
+
+    def _postprocess(self):
+        """Calculates lengths and centers after definition."""
+        # Preliminary sampling to determine bounds of dependent axes
+        self.lengths = {}
+        self.centers = {}
+        
+        for ax in self.axes_sec:
+            self.ranges[ax] = [self.coords[ax].min().item(), self.coords[ax].max().item()]
+            
+        for ax in self.axes:
+            self.lengths[ax] = self.ranges[ax][1] - self.ranges[ax][0]
+            self.centers[ax] = self.ranges[ax][0] + self.lengths[ax] / 2
 
 class Bound(PhysicsAttach):
     """
@@ -92,7 +123,6 @@ class Bound(PhysicsAttach):
         ax = 2 if self.parameterized else self.ax
         self.coords = {}
         
-
         if scheme == 'random':
             self.coords[ax] = torch.empty(n_points).uniform_(self.ranges[ax][0], self.ranges[ax][1])
         elif scheme == 'lhs':
