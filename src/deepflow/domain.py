@@ -37,7 +37,8 @@ class ProblemDomain():
         self.sampling_option = None
         
         for g in self.bound_list + self.area_list:
-            g.process_coordinates()
+            if isinstance(g, CustomData):
+                g.process_coordinates()
 
     def __str__(self):
         return f"""number of bound : {[f'{i}: {len(bound.X)}' for i, bound in enumerate(self.bound_list)]}
@@ -97,8 +98,6 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
 
     def sampling_R3(self, bound_sampling_res:list=None, area_sampling_res:list=None):
         self.sampling_option = self.sampling_option + ' + R3'
-        for geometry in self.bound_list + self.area_list:
-            geometry.clear_residual_based_points()
 
         if bound_sampling_res:
             for i, res in enumerate(bound_sampling_res):
@@ -118,10 +117,8 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 # Add RAR point to saved points
 
     def sampling_R3_(self, bound_sampling_res:list=None, area_sampling_res:list=None):
-        for geometry in self.bound_list + self.area_list:
-            geometry.clear_residual_based_points()
-
         self.sampling_option = self.sampling_option + ' + R3'
+        
         if bound_sampling_res:
             for i, res in enumerate(bound_sampling_res):
                 # Sample new candidates
@@ -142,6 +139,7 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
     def sampling_accumulate(self, bound_sampling_res:list=None, area_sampling_res:list=None):
         ### EXPERIMENTAL
         self.sampling_option = self.sampling_option + ' + R3'
+        
         if bound_sampling_res:
             for i, res in enumerate(bound_sampling_res):
                 # Sample new candidates
@@ -158,7 +156,9 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 self.area_list[i].apply_residual_based_points()
                 self.area_list[i].process_coordinates()
                 # Add RAR point to saved points
-
+    def clear_residual_points(self):
+        for geometry in self.bound_list + self.area_list:
+            geometry.clear_residual_based_points()
 #------------------------------------------------------------------------------------------------
     def _format_condition_dict(self, obj, obj_type='Bound'):
         """Helper function to format condition dictionary for display."""
