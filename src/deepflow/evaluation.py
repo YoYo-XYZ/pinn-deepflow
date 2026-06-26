@@ -33,6 +33,10 @@ class Evaluator(Visualizer):
         
         if isinstance(geometry, CustomData):
             self.postprocess()
+        
+        # If geometry already has coordinates (i.e. has been sampled), we can attempt postprocess
+        if hasattr(self.geometry, "X") and getattr(self.geometry, "X") is not None:
+            self.postprocess()
         # If Visualizer requires data_dict immediately, initialize it with empty data
         # or handle the parent init carefully.
         # super().__init__({}) 

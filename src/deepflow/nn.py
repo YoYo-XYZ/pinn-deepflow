@@ -154,7 +154,7 @@ class NN(ABC, nn.Module):
         learning_rate: float, 
         epochs: int, 
         calc_loss: Callable, 
-        use_scheduler: Optional[Dict] = None, 
+        use_scheduler: Optional[bool] = False, 
         print_every: int = 200, 
         threshold_loss: Optional[float] = None,
         do_between_epochs: Optional[Callable] = None
@@ -320,9 +320,13 @@ class FNN(NN):
         self.layer_list = [self.input_num] + self.hidden_layer + [self.output_num]
 
         layers = []
-        for i in range(len(self.layer_list)-1):
+        # Add all hidden layers with activations
+        for i in range(len(self.layer_list) - 2):
             layers.append(nn.Linear(self.layer_list[i], self.layer_list[i+1]))
             layers.append(self.activation)
+            
+        # Add the final output layer without activation
+        layers.append(nn.Linear(self.layer_list[-2], self.layer_list[-1]))
 
         self.net = nn.Sequential(*layers)
 

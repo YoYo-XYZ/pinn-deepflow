@@ -172,7 +172,6 @@ class PhysicsAttach:
 
         # Pre-calculate target values for BC/IC
         if self.physics_type == "BC" or self.physics_type == "IC":
-            print('b')
             self._prepare_target_outputs(device)
 
         return self.inputs_tensor_dict
@@ -247,7 +246,7 @@ class PhysicsAttach:
             pred_dict = self.calc_output(model)
             self.residual_field_raw = torch.stack(tuple(pred_dict[key] - self.target_output_tensor_dict[key] for key in pred_dict), dim = 0)
 
-        if "PDE" in self.physics_type:
+        if  self.physics_type == "PDE":
             self.process_pde()
             self.residual_field_raw = self.PDE.calc_residual_field_raw()
         
