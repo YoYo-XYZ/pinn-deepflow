@@ -4,6 +4,35 @@ from .nn import NN
 from torch import nn
 
 import pennylane as qml
+
+
+# ---------------------------------------------------------------------------
+# Module-level quantum circuit for QCPINN (must be at module scope for
+# pickling / deepcopy / multiprocessing compatibility).
+# ---------------------------------------------------------------------------
+
+def _qcpinn_circuit(inputs, weights):
+    """Quantum circuit for QCPINN.
+
+    Number of qubits and layer count are inferred from the *runtime shapes* of the
+    tensors so that no closure over instance state is needed and the
+    function remains picklable.
+    """
+    nqubits = inputs.shape[-1]
+    n_layers = weights.shape[0]
+
+    qml.AngleEmbedding(inputs, wires=range(nqubits), rotation="Y")
+
+    for layer in range(n_layers):
+        for i in range(nqubits):
+            qml.RX(weights[layer, 0, i], wires=i)
+            qml.RY(weights[layer, 1, i], wires=i)
+        for i in range(nqubits):
+            qml.CRX(weights[layer, 2, i], wires=[i, (i - 1) % nqubits])
+
+    return [qml.expval(qml.PauliZ(i)) for i in range(nqubits)]
+
+
 class QPINN(NN):
     def __init__(
         self,
@@ -120,25 +149,13 @@ class QCPINN(NN):
         self._build_network()
     
     def _qnn_setup(self):
-
         qml_device = qml.device("default.qubit", wires=self.nqubits)
 
-        @qml.qnode(qml_device, interface="torch")
-        def _qnn_layer(inputs, weights):
-            qml.AngleEmbedding(inputs, wires=range(self.nqubits), rotation="Y")
-
-            for layer in range(self.q_layer_iterations):
-                # angle cascade ansatz
-                for i in range(self.nqubits):
-                    qml.RX(weights[layer, 0, i], wires=i)
-                    qml.RY(weights[layer, 1, i], wires=i)
-                for i in range(self.nqubits): # entanglement
-                    qml.CRX(weights[layer, 2, i], wires=[i, (i-1) % self.nqubits])
-
-            return [qml.expval(qml.PauliZ(i)) for i in range(self.nqubits)]
-
-        
-        qlayer = qml.qnn.TorchLayer(_qnn_layer, weight_shapes={"weights":(self.q_layer_iterations, 3, self.nqubits)})
+        qnode = qml.QNode(_qcpinn_circuit, qml_device, interface="torch")
+        qlayer = qml.qnn.TorchLayer(
+            qnode,
+            weight_shapes={"weights": (self.q_layer_iterations, 3, self.nqubits)},
+        )
         return qlayer
 
     def _build_network(self):
