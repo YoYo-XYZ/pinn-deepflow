@@ -316,7 +316,9 @@ class Area(PhysicsAttach):
 
     def __add__(self, other_bound: 'Bound') -> 'Area':
         """Merge a boundary with an area"""
-        return Area(self.bound_list.copy().append(other_bound))
+        new_bound_list = self.bound_list.copy()
+        new_bound_list.append(other_bound)
+        return Area(new_bound_list)
     
     def __iter__(self):
         return iter(self.bound_list)

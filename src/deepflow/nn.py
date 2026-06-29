@@ -220,9 +220,12 @@ class NN(ABC, nn.Module):
         print_every: int = 50, 
         threshold_loss: Optional[float] = None,
         do_between_epochs: Optional[Callable] = None,
-    ) -> 'NN':
+    ) -> tuple['NN', 'NN']:
         """
         Trains the model using the L-BFGS optimizer.
+        
+        Returns:
+            tuple: (model, best_model) — the final model and the model with the lowest loss.
         """
         model = copy.deepcopy(self.to(get_device()))
 
@@ -235,6 +238,9 @@ class NN(ABC, nn.Module):
             max_iter=20, 
             line_search_fn="strong_wolfe"
         )
+
+        best_loss = float('inf')
+        best_model = copy.deepcopy(model)
 
         try:
             for epoch in range(epochs):
@@ -269,6 +275,11 @@ class NN(ABC, nn.Module):
                     total_loss_num = loss_dict_container['total_loss'].item()
                     model._record_loss(loss_dict_container)
 
+                    # Track best model
+                    if total_loss_num < best_loss:
+                        best_loss = total_loss_num
+                        best_model = copy.deepcopy(model)
+
                 if epoch % print_every == 0:
                     model.print_status()
                 
@@ -282,10 +293,10 @@ class NN(ABC, nn.Module):
 
         except KeyboardInterrupt:
             print('Training interrupted by user.')
-            return model
+            return model, best_model
         
         model.print_status()
-        return model
+        return model, best_model
     
     def save_as_pickle(self, file_name: str = "model.pkl") -> None:
         """Saves the model as a pickle file."""
