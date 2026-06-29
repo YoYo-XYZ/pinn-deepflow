@@ -256,10 +256,16 @@ class NN(ABC, nn.Module):
                         print("Detected NaN in loss. Stop the training.")
                         nan_detected = True
                         return 0.0
-                    total_loss.backward()
+                    # retain_graph=True is needed because:
+                    # 1. calc_loss stores residual field tensors with grad_fn
+                    #    on geometry objects (via calc_grad with create_graph=True).
+                    # 2. LBFGS line search calls closure() multiple times per step.
+                    #    Without retain_graph, the second closure call would see
+                    #    freed saved tensors from the first backward.
+                    total_loss.backward(retain_graph=True)
                     
                     loss_dict_container.update(loss_dict) # Store loss_dict in the container
-                    return total_loss
+                    return total_loss.detach()  # detach to avoid keeping graph alive after step
                 
                 optimizer.step(closure)
                 if nan_detected:

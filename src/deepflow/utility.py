@@ -1,13 +1,24 @@
+import random
+import numpy as np
 import torch
 import scipy
-from typing import Tuple, List, Union, Generator
+from typing import Tuple, List, Union, Generator, Optional
 
-def latin_hypercube_sampling(n_samples: int, n_dimensions: int, lower_lim:list, upper_lim:list) -> torch.Tensor:
+# Module-level seed storage for reproducibility helpers
+_GLOBAL_SEED = None
+
+def latin_hypercube_sampling(n_samples: int, n_dimensions: int, lower_lim:list, upper_lim:list, seed:Optional[int]=None) -> torch.Tensor:
     """
-    Generates Latin Hypercube Samples in the unit hypercube [0,1]^n_dimensions.
+    Generates Latin Hypercube Samples scaled to [lower_lim, upper_lim].
+
+    Reproducibility:
+        Pass an explicit ``seed``, or set one globally via :func:`manual_seed`.
+        If neither is provided, SciPy's default (``None``) is used and results
+        will vary between runs.
     """
-    # Generate LHS using scipy
-    lhs = scipy.stats.qmc.LatinHypercube(d=n_dimensions, strength=1)
+    # Resolve seed: explicit > global fallback > None (non-deterministic)
+    seed = seed if seed is not None else _GLOBAL_SEED
+    lhs = scipy.stats.qmc.LatinHypercube(d=n_dimensions, strength=1, seed=seed)
     sample = lhs.random(n=n_samples)
     sample = scipy.stats.qmc.scale(sample, lower_lim, upper_lim)
     return torch.tensor(sample, dtype=torch.float32)
@@ -16,10 +27,32 @@ device = 'cpu' if not torch.cuda.is_available() else 'cuda'
 def get_device():
     global device
     return device
-def manual_seed(seed:int):
+def manual_seed(seed:int, deterministic:bool=False):
+    """
+    Set all random seeds for reproducible training runs.
+
+    Seeds Python's ``random``, NumPy, PyTorch (CPU & GPU), and configures
+    cuDNN for determinism when CUDA is available.
+
+    Args:
+        seed: Integer seed passed to all RNGs.
+        deterministic: If ``True``, enables PyTorch's deterministic mode via
+            ``torch.use_deterministic_algorithms(True)`` (may impact performance).
+    """
+    global _GLOBAL_SEED
+    _GLOBAL_SEED = seed
+
+    random.seed(seed)
+    np.random.seed(seed)
     torch.manual_seed(seed)
+
     if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed) # For current GPU
+        torch.cuda.manual_seed_all(seed)        # Multi-GPU coverage
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+    if deterministic:
+        torch.use_deterministic_algorithms(True)
 
 def calc_grad(y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     """
