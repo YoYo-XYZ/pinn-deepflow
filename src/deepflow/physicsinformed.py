@@ -241,7 +241,11 @@ class PhysicsAttach:
         if self.physics_type in ["BC", "IC"]:
             # If all conditions are HardConstraints, the loss is structurally zero
             if all(isinstance(cond, HardConstraint) for cond in self.condition_dict.values()):
-                return
+                device = self.X_.device
+                n_points = self.X_.shape[0]
+                self.residual_field_raw = torch.zeros(1, n_points, device=device)
+                self.residual_field = torch.zeros(n_points, device=device)
+                return self.residual_field
 
             pred_dict = self.calc_output(model)
             self.residual_field_raw = torch.stack(tuple(pred_dict[key] - self.target_output_tensor_dict[key] for key in pred_dict), dim = 0)

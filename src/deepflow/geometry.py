@@ -251,20 +251,23 @@ class Area(PhysicsAttach):
         """
         Samples points within the area.
         """
+        # Normalize n_points_square to nx, ny, and n_total before branching
+        if isinstance(n_points_square, (list, tuple)):
+            nx, ny = n_points_square[0], n_points_square[1]
+            n_total = nx * ny
+        else:
+            nx = ny = n_points_square
+            n_total = n_points_square
+
         if scheme == 'random':
-            points = torch.empty(n_points_square, 2)
+            points = torch.empty(n_total, 2)
             points[:, 0].uniform_(self.ranges[0][0], self.ranges[0][1])
             points[:, 1].uniform_(self.ranges[1][0], self.ranges[1][1])
             X, Y = points[:, 0], points[:, 1]
         elif scheme == 'lhs':
-            samples = latin_hypercube_sampling(n_points_square, 2, [self.ranges[0][0], self.ranges[1][0]], [self.ranges[0][1], self.ranges[1][1]]).squeeze(-1)
+            samples = latin_hypercube_sampling(n_total, 2, [self.ranges[0][0], self.ranges[1][0]], [self.ranges[0][1], self.ranges[1][1]]).squeeze(-1)
             X, Y = samples[:, 0], samples[:, 1]
         elif scheme == 'uniform':
-            if isinstance(n_points_square, (list, tuple)):
-                nx, ny = n_points_square[0], n_points_square[1]
-            else:
-                nx = ny = n_points_square
-                
             X_range = torch.linspace(self.ranges[0][0], self.ranges[0][1], nx)
             Y_range = torch.linspace(self.ranges[1][0], self.ranges[1][1], ny)
             
@@ -347,7 +350,7 @@ class Area(PhysicsAttach):
             plt.plot(X.numpy(), Y.numpy(), color='red', linestyle='--')
             
         # Sample interior to verify logic
-        X, Y = self.sampling_area([100, 100], random=False)
+        X, Y = self.sampling_area([100, 100], scheme='uniform')
         plt.scatter(X.numpy(), Y.numpy(), s=0.05, color='green', alpha=0.5)
         
         plt.gca().set_aspect('equal', adjustable='box')
