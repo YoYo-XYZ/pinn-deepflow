@@ -4,6 +4,7 @@ from typing import List, Tuple, Callable, Optional, Union, Dict, Any
 import torch
 
 from .utility import *
+from .utility import _next_seed
 from .physicsinformed import PhysicsAttach
 
 # Constants for numerical stability
@@ -124,7 +125,12 @@ class Bound(PhysicsAttach):
         self.coords = {}
         
         if scheme == 'random':
-            self.coords[ax] = torch.empty(n_points).uniform_(self.ranges[ax][0], self.ranges[ax][1])
+            gen_seed = _next_seed()
+            if gen_seed is not None:
+                gen = torch.Generator().manual_seed(gen_seed)
+                self.coords[ax] = torch.empty(n_points).uniform_(self.ranges[ax][0], self.ranges[ax][1], generator=gen)
+            else:
+                self.coords[ax] = torch.empty(n_points).uniform_(self.ranges[ax][0], self.ranges[ax][1])
         elif scheme == 'lhs':
             self.coords[ax] = latin_hypercube_sampling(n_points, 1, [self.ranges[ax][0]], [self.ranges[ax][1]]).squeeze(-1)
         elif scheme == 'uniform':
@@ -260,9 +266,16 @@ class Area(PhysicsAttach):
             n_total = n_points_square
 
         if scheme == 'random':
-            points = torch.empty(n_total, 2)
-            points[:, 0].uniform_(self.ranges[0][0], self.ranges[0][1])
-            points[:, 1].uniform_(self.ranges[1][0], self.ranges[1][1])
+            gen_seed = _next_seed()
+            if gen_seed is not None:
+                gen = torch.Generator().manual_seed(gen_seed)
+                points = torch.empty(n_total, 2)
+                points[:, 0].uniform_(self.ranges[0][0], self.ranges[0][1], generator=gen)
+                points[:, 1].uniform_(self.ranges[1][0], self.ranges[1][1], generator=gen)
+            else:
+                points = torch.empty(n_total, 2)
+                points[:, 0].uniform_(self.ranges[0][0], self.ranges[0][1])
+                points[:, 1].uniform_(self.ranges[1][0], self.ranges[1][1])
             X, Y = points[:, 0], points[:, 1]
         elif scheme == 'lhs':
             samples = latin_hypercube_sampling(n_total, 2, [self.ranges[0][0], self.ranges[1][0]], [self.ranges[0][1], self.ranges[1][1]]).squeeze(-1)

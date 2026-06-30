@@ -8,7 +8,7 @@ import torch.nn as nn
 # Assuming these modules exist in your package structure
 from .nn import HardConstraint
 from .pde import PDE
-from .utility import calc_grad, get_device
+from .utility import calc_grad, get_device, _next_seed
 
 class PhysicsAttach:
     """
@@ -137,7 +137,12 @@ class PhysicsAttach:
             if self.scheme == "uniform":
                 self.t = torch.linspace(self.range_t[0], self.range_t[1], n_points)
             elif self.scheme == "random":
-                self.t = torch.empty(n_points).uniform_(self.range_t[0], self.range_t[1])
+                gen_seed = _next_seed()
+                if gen_seed is not None:
+                    gen = torch.Generator().manual_seed(gen_seed)
+                    self.t = torch.empty(n_points).uniform_(self.range_t[0], self.range_t[1], generator=gen)
+                else:
+                    self.t = torch.empty(n_points).uniform_(self.range_t[0], self.range_t[1])
             if self.expo_scaling:
                 T1 = self.range_t[1]
                 self.t = (1 + self.t)**(self.t/T1) - 1

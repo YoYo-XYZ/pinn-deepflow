@@ -6,6 +6,14 @@ from typing import Tuple, List, Union, Generator, Optional
 
 # Module-level seed storage for reproducibility helpers
 _GLOBAL_SEED = None
+_RNG = None  # Advancing deterministic RNG for repeated sampling calls
+
+def _next_seed() -> Optional[int]:
+    """Return the next integer from the advancing module-level RNG, or None if not seeded."""
+    global _RNG
+    if _RNG is not None:
+        return _RNG.randint(0, 2**32 - 1)
+    return None
 
 def latin_hypercube_sampling(n_samples: int, n_dimensions: int, lower_lim:list, upper_lim:list, seed:Optional[int]=None) -> torch.Tensor:
     """
@@ -16,8 +24,8 @@ def latin_hypercube_sampling(n_samples: int, n_dimensions: int, lower_lim:list, 
         If neither is provided, SciPy's default (``None``) is used and results
         will vary between runs.
     """
-    # Resolve seed: explicit > global fallback > None (non-deterministic)
-    seed = seed if seed is not None else _GLOBAL_SEED
+    # Resolve seed: explicit > per-call advancing RNG > global fallback > None (non-deterministic)
+    seed = seed if seed is not None else (_next_seed() if _RNG is not None else _GLOBAL_SEED)
     lhs = scipy.stats.qmc.LatinHypercube(d=n_dimensions, strength=1, seed=seed)
     sample = lhs.random(n=n_samples)
     sample = scipy.stats.qmc.scale(sample, lower_lim, upper_lim)
@@ -39,8 +47,9 @@ def manual_seed(seed:int, deterministic:bool=False):
         deterministic: If ``True``, enables PyTorch's deterministic mode via
             ``torch.use_deterministic_algorithms(True)`` (may impact performance).
     """
-    global _GLOBAL_SEED
+    global _GLOBAL_SEED, _RNG
     _GLOBAL_SEED = seed
+    _RNG = random.Random(seed)
 
     random.seed(seed)
     np.random.seed(seed)
