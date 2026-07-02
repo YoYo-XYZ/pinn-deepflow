@@ -211,6 +211,12 @@ class PhysicsAttach:
         """
         Post-process the model's output to match target conditions.
         Handles derivative constraints (e.g., if key is 'u_x').
+
+        Uses ``self.model_inputs`` (not ``self.inputs_tensor_dict``) for
+        derivative computation so that batched forward passes work correctly:
+        ``model_inputs`` points to the tensors actually fed to the model (which
+        are in the autograd graph), whereas ``inputs_tensor_dict`` may hold the
+        original per-geometry tensors that are not in a batched graph.
         """
         prediction_dict = self.model_outputs
         pred_dict = {}
@@ -221,7 +227,7 @@ class PhysicsAttach:
                 var_name, grad_var = key.split('_')
                 if var_name not in prediction_dict:
                     raise KeyError(f"Model output missing variable '{var_name}' required for condition '{key}'.")
-                pred_dict[key] = calc_grad(prediction_dict[var_name], self.model_inputs[grad_var])
+                pred_dict[key] = calc_grad(prediction_dict[var_name], self.model_inputs[grad_var]) 
             else:
                 pred_dict[key] = prediction_dict[key]
                 
@@ -248,10 +254,10 @@ class PhysicsAttach:
         """
         Compute the residual field from cached ``model_inputs`` / ``model_outputs``.
 
-        This is the post-forward-pass portion of :meth:`calc_residual_field`,
-        extracted so that callers which have already run the model (e.g. the
-        batched loss in :class:`ProblemDomain`) can reuse a shared batched
-        output instead of re-running a forward pass per geometry.
+        This is the residual-computation half of :meth:`calc_residual_field`,
+        extracted so that callers which have already run the forward pass
+        (e.g. batched loss in :class:`ProblemDomain`) can skip the redundant
+        ``process_model`` call.
         """
         if self.physics_type in ["BC", "IC"]:
             # If all conditions are HardConstraints, the loss is structurally zero
@@ -268,7 +274,7 @@ class PhysicsAttach:
         if  self.physics_type == "PDE":
             self.process_pde()
             self.residual_field_raw = self.PDE.calc_residual_field_raw()
-
+        
         self.residual_field = self.residual_field_raw.abs().sum(dim=0)
         return self.residual_field
 

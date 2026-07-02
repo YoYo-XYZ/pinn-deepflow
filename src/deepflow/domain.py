@@ -274,21 +274,25 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             yield geometry
 
     def _batched_loss(self, model) -> dict:
-        """Compute per-physics-type losses with one forward pass per physics type.
+        """
+        Compute per-physics-type losses with **one forward pass per physics type**.
 
-        Geometries sharing the same ``physics_type`` are grouped together;
-        their input coordinates are concatenated into a single batch so that
-        only one ``model()`` forward pass is performed per group.  The batched
-        outputs are then sliced back to each geometry for residual/loss
-        computation, avoiding redundant forward passes.
+        Geometries sharing the same ``physics_type`` (BC, IC, or PDE) have their
+        input coordinates concatenated into a single batch, the model is called
+        once for that batch, and the outputs are sliced back to each geometry for
+        per-geometry residual computation (via ``_compute_residual_field``).
 
-        For channel-flow (4 BC bounds + 1 PDE area) this reduces 5 forward
-        passes per epoch to 2 (one BC group + one PDE group).
+        This reduces the number of forward passes from *N_geometries* to
+        *N_physics_types* (e.g. 5 → 2 for steady channel flow: 1 BC pass + 1
+        PDE pass).
+
+        Assumes all geometries within the same physics-type group share the same
+        ``inputs_tensor_dict`` keys.
         """
         loss_dict = {"pde_loss": 0.0, "bc_loss": 0.0, "ic_loss": 0.0}
 
-        # Group geometries by physics_type
-        groups = {}
+        # Group geometries by physics_type, preserving insertion order
+        groups: dict[str, list] = {}
         for geometry in self:
             groups.setdefault(geometry.physics_type, []).append(geometry)
 
@@ -300,14 +304,21 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 for k in input_keys
             }
 
-            # Single forward pass for the entire group
+            # Single forward pass for the entire physics-type group
             batched_outputs = model(batched_inputs)
 
-            # Slice outputs back to each geometry and compute per-geometry loss
+            # Slice outputs back to each geometry and compute per-geometry loss.
+            # Use the original leaf tensors (inputs_tensor_dict) as model_inputs
+            # so that torch.autograd.grad can compute higher-order derivatives
+            # (PDE residuals need 2nd derivatives). Slices of torch.cat are
+            # non-leaf intermediates which autograd cannot differentiate through
+            # for higher-order grads, but the original leaf tensors remain in
+            # the graph (leaf → cat → model → output_slice), so
+            # grad(output_slice, leaf_input) works correctly.
             start = 0
             for g in geometries:
-                end = start + g.X_.shape[0]
-                g.model_inputs = {k: batched_inputs[k][start:end] for k in input_keys}
+                end = start + len(g.X_)
+                g.model_inputs = g.inputs_tensor_dict
                 g.model_outputs = {k: batched_outputs[k][start:end] for k in batched_outputs}
                 g._compute_residual_field()
                 loss_dict[f'{physics_type.lower()}_loss'] += torch.mean(
@@ -327,7 +338,7 @@ def calc_loss_simple(domain: ProblemDomain) -> callable:
     return calc_loss_function
 
 def calc_loss_weighted(domain: ProblemDomain, bc_weights = 1, ic_weights = 1, pde_weights = 1) -> callable:
-    """Returns a simple loss calculation for the given domain for PINN training."""
+    """Returns a weighted loss calculation for the given domain for PINN training."""
     weight = {"pde_loss": pde_weights, "bc_loss": bc_weights, "ic_loss": ic_weights}
     def calc_loss_function(model):
         loss_dict = domain._batched_loss(model)
