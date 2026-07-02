@@ -207,7 +207,7 @@ class PhysicsAttach:
     # Model Execution & Loss Calculation
     # --------------------------------------------------------------------------
 
-    def calc_output(self, model: nn.Module) -> Dict[str, torch.Tensor]:
+    def calc_output(self, model: nn.Module = None) -> Dict[str, torch.Tensor]:
         """
         Post-process the model's output to match target conditions.
         Handles derivative constraints (e.g., if key is 'u_x').
@@ -221,7 +221,7 @@ class PhysicsAttach:
                 var_name, grad_var = key.split('_')
                 if var_name not in prediction_dict:
                     raise KeyError(f"Model output missing variable '{var_name}' required for condition '{key}'.")
-                pred_dict[key] = calc_grad(prediction_dict[var_name], self.inputs_tensor_dict[grad_var]) 
+                pred_dict[key] = calc_grad(prediction_dict[var_name], self.model_inputs[grad_var])
             else:
                 pred_dict[key] = prediction_dict[key]
                 
@@ -242,7 +242,17 @@ class PhysicsAttach:
         Calculate the element-wise loss field (absolute error or residual).
         """
         self.process_model(model)
-        
+        return self._compute_residual_field()
+
+    def _compute_residual_field(self) -> Union[int, torch.Tensor]:
+        """
+        Compute the residual field from cached ``model_inputs`` / ``model_outputs``.
+
+        This is the post-forward-pass portion of :meth:`calc_residual_field`,
+        extracted so that callers which have already run the model (e.g. the
+        batched loss in :class:`ProblemDomain`) can reuse a shared batched
+        output instead of re-running a forward pass per geometry.
+        """
         if self.physics_type in ["BC", "IC"]:
             # If all conditions are HardConstraints, the loss is structurally zero
             if all(isinstance(cond, HardConstraint) for cond in self.condition_dict.values()):
@@ -252,13 +262,13 @@ class PhysicsAttach:
                 self.residual_field = torch.zeros(n_points, device=device)
                 return self.residual_field
 
-            pred_dict = self.calc_output(model)
+            pred_dict = self.calc_output()
             self.residual_field_raw = torch.stack(tuple(pred_dict[key] - self.target_output_tensor_dict[key] for key in pred_dict), dim = 0)
 
         if  self.physics_type == "PDE":
             self.process_pde()
             self.residual_field_raw = self.PDE.calc_residual_field_raw()
-        
+
         self.residual_field = self.residual_field_raw.abs().sum(dim=0)
         return self.residual_field
 

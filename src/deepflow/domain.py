@@ -272,16 +272,55 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
     def __iter__(self):
         for geometry in self.bound_list + self.area_list:
             yield geometry
-    
-def calc_loss_simple(domain: ProblemDomain) -> callable:
-    """Returns a simple loss calculation for the given domain for PINN training."""
-    import traceback
-    def calc_loss_function(model):
+
+    def _batched_loss(self, model) -> dict:
+        """Compute per-physics-type losses with one forward pass per physics type.
+
+        Geometries sharing the same ``physics_type`` are grouped together;
+        their input coordinates are concatenated into a single batch so that
+        only one ``model()`` forward pass is performed per group.  The batched
+        outputs are then sliced back to each geometry for residual/loss
+        computation, avoiding redundant forward passes.
+
+        For channel-flow (4 BC bounds + 1 PDE area) this reduces 5 forward
+        passes per epoch to 2 (one BC group + one PDE group).
+        """
         loss_dict = {"pde_loss": 0.0, "bc_loss": 0.0, "ic_loss": 0.0}
 
-        for geometry in domain:
-                loss_dict[f'{geometry.physics_type.lower()}_loss'] += geometry.calc_loss(model)
-        
+        # Group geometries by physics_type
+        groups = {}
+        for geometry in self:
+            groups.setdefault(geometry.physics_type, []).append(geometry)
+
+        for physics_type, geometries in groups.items():
+            # Concatenate inputs across all geometries in this group
+            input_keys = list(geometries[0].inputs_tensor_dict.keys())
+            batched_inputs = {
+                k: torch.cat([g.inputs_tensor_dict[k] for g in geometries])
+                for k in input_keys
+            }
+
+            # Single forward pass for the entire group
+            batched_outputs = model(batched_inputs)
+
+            # Slice outputs back to each geometry and compute per-geometry loss
+            start = 0
+            for g in geometries:
+                end = start + g.X_.shape[0]
+                g.model_inputs = {k: batched_inputs[k][start:end] for k in input_keys}
+                g.model_outputs = {k: batched_outputs[k][start:end] for k in batched_outputs}
+                g._compute_residual_field()
+                loss_dict[f'{physics_type.lower()}_loss'] += torch.mean(
+                    g.residual_field_raw.square().sum(dim=0)
+                )
+                start = end
+
+        return loss_dict
+
+def calc_loss_simple(domain: ProblemDomain) -> callable:
+    """Returns a simple loss calculation for the given domain for PINN training."""
+    def calc_loss_function(model):
+        loss_dict = domain._batched_loss(model)
         loss_dict["total_loss"] = sum(value for key, value in loss_dict.items() if key != "total_loss")
         return loss_dict
     
@@ -289,14 +328,9 @@ def calc_loss_simple(domain: ProblemDomain) -> callable:
 
 def calc_loss_weighted(domain: ProblemDomain, bc_weights = 1, ic_weights = 1, pde_weights = 1) -> callable:
     """Returns a simple loss calculation for the given domain for PINN training."""
-    import traceback
     weight = {"pde_loss": pde_weights, "bc_loss": bc_weights, "ic_loss": ic_weights}
     def calc_loss_function(model):
-        loss_dict = {"pde_loss": 0.0, "bc_loss": 0.0, "ic_loss": 0.0}
-
-        for geometry in domain:
-                loss_dict[f'{geometry.physics_type.lower()}_loss'] += geometry.calc_loss(model)
-        
+        loss_dict = domain._batched_loss(model)
         loss_dict["total_loss"] = sum(weight[key] * value for key, value in loss_dict.items() if key != "total_loss")
         return loss_dict
     
