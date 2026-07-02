@@ -79,13 +79,16 @@ class Evaluator(Visualizer):
         data_dict = self.geometry.process_model(self.model)
 
         # 2. Physics Residuals
+        # process_model() above already populated self.geometry.model_inputs/outputs,
+        # so use _compute_residual_field() to avoid a redundant model forward pass
+        # that calc_residual_field() would otherwise perform.
         if self.geometry.physics_type == 'PDE':
             # Use .update() for dictionary merging (compatible with older python)
-            data_dict[f"{self.geometry.physics_type}".lower() + "_residual"] = self.geometry.calc_residual_field(self.model)
+            data_dict[f"{self.geometry.physics_type}".lower() + "_residual"] = self.geometry._compute_residual_field()
             data_dict.update(self.geometry.PDE.var)
-        
+
         elif self.geometry.physics_type in ['BC', 'IC']:
-            data_dict[f"{self.geometry.physics_type}".lower() + "_residual"] = self.geometry.calc_residual_field(self.model)
+            data_dict[f"{self.geometry.physics_type}".lower() + "_residual"] = self.geometry._compute_residual_field()
         # 4. Coordinates
         data_dict['x'] = self.geometry.X
         data_dict['y'] = self.geometry.Y
