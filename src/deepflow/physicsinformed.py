@@ -152,7 +152,12 @@ class PhysicsAttach:
             raise ValueError("Time range must be defined before sampling time coordinates.")
 
         self.T = self.t
-        self.T_ = self.t.to(device).requires_grad_()
+        # .detach() ensures T_ is always a fresh leaf tensor, even when
+        # self.t was previously given requires_grad in-place by an earlier
+        # process_coordinates call (which makes .to(device) return the same
+        # tensor).  Without .detach(), R3 resampling can produce a non-leaf
+        # T_ carrying a stale grad_fn, which breaks the next backward().
+        self.T_ = self.t.to(device).detach().requires_grad_()
         self.inputs_tensor_dict['t'] = self.T_
 
     def process_coordinates(self, device: Optional[torch.device] = None) -> Dict[str, Optional[torch.Tensor]]:
@@ -168,9 +173,14 @@ class PhysicsAttach:
 
         device = get_device() if device is None else device
         
-        # Enable gradients for physics calculation (autograd)
-        self.X_ = self.X.to(device).requires_grad_()
-        self.Y_ = self.Y.to(device).requires_grad_()
+        # .detach() ensures X_/Y_ are always fresh leaf tensors, even when
+        # self.X/self.Y were previously given requires_grad in-place by an
+        # earlier process_coordinates call (which makes .to(device) return
+        # the same tensor).  Without .detach(), R3 resampling can produce
+        # non-leaf X_/Y_ carrying a stale grad_fn from the previous graph,
+        # which breaks the next backward().
+        self.X_ = self.X.to(device).detach().requires_grad_()
+        self.Y_ = self.Y.to(device).detach().requires_grad_()
 
         self.inputs_tensor_dict['x'] = self.X_
         self.inputs_tensor_dict['y'] = self.Y_

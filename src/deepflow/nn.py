@@ -256,19 +256,18 @@ class NN(ABC, nn.Module):
                         print("Detected NaN in loss. Stop the training.")
                         nan_detected = True
                         return 0.0
-                    # retain_graph=True is required because:
-                    # 1. calc_loss stores residual field tensors with grad_fn
-                    #    on geometry objects (via calc_grad with create_graph=True).
-                    # 2. LBFGS line search calls closure() multiple times per step
-                    #    with the same underlying graph context (the same input
-                    #    leaf tensors are reused across trial evaluations). When
-                    #    create_graph=True is used for 2nd-order PDE residuals,
-                    #    autograd frees saved intermediate values after the first
-                    #    backward(), breaking the next closure evaluation. Without
-                    #    retaining the graph, the line search hits
-                    #    "RuntimeError: Trying to backward through the graph a
-                    #    second time".
-                    total_loss.backward(retain_graph=True)
+                    # retain_graph=False (default): each closure call performs
+                    # a fresh forward pass that builds a new graph. The LBFGS
+                    # line search only consumes the scalar loss and parameter
+                    # .grad attributes — it never traverses the autograd graph
+                    # across calls. Freeing the graph immediately after backward()
+                    # reduces peak memory (especially important with
+                    # create_graph=True in calc_grad for 2nd-order PDE residuals).
+                    #
+                    # This requires process_coordinates() to produce fresh leaf
+                    # tensors (via .detach().requires_grad_()) so that R3
+                    # resampling doesn't leave stale grad_fn references on X_/Y_.
+                    total_loss.backward()
                     
                     loss_dict_container.update(loss_dict) # Store loss_dict in the container
                     return total_loss.detach()  # detach to avoid keeping graph alive after step
