@@ -156,16 +156,27 @@ class NN(ABC, nn.Module):
         use_scheduler: Optional[bool] = False, 
         print_every: int = 200, 
         threshold_loss: Optional[float] = None,
-        do_between_epochs: Optional[Callable] = None
+        do_between_epochs: Optional[Callable] = None,
+        compile_model: bool = False,
     )-> tuple['NN', 'NN']:
         """
         Trains the model using the Adam optimizer.
+
+        Args:
+            compile_model: If ``True``, wraps the model with ``torch.compile``
+                for kernel fusion and reduced overhead. Requires PyTorch 2.0+
+                and the Triton backend (Linux). The first epoch will be slower
+                due to compilation; subsequent epochs benefit from fused kernels.
         """
         model = copy.deepcopy(self.to(get_device()))
+        if compile_model:
+            model = torch.compile(model)
 
         model.train() # Set to training mode
-                
-        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+        # Use fused Adam on CUDA for fewer kernel launches (PyTorch 2.0+)
+        fused = torch.cuda.is_available()
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, fused=fused)
         
         scheduler = None
         if use_scheduler:
@@ -173,6 +184,7 @@ class NN(ABC, nn.Module):
             scheduler = torch.optim.lr_scheduler.StepLR(optimizer, epochs//20, gamma=0.9)
 
         best_loss = float('inf')
+        best_state = None
         try:
             for epoch in range(1,epochs+1):
                 optimizer.zero_grad(set_to_none=True)
@@ -191,10 +203,10 @@ class NN(ABC, nn.Module):
                 
                 model._record_loss(loss_dict)
 
-                # Save best state
+                # Save best state (just parameters, not entire object graph)
                 if total_loss_num < best_loss:
                     best_loss = total_loss_num
-                    best_model = copy.deepcopy(model)
+                    best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
                     
                     if threshold_loss and best_loss < threshold_loss:
                         print(f"Stop: Loss {best_loss:.5f} < Threshold {threshold_loss}")
@@ -207,7 +219,11 @@ class NN(ABC, nn.Module):
 
         except KeyboardInterrupt:
             print('Training interrupted by user.')
-            return model, best_model
+            
+        # Reconstruct best model from saved parameters
+        best_model = copy.deepcopy(model)
+        if best_state is not None:
+            best_model.load_state_dict(best_state)
             
         model.print_status()
         return model, best_model
@@ -219,14 +235,21 @@ class NN(ABC, nn.Module):
         print_every: int = 50, 
         threshold_loss: Optional[float] = None,
         do_between_epochs: Optional[Callable] = None,
+        compile_model: bool = False,
     ) -> tuple['NN', 'NN']:
         """
         Trains the model using the L-BFGS optimizer.
+
+        Args:
+            compile_model: If ``True``, wraps the model with ``torch.compile``
+                for kernel fusion and reduced overhead. Requires PyTorch 2.0+.
         
         Returns:
             tuple: (model, best_model) — the final model and the model with the lowest loss.
         """
         model = copy.deepcopy(self.to(get_device()))
+        if compile_model:
+            model = torch.compile(model)
 
         model.train()
 
@@ -239,7 +262,7 @@ class NN(ABC, nn.Module):
         )
 
         best_loss = float('inf')
-        best_model = copy.deepcopy(model)
+        best_state = None
 
         try:
             for epoch in range(epochs):
@@ -285,10 +308,10 @@ class NN(ABC, nn.Module):
                     total_loss_num = loss_dict_container['total_loss'].item()
                     model._record_loss(loss_dict_container)
 
-                    # Track best model
+                    # Track best model (just parameters, not entire object graph)
                     if total_loss_num < best_loss:
                         best_loss = total_loss_num
-                        best_model = copy.deepcopy(model)
+                        best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
 
                 if epoch % print_every == 0:
                     model.print_status()
@@ -303,7 +326,11 @@ class NN(ABC, nn.Module):
 
         except KeyboardInterrupt:
             print('Training interrupted by user.')
-            return model, best_model
+        
+        # Reconstruct best model from saved parameters
+        best_model = copy.deepcopy(model)
+        if best_state is not None:
+            best_model.load_state_dict(best_state)
         
         model.print_status()
         return model, best_model

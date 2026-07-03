@@ -291,10 +291,14 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         """
         loss_dict = {"pde_loss": 0.0, "bc_loss": 0.0, "ic_loss": 0.0}
 
-        # Group geometries by physics_type, preserving insertion order
-        groups: dict[str, list] = {}
-        for geometry in self:
-            groups.setdefault(geometry.physics_type, []).append(geometry)
+        # Group geometries by physics_type, preserving insertion order.
+        # Cache the grouping since geometry structure is fixed during training.
+        if not hasattr(self, '_groups_cache'):
+            groups: dict[str, list] = {}
+            for geometry in self:
+                groups.setdefault(geometry.physics_type, []).append(geometry)
+            self._groups_cache = groups
+        groups = self._groups_cache
 
         for physics_type, geometries in groups.items():
             # Concatenate inputs across all geometries in this group
