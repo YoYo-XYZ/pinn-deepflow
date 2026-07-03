@@ -174,10 +174,8 @@ class NN(ABC, nn.Module):
 
         model.train() # Set to training mode
 
-        # Use fused Adam on CUDA for fewer kernel launches (PyTorch 2.0+)
-        fused = torch.cuda.is_available()
-        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, fused=fused)
-        
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
         scheduler = None
         if use_scheduler:
             # Allow custom scheduler config or default

@@ -35,7 +35,7 @@ device = 'cpu' if not torch.cuda.is_available() else 'cuda'
 def get_device():
     global device
     return device
-def manual_seed(seed:int, deterministic:bool=False, allow_tf32:bool=True):
+def manual_seed(seed:int, deterministic:bool=False):
     """
     Set all random seeds for reproducible training runs.
 
@@ -46,10 +46,6 @@ def manual_seed(seed:int, deterministic:bool=False, allow_tf32:bool=True):
         seed: Integer seed passed to all RNGs.
         deterministic: If ``True``, enables PyTorch's deterministic mode via
             ``torch.use_deterministic_algorithms(True)`` (may impact performance).
-        allow_tf32: If ``True`` (default), enables TF32 for CUDA matmul and cuDNN
-            on Ampere+ GPUs. TF32 uses tensor cores for ~2-3x matmul speedup
-            with negligible precision loss (~10 decimal digits vs ~7 for FP32).
-            Set to ``False`` for full FP32 precision.
     """
     global _GLOBAL_SEED, _RNG
     _GLOBAL_SEED = seed
@@ -63,9 +59,6 @@ def manual_seed(seed:int, deterministic:bool=False, allow_tf32:bool=True):
         torch.cuda.manual_seed_all(seed)        # Multi-GPU coverage
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-        if allow_tf32:
-            torch.backends.cuda.matmul.allow_tf32 = True
-            torch.backends.cudnn.allow_tf32 = True
 
     if deterministic:
         torch.use_deterministic_algorithms(True)
