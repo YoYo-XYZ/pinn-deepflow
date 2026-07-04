@@ -126,6 +126,7 @@ class QPINN(NN):
             layers.append(self.activation)
         
         self.net = nn.Sequential(*layers)
+        self._init_weights()
 
 class QCPINN(NN):
     def __init__(
@@ -179,3 +180,4 @@ class QCPINN(NN):
             layers.append(self.activation)
         
         self.net = nn.Sequential(*layers)
+        self._init_weights()

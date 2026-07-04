@@ -12,18 +12,18 @@
 
 | Metric | DeepFlow | DeepXDE | Unit |
 |--------|----------|---------|------|
-| Train time | 64.91 | 53.35 | s |
-| Final total loss | 8.690780e-03 | 1.802161e-02 | – |
+| Train time | 48.83 | 53.35 | s |
+| Final total loss | 1.446839e-02 | 1.802161e-02 | – |
 | Best train loss | N/A | 1.802161e-02 | – |
 | Best test loss | N/A | 1.865015e-02 | – |
-| Mean |u| | 0.912825 | 0.787991 | – |
-| Mean |v| | 0.010395 | 0.014275 | – |
-| Max |continuity residual| | 2.621929e+00 | 4.466429e-01 | – |
-| Max |x-momentum residual| | 3.512159e+00 | 3.389401e-01 | – |
-| Max |y-momentum residual| | 2.037790e+00 | 2.837259e-01 | – |
-| Mass flux inlet | 0.985164 | 0.976968 | – |
-| Mass flux outlet | 0.884441 | 0.726149 | – |
-| Mass flux rel. error | 1.022390e-01 | 2.567326e-01 | – |
+| Mean |u| | 0.846296 | 0.787991 | – |
+| Mean |v| | 0.011450 | 0.014275 | – |
+| Max |continuity residual| | 2.592936e+00 | 4.466429e-01 | – |
+| Max |x-momentum residual| | 2.762563e+00 | 3.389401e-01 | – |
+| Max |y-momentum residual| | 1.034605e+00 | 2.837259e-01 | – |
+| Mass flux inlet | 0.975892 | 0.976968 | – |
+| Mass flux outlet | 0.774808 | 0.726149 | – |
+| Mass flux rel. error | 2.060518e-01 | 2.567326e-01 | – |
 
 ## Generated Figures
 

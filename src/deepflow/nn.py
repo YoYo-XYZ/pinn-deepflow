@@ -66,6 +66,19 @@ class NN(ABC, nn.Module):
         """Define the network architecture in subclasses."""
         pass
 
+    def _init_weights(self) -> None:
+        """
+        Apply Glorot (Xavier) normal initialization to all nn.Linear layers.
+
+        Weights are drawn from N(0, std²) with
+        ``std = sqrt(2 / (fan_in + fan_out))``.  Biases are zero-filled.
+        """
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
     def _init_history(self):
         """Initializes the loss history dictionary."""
         base_keys = ['total_loss', 'bc_loss', 'pde_loss']
@@ -375,6 +388,7 @@ class FNN(NN):
         layers.append(nn.Linear(self.layer_list[-2], self.layer_list[-1]))
 
         self.net = nn.Sequential(*layers)
+        self._init_weights()
 
 class PINN(FNN):
     def __init__(

@@ -215,6 +215,16 @@ def _scatter_plot(ax, x, y, field, title, cmap="viridis", vrange=None):
     plt.colorbar(sc, ax=ax, shrink=0.8)
 
 
+def _shared_range(*arrays):
+    """Return a shared (vmin, vmax) covering all supplied arrays, ignoring NaNs."""
+    flat = [np.asarray(a).ravel() for a in arrays if a is not None and len(np.asarray(a))]
+    if not flat:
+        return None
+    vals = np.concatenate(flat)
+    if len(vals) == 0:
+        return None
+    return float(np.nanmin(vals)), float(np.nanmax(vals))
+
 def _line_plot(ax, x, y, label, color):
     ax.plot(x, y, label=label, color=color)
     ax.set_xlabel("x" if "u(x)" in label or "u(y)" not in label else "y")
@@ -255,10 +265,14 @@ def _profile_u_vs_x_at_y(data, y_target):
 
 # -- (a) u velocity field ---------------------------------------------------
 fig, axes = plt.subplots(1, 2, figsize=(14, 4))
+u_range = _shared_range(
+    _field_data(df_data, "u")[2] if df_data is not None else None,
+    _field_data(dx_data, "u")[2] if dx_data is not None else None,
+)
 for ax, label, data in zip(axes, ["DeepFlow", "DeepXDE"], [df_data, dx_data]):
     if data is not None:
         x, y, u = _field_data(data, "u")
-        _scatter_plot(ax, x, y, u, f"u – {label}", cmap="jet")
+        _scatter_plot(ax, x, y, u, f"u – {label}", cmap="jet", vrange=u_range)
     else:
         ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
 plt.tight_layout()
@@ -267,10 +281,14 @@ plt.close(fig)
 
 # -- (b) v velocity field ---------------------------------------------------
 fig, axes = plt.subplots(1, 2, figsize=(14, 4))
+v_range = _shared_range(
+    _field_data(df_data, "v")[2] if df_data is not None else None,
+    _field_data(dx_data, "v")[2] if dx_data is not None else None,
+)
 for ax, label, data in zip(axes, ["DeepFlow", "DeepXDE"], [df_data, dx_data]):
     if data is not None:
         x, y, v = _field_data(data, "v")
-        _scatter_plot(ax, x, y, v, f"v – {label}", cmap="jet")
+        _scatter_plot(ax, x, y, v, f"v – {label}", cmap="jet", vrange=v_range)
     else:
         ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
 plt.tight_layout()
@@ -279,10 +297,14 @@ plt.close(fig)
 
 # -- (c) Pressure field ----------------------------------------------------
 fig, axes = plt.subplots(1, 2, figsize=(14, 4))
+p_range = _shared_range(
+    _field_data(df_data, "p")[2] if df_data is not None else None,
+    _field_data(dx_data, "p")[2] if dx_data is not None else None,
+)
 for ax, label, data in zip(axes, ["DeepFlow", "DeepXDE"], [df_data, dx_data]):
     if data is not None:
         x, y, p = _field_data(data, "p")
-        _scatter_plot(ax, x, y, p, f"p – {label}", cmap="jet")
+        _scatter_plot(ax, x, y, p, f"p – {label}", cmap="jet", vrange=p_range)
     else:
         ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
 plt.tight_layout()
@@ -291,12 +313,25 @@ plt.close(fig)
 
 # -- (d) Velocity magnitude ------------------------------------------------
 fig, axes = plt.subplots(1, 2, figsize=(14, 4))
+if df_data is not None:
+    x_df, y_df, u_df = _field_data(df_data, "u")
+    _, _, v_df = _field_data(df_data, "v")
+    mag_df = np.sqrt(u_df**2 + v_df**2)
+else:
+    mag_df = None
+if dx_data is not None:
+    x_dx, y_dx, u_dx = _field_data(dx_data, "u")
+    _, _, v_dx = _field_data(dx_data, "v")
+    mag_dx = np.sqrt(u_dx**2 + v_dx**2)
+else:
+    mag_dx = None
+mag_range = _shared_range(mag_df, mag_dx)
 for ax, label, data in zip(axes, ["DeepFlow", "DeepXDE"], [df_data, dx_data]):
     if data is not None:
         x, y, u = _field_data(data, "u")
         _, _, v = _field_data(data, "v")
         mag = np.sqrt(u**2 + v**2)
-        _scatter_plot(ax, x, y, mag, f"|U| – {label}", cmap="jet")
+        _scatter_plot(ax, x, y, mag, f"|U| – {label}", cmap="jet", vrange=mag_range)
     else:
         ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
 plt.tight_layout()
@@ -305,10 +340,14 @@ plt.close(fig)
 
 # -- (e) Continuity residual -----------------------------------------------
 fig, axes = plt.subplots(1, 2, figsize=(14, 4))
+cont_range = _shared_range(
+    np.abs(_field_data(df_data, "continuity_residual")[2]) if df_data is not None else None,
+    np.abs(_field_data(dx_data, "continuity_residual")[2]) if dx_data is not None else None,
+)
 for ax, label, data in zip(axes, ["DeepFlow", "DeepXDE"], [df_data, dx_data]):
     if data is not None:
         x, y, r = _field_data(data, "continuity_residual")
-        _scatter_plot(ax, x, y, np.abs(r), f"|Continuity| – {label}", cmap="hot")
+        _scatter_plot(ax, x, y, np.abs(r), f"|Continuity| – {label}", cmap="hot", vrange=cont_range)
     else:
         ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
 plt.tight_layout()
@@ -317,10 +356,14 @@ plt.close(fig)
 
 # -- (f) X-momentum residual -----------------------------------------------
 fig, axes = plt.subplots(1, 2, figsize=(14, 4))
+xmom_range = _shared_range(
+    np.abs(_field_data(df_data, "x_momentum_residual")[2]) if df_data is not None else None,
+    np.abs(_field_data(dx_data, "x_momentum_residual")[2]) if dx_data is not None else None,
+)
 for ax, label, data in zip(axes, ["DeepFlow", "DeepXDE"], [df_data, dx_data]):
     if data is not None:
         x, y, r = _field_data(data, "x_momentum_residual")
-        _scatter_plot(ax, x, y, np.abs(r), f"|x-Momentum| – {label}", cmap="hot")
+        _scatter_plot(ax, x, y, np.abs(r), f"|x-Momentum| – {label}", cmap="hot", vrange=xmom_range)
     else:
         ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
 plt.tight_layout()
