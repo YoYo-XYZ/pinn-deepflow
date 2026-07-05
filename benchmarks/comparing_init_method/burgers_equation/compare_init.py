@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 """
 Compare DeepFlow Burgers-equation performance with Glorot-normal (current default)
 vs the old Kaiming-uniform initialization.
