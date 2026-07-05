@@ -97,6 +97,14 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 area.clear_residual_based_points()
 
     def sampling_R3(self, bound_sampling_res:list=None, area_sampling_res:list=None):
+        """
+        R3 residual-based resampling with a **fixed total budget** (paper version).
+
+        For each geometry, points whose residual exceeds the mean are kept,
+        and the remaining budget is filled with fresh random samples. The total
+        number of points per geometry therefore stays roughly equal to the
+        requested resolution over time.
+        """
         self.sampling_option = self.sampling_option + ' + R3'
 
         if bound_sampling_res:
@@ -117,6 +125,14 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 # Add RAR point to saved points
 
     def sampling_R3_(self, bound_sampling_res:list=None, area_sampling_res:list=None):
+        """
+        R3 residual-based resampling with an **accumulating budget**.
+
+        For each geometry, points whose residual exceeds the mean are kept and
+        *added* on top of a fresh random sample of size ``res``. The total number
+        of points therefore grows over time. This matches the historical
+        deepflow behaviour prior to the paper-correct ``sampling_R3`` change.
+        """
         self.sampling_option = self.sampling_option + ' + R3'
         
         if bound_sampling_res:
