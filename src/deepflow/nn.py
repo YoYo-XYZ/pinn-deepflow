@@ -39,11 +39,17 @@ class NN(ABC, nn.Module):
         self,
         input_vars: Optional[List[str]] = None, 
         output_vars: Optional[List[str]] = None,
+        weight_init: Union[str, Callable, None] = 'kaiming',
     ):
         """
         Args:
             input_vars (list): List of input variable names (e.g., ['x', 'y']).
             output_vars (list): List of output variable names (e.g., ['u']).
+            weight_init: Weight initialization scheme for ``nn.Linear`` layers.
+                Supported string aliases: ``'kaiming'``/``'he'`` (default),
+                ``'xavier'``/``'glorot'``.  ``None`` leaves PyTorch's default
+                initialization untouched.  A callable receives the model and
+                can apply arbitrary initialization.
         """
         super().__init__()
         
@@ -54,6 +60,7 @@ class NN(ABC, nn.Module):
         self.input_num = len(self.input_keys)
         self.output_num = len(self.output_keys)
         
+        self.weight_init = weight_init
         # Hard constraint containers
         self.hard_constraints: Optional[Dict] = None
         self.hard_constants: Optional[Dict] = None
@@ -65,6 +72,48 @@ class NN(ABC, nn.Module):
     def _build_network(self):
         """Define the network architecture in subclasses."""
         pass
+
+    def _init_weights(self) -> None:
+        """
+        Apply the selected weight initialization scheme to all ``nn.Linear``
+        layers in the network. The scheme is controlled by ``self.weight_init``.
+
+        Supported string aliases:
+            - ``'kaiming'`` / ``'he'``: Kaiming uniform (PyTorch ``nn.Linear``
+              default). Weights use ``a = sqrt(5)``; biases are uniform in
+              ``[-1/sqrt(fan_in), 1/sqrt(fan_in)]``.
+            - ``'xavier'`` / ``'glorot'``: Xavier normal. Biases are zero.
+
+        Passing ``None`` skips initialization, leaving PyTorch's defaults. A
+        callable receives the model instance and can apply a custom scheme.
+        """
+        if self.weight_init is None:
+            return
+
+        if callable(self.weight_init):
+            self.weight_init(self)
+            return
+
+        init_name = str(self.weight_init).lower()
+        if init_name not in ('kaiming', 'he', 'xavier', 'glorot'):
+            raise ValueError(
+                f"Unknown weight_init='{self.weight_init}'. "
+                f"Supported values are: 'kaiming', 'he', 'xavier', 'glorot', "
+                f"None, or a callable."
+            )
+
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                if init_name in ('kaiming', 'he'):
+                    nn.init.kaiming_uniform_(m.weight, a=5 ** 0.5)
+                    if m.bias is not None:
+                        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(m.weight)
+                        bound = 1 / (fan_in ** 0.5) if fan_in > 0 else 0
+                        nn.init.uniform_(m.bias, -bound, bound)
+                else:  # xavier / glorot
+                    nn.init.xavier_normal_(m.weight)
+                    if m.bias is not None:
+                        nn.init.zeros_(m.bias)
 
     def _init_history(self):
         """Initializes the loss history dictionary."""
@@ -351,12 +400,13 @@ def load_from_pickle(file_name: str) -> None:
 class FNN(NN):
     def __init__(
         self,
-        input_vars: Optional[List[str]] = None, 
+        input_vars: Optional[List[str]] = None,
         output_vars: Optional[List[str]] = None,
         hidden_layer: List[int] = [50, 50, 50, 50],
-        activation: nn.Module = nn.Tanh()
+        activation: nn.Module = nn.Tanh(),
+        weight_init: Union[str, Callable, None] = 'kaiming',
     ):
-        super().__init__(input_vars, output_vars)
+        super().__init__(input_vars, output_vars, weight_init=weight_init)
         self.activation = activation
         self.hidden_layer = hidden_layer
         self._build_network()
@@ -370,19 +420,26 @@ class FNN(NN):
         for i in range(len(self.layer_list) - 2):
             layers.append(nn.Linear(self.layer_list[i], self.layer_list[i+1]))
             layers.append(self.activation)
-            
+
         # Add the final output layer without activation
         layers.append(nn.Linear(self.layer_list[-2], self.layer_list[-1]))
 
         self.net = nn.Sequential(*layers)
+        self._init_weights()
 
 class PINN(FNN):
     def __init__(
         self,
-        input_vars: Optional[List[str]] = None, 
+        input_vars: Optional[List[str]] = None,
         output_vars: Optional[List[str]] = None,
         width: int = 32,
         length: int = 4,
-        activation: nn.Module = nn.Tanh()
+        activation: nn.Module = nn.Tanh(),
+        weight_init: Union[str, Callable, None] = 'kaiming',
     ):
-        super().__init__(input_vars, output_vars, [width for _ in range(length)], activation)
+        super().__init__(
+            input_vars, output_vars,
+            [width for _ in range(length)],
+            activation,
+            weight_init=weight_init,
+        )

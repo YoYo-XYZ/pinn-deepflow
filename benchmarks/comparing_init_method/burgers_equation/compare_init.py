@@ -12,7 +12,6 @@ import sys
 import time
 import numpy as np
 import torch
-import torch.nn as nn
 import matplotlib.pyplot as plt
 from torch import sin, pi
 
@@ -46,32 +45,29 @@ def build_domain():
     return domain
 
 
-def train_one(init_name, init_fn, seed):
+def train_one(init_name, weight_init, seed):
     print(f"\n--- Training with {init_name} initialization ---")
     df.manual_seed(seed)
-    # Monkey-patch the initialization for Kaiming run
-    original_init = df.NN._init_weights
-    df.NN._init_weights = init_fn
 
-    try:
-        domain = build_domain()
-        model0 = df.PINN(
-            width=WIDTH, length=DEPTH,
-            input_vars=["x", "y"], output_vars=["u"],
-        )
-        t0 = time.perf_counter()
-        model1, model1_best = model0.train_adam(
-            calc_loss=df.calc_loss_simple(domain),
-            learning_rate=LR, epochs=EPOCHS,
-        )
-        train_time = time.perf_counter() - t0
+    domain = build_domain()
+    model0 = df.PINN(
+        width=WIDTH, length=DEPTH,
+        input_vars=["x", "y"], output_vars=["u"],
+        weight_init=weight_init,
+    )
+    t0 = time.perf_counter()
+    model1, model1_best = model0.train_adam(
+        calc_loss=df.calc_loss_simple(domain),
+        learning_rate=LR, epochs=EPOCHS,
+    )
+    train_time = time.perf_counter() - t0
 
-        # Evaluate on a uniform grid
-        prediction = domain.area_list[0].evaluate(model1_best)
-        prediction.sampling_area(EVAL_GRID)
-        data = prediction.data_dict
+    # Evaluate on a uniform grid
+    prediction = domain.area_list[0].evaluate(model1_best)
+    prediction.sampling_area(EVAL_GRID)
+    data = prediction.data_dict
 
-        return {
+    return {
             "init": init_name,
             "time": train_time,
             "final_total": float(data["total_loss"][-1]),
@@ -82,8 +78,6 @@ def train_one(init_name, init_fn, seed):
             "y": np.asarray(data["y"]),
             "u": np.asarray(data["u"]),
         }
-    finally:
-        df.NN._init_weights = original_init
 
 
 def _scatter_plot(ax, x, y, field, title, cmap="jet", vrange=None):
@@ -109,33 +103,13 @@ def _shared_range(*arrays):
     return float(np.nanmin(vals)), float(np.nanmax(vals))
 
 
-def kaiming_init(self):
-    """Restore the old PyTorch default (Kaiming/He uniform) initialization."""
-    for m in self.modules():
-        if isinstance(m, nn.Linear):
-            nn.init.kaiming_uniform_(m.weight, a=5 ** 0.5)
-            if m.bias is not None:
-                fan_in, _ = nn.init._calculate_fan_in_and_fan_out(m.weight)
-                bound = 1 / (fan_in ** 0.5) if fan_in > 0 else 0
-                nn.init.uniform_(m.bias, -bound, bound)
-
-
-def glorot_init(self):
-    """Current default: Glorot (Xavier) normal."""
-    for m in self.modules():
-        if isinstance(m, nn.Linear):
-            nn.init.xavier_normal_(m.weight)
-            if m.bias is not None:
-                nn.init.zeros_(m.bias)
-
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     results = [
-        train_one("Glorot-normal", glorot_init, SEED),
-        train_one("Kaiming-uniform", kaiming_init, SEED),
+        train_one("Glorot-normal", "glorot", SEED),
+        train_one("Kaiming-uniform", "kaiming", SEED),
     ]
 
     print("\n" + "=" * 80)

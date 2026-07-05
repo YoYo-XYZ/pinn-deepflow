@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union, Callable
 from .nn import NN
 
 from torch import nn
@@ -36,15 +36,16 @@ def _qcpinn_circuit(inputs, weights):
 class QPINN(NN):
     def __init__(
         self,
-        input_vars: Optional[List[str]] = None, 
+        input_vars: Optional[List[str]] = None,
         output_vars: Optional[List[str]] = None,
         nqubits: Optional[int] = 4,
         q_depth: int = 4,
         hidden_layer_pre: Optional[List[int]] = None,
         hidden_layer_post: Optional[List[int]] = None,
-        activation: nn.Module = nn.Tanh()
+        activation: nn.Module = nn.Tanh(),
+        weight_init: Union[str, Callable, None] = 'kaiming',
     ):
-        super().__init__(input_vars, output_vars)
+        super().__init__(input_vars, output_vars, weight_init=weight_init)
         self.nqubits = nqubits
         self.q_depth = q_depth
         self.hidden_layer_pre = hidden_layer_pre if hidden_layer_pre is not None else []
@@ -126,20 +127,22 @@ class QPINN(NN):
             layers.append(self.activation)
         
         self.net = nn.Sequential(*layers)
+        self._init_weights()
 
 class QCPINN(NN):
     def __init__(
         self,
-        input_vars: Optional[List[str]] = None, 
+        input_vars: Optional[List[str]] = None,
         output_vars: Optional[List[str]] = None,
         nqubits: Optional[int] = 4,
         q_layer_type: str = "cascade",
         q_layer_iterations: int = 1,
         hidden_layer_pre: Optional[List[int]] = None,
         hidden_layer_post: Optional[List[int]] = None,
-        activation: nn.Module = nn.Tanh()
+        activation: nn.Module = nn.Tanh(),
+        weight_init: Union[str, Callable, None] = 'kaiming',
     ):
-        super().__init__(input_vars, output_vars)
+        super().__init__(input_vars, output_vars, weight_init=weight_init)
         self.nqubits = nqubits
         self.hidden_layer_pre = hidden_layer_pre if hidden_layer_pre is not None else []
         self.hidden_layer_post = hidden_layer_post if hidden_layer_post is not None else []
@@ -179,4 +182,5 @@ class QCPINN(NN):
             layers.append(self.activation)
         
         self.net = nn.Sequential(*layers)
+        self._init_weights()
 
