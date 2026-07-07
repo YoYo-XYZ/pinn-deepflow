@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -808,6 +808,17 @@
 </code></pre></div>
 <img alt="alt text" src="../static/quickstart/flow_field.png" />
 <img alt="alt text" src="../static/quickstart/loss_curve.png" /></p>
+<h1 id="4-optional-train-in-fp64-double-precision">4. Optional: Train in FP64 (Double Precision)</h1>
+<p>Recent work on PINNs reports that double precision can improve convergence and
+accuracy. Enable FP64 globally before building the geometry or model:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">deepflow</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">df</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">df</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1"># Continue with geometry, PDE, sampling, and training as shown above.</span>
+</code></pre></div>
+<p>Switch back to FP32 at any time with <code>df.dtype = torch.float32</code>.</p>
 
 
 
