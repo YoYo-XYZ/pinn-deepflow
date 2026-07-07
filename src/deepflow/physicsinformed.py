@@ -8,7 +8,7 @@ import torch.nn as nn
 # Assuming these modules exist in your package structure
 from .nn import HardConstraint
 from .pde import PDE
-from .utility import calc_grad, get_device, _next_seed
+from .utility import calc_grad, get_device, get_dtype, _next_seed
 
 class PhysicsAttach:
     """
@@ -135,19 +135,19 @@ class PhysicsAttach:
             self.t = self.range_t[0] * torch.ones_like(self.X, device=device)
         elif isinstance(self.range_t, (tuple, list)):
             if self.scheme == "uniform":
-                self.t = torch.linspace(self.range_t[0], self.range_t[1], n_points)
+                self.t = torch.linspace(self.range_t[0], self.range_t[1], n_points, dtype=get_dtype())
             elif self.scheme == "random":
                 gen_seed = _next_seed()
                 if gen_seed is not None:
                     gen = torch.Generator().manual_seed(gen_seed)
-                    self.t = torch.empty(n_points).uniform_(self.range_t[0], self.range_t[1], generator=gen)
+                    self.t = torch.empty(n_points, dtype=get_dtype()).uniform_(self.range_t[0], self.range_t[1], generator=gen)
                 else:
-                    self.t = torch.empty(n_points).uniform_(self.range_t[0], self.range_t[1])
+                    self.t = torch.empty(n_points, dtype=get_dtype()).uniform_(self.range_t[0], self.range_t[1])
             if self.expo_scaling:
                 T1 = self.range_t[1]
                 self.t = (1 + self.t)**(self.t/T1) - 1
         elif isinstance(self.range_t, (int, float)):
-            self.t =  self.range_t * torch.ones_like(self.X_, device=device)
+            self.t =  self.range_t * torch.ones_like(self.X, device=device)
         elif self.range_t is None:
             raise ValueError("Time range must be defined before sampling time coordinates.")
 

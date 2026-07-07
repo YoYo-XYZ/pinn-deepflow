@@ -63,3 +63,19 @@ _ =prediction.plot_loss_curve()
 ```
 ![alt text](static/quickstart/flow_field.png)
 ![alt text](static/quickstart/loss_curve.png)
+
+# 4. Optional: Train in FP64 (Double Precision)
+
+Recent work on PINNs reports that double precision can improve convergence and
+accuracy. Enable FP64 globally before building the geometry or model:
+
+```python
+import torch
+import deepflow as df
+
+df.dtype = torch.float64
+
+# Continue with geometry, PDE, sampling, and training as shown above.
+```
+
+Switch back to FP32 at any time with `df.dtype = torch.float32`.

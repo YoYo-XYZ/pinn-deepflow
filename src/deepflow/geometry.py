@@ -4,7 +4,7 @@ from typing import List, Tuple, Callable, Optional, Union, Dict, Any
 import torch
 
 from .utility import *
-from .utility import _next_seed
+from .utility import _next_seed, get_dtype
 from .physicsinformed import PhysicsAttach
 
 # Constants for numerical stability
@@ -128,13 +128,13 @@ class Bound(PhysicsAttach):
             gen_seed = _next_seed()
             if gen_seed is not None:
                 gen = torch.Generator().manual_seed(gen_seed)
-                self.coords[ax] = torch.empty(n_points).uniform_(self.ranges[ax][0], self.ranges[ax][1], generator=gen)
+                self.coords[ax] = torch.empty(n_points, dtype=get_dtype()).uniform_(self.ranges[ax][0], self.ranges[ax][1], generator=gen)
             else:
-                self.coords[ax] = torch.empty(n_points).uniform_(self.ranges[ax][0], self.ranges[ax][1])
+                self.coords[ax] = torch.empty(n_points, dtype=get_dtype()).uniform_(self.ranges[ax][0], self.ranges[ax][1])
         elif scheme == 'lhs':
             self.coords[ax] = latin_hypercube_sampling(n_points, 1, [self.ranges[ax][0]], [self.ranges[ax][1]]).squeeze(-1)
         elif scheme == 'uniform':
-            self.coords[ax] = torch.linspace(self.ranges[ax][0], self.ranges[ax][1], n_points)
+            self.coords[ax] = torch.linspace(self.ranges[ax][0], self.ranges[ax][1], n_points, dtype=get_dtype())
 
         if self.parameterized:
             # Assuming funcs[2] contains [func_x(t), func_y(t)]
@@ -269,11 +269,11 @@ class Area(PhysicsAttach):
             gen_seed = _next_seed()
             if gen_seed is not None:
                 gen = torch.Generator().manual_seed(gen_seed)
-                points = torch.empty(n_total, 2)
+                points = torch.empty(n_total, 2, dtype=get_dtype())
                 points[:, 0].uniform_(self.ranges[0][0], self.ranges[0][1], generator=gen)
                 points[:, 1].uniform_(self.ranges[1][0], self.ranges[1][1], generator=gen)
             else:
-                points = torch.empty(n_total, 2)
+                points = torch.empty(n_total, 2, dtype=get_dtype())
                 points[:, 0].uniform_(self.ranges[0][0], self.ranges[0][1])
                 points[:, 1].uniform_(self.ranges[1][0], self.ranges[1][1])
             X, Y = points[:, 0], points[:, 1]
@@ -281,8 +281,8 @@ class Area(PhysicsAttach):
             samples = latin_hypercube_sampling(n_total, 2, [self.ranges[0][0], self.ranges[1][0]], [self.ranges[0][1], self.ranges[1][1]]).squeeze(-1)
             X, Y = samples[:, 0], samples[:, 1]
         elif scheme == 'uniform':
-            X_range = torch.linspace(self.ranges[0][0], self.ranges[0][1], nx)
-            Y_range = torch.linspace(self.ranges[1][0], self.ranges[1][1], ny)
+            X_range = torch.linspace(self.ranges[0][0], self.ranges[0][1], nx, dtype=get_dtype())
+            Y_range = torch.linspace(self.ranges[1][0], self.ranges[1][1], ny, dtype=get_dtype())
             
             # Padding to avoid hitting exact boundaries
             X_range[0] += EPS

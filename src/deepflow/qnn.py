@@ -1,5 +1,6 @@
 from typing import List, Optional, Union, Callable
 from .nn import NN
+from .utility import get_dtype
 
 from torch import nn
 
@@ -52,6 +53,7 @@ class QPINN(NN):
         self.hidden_layer_post = hidden_layer_post if hidden_layer_post is not None else []
         self.activation = activation
         self._build_network()
+        self.to(get_dtype())
 
     def _feature_map(self, qml_device):
         @qml.qnode(qml_device, interface="torch")
@@ -150,6 +152,7 @@ class QCPINN(NN):
         self.q_layer_type = q_layer_type
         self.q_layer_iterations = q_layer_iterations
         self._build_network()
+        self.to(get_dtype())
     
     def _qnn_setup(self):
         qml_device = qml.device("default.qubit", wires=self.nqubits)

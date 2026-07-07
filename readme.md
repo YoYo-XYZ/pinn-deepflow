@@ -1,4 +1,5 @@
 # DeepFlow: Physics-Informed Neural Networks for Fluid Dynamics
+
 [![PyPI version](https://badge.fury.io/py/deepflow.svg)](https://badge.fury.io/py/deepflow)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/deepflow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -27,11 +28,13 @@ DeepFlow is a user-friendly framework for solving PDEs, with a focus on fluid dy
 - 🔧 **CFD-Solver Style**: Straightforward workflow similar to CFD software.
 - 📊 **Built-in Visualization**: Tools to evaluate and plot results.
 - 🚀 **GPU Acceleration**: Enable GPU for faster training.
+- 🔢 **FP64 Precision**: Switch to double precision for improved PINN accuracy/stability.
 - **Flexible Domain Definition**: Easily define complex 2D geometries.
 
 ## Current Implementations
+
 - **Supported problems**: solving **forward** partial differential equations (PDEs)
-    - transient & steady 2D imcompressible Navier-Stokes equations, 2D Fourier Heat equation, Burgers' equation
+  - transient & steady 2D imcompressible Navier-Stokes equations, 2D Fourier Heat equation, Burgers' equation
 - **Sampling methods**: Uniform, Random, Latin Hypercube Sampling, RAR-G [[0]](https://arxiv.org/abs/2207.10289), R3 [[1]](https://arxiv.org/abs/2207.02338)
 - **2D Geometries**: Custom functions, Rectangle, Circle, Polygon, and combinations & subtractions.
 - **Hard Boundary Conditions**: Automatic Hard BC w.r.t. to geometry.
@@ -66,6 +69,7 @@ pip install -e .
 - Ultrplot >= 1.0.0
 
 ## Quick Start
+
 ![](static/deepflow_workflow.svg)
 This example demonstrates how to simulate Steady channel flow **under 20 lines of code!** We recommend using a Python notebook (`.ipynb`) for interactive experience.
 
@@ -80,7 +84,9 @@ domain = df.domain(rectangle)
 
 domain.show_setup() # Display the domain setup
 ```
+
 ![alt text](static/quickstart/setup_show.png)
+
 ```python
 # Define Boundary Conditions
 domain.bound_list[0].define_bc({'u': 1, 'v': 0})  # Inflow: u=1
@@ -93,6 +99,7 @@ domain.area_list[0].define_pde(df.pde.NavierStokes(U=0.0001, L=1, mu=0.001, rho=
 
 domain.show_setup() # Display the domain setup
 ```
+
 ![alt text](static/quickstart/cond_show.png)
 
 ```python
@@ -100,14 +107,16 @@ domain.show_setup() # Display the domain setup
 domain.sampling_random([200, 400, 200, 400], [5000])
 domain.show_coordinates(display_physics=True)
 ```
-![alt text](static/quickstart/coord_show.png)
-### 2. Create and Train the model
 
+![alt text](static/quickstart/coord_show.png)
+
+### 2. Create and Train the model
 
 ```python
 # Initialize the PINN model
 model0 = df.PINN(width=40, length=4)
 ```
+
 ```python
 # Train the model using Adam Optimizer
 model1, model1_best = model0.train_adam(
@@ -118,6 +127,7 @@ model1, model1_best = model0.train_adam(
 ```
 
 ### 3. Visualize Results
+
 ```python
 # Evaluate the best model
 prediction = domain.area_list[0].evaluate(model1_best)
@@ -129,8 +139,34 @@ _ = prediction.plot_color('u', cmap='jet')
 # Plot Training Loss
 _ =prediction.plot_loss_curve()
 ```
+
 ![alt text](static/quickstart/flow_field.png)
 ![alt text](static/quickstart/loss_curve.png)
+
+### Using FP64 (Double) Precision
+
+Recent PINN research shows that training in double precision (FP64) can
+significantly improve convergence and accuracy. DeepFlow lets you switch the
+entire pipeline—model weights, sampled coordinates, and PDE residuals—to FP64
+with one line:
+
+```python
+import torch
+import deepflow as df
+
+# Enable FP64 globally before defining geometry / model
+df.dtype = torch.float64
+
+# ... define geometry, PDE, sample, build model, and train as usual
+```
+
+To switch back to the default FP32 precision:
+
+```python
+df.dtype = torch.float32
+```
+
+Only `torch.float32` and `torch.float64` are supported.
 
 ## Examples
 
@@ -138,12 +174,14 @@ Explore the [examples](examples)
  directory for real use cases, including
 
 Steady-state:
+
 - [Steady flow around a cylinder](examples/cylinder_flow_steady)
 - [Lid-driven cavity flow](examples/cavity_flow_steady)
 - [Backward-facing step flow](examples/BFS_flow_steady)
-- [Burgers' Equation](examples/burgers_eq)
+- [Burgers&#39; Equation](examples/burgers_eq)
 
 Time-dependent:
+
 - [Transient channel flow](examples/channel_flow_transient)
 - [Fourier Heat Equation](examples/heat_eq)
 

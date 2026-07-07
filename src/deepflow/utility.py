@@ -29,12 +29,42 @@ def latin_hypercube_sampling(n_samples: int, n_dimensions: int, lower_lim:list, 
     lhs = scipy.stats.qmc.LatinHypercube(d=n_dimensions, strength=1, seed=seed)
     sample = lhs.random(n=n_samples)
     sample = scipy.stats.qmc.scale(sample, lower_lim, upper_lim)
-    return torch.tensor(sample, dtype=torch.float32)
+    return torch.tensor(sample, dtype=get_dtype())
 
+# Module-level device configuration (mirrored by dtype below)
 device = 'cpu' if not torch.cuda.is_available() else 'cuda'
 def get_device():
     global device
     return device
+
+# Module-level floating-point dtype configuration
+_DEFAULT_DTYPE = torch.float32
+
+
+def get_dtype() -> torch.dtype:
+    """Return the current global floating-point dtype used by deepflow."""
+    global _DEFAULT_DTYPE
+    return _DEFAULT_DTYPE
+
+
+def set_dtype(value: torch.dtype) -> None:
+    """
+    Set the global floating-point dtype used by deepflow.
+
+    Args:
+        value: ``torch.float32`` or ``torch.float64``. Also accepts the
+            aliases ``torch.float`` and ``torch.double``.
+
+    Raises:
+        ValueError: If ``value`` is not a supported floating-point dtype.
+    """
+    global _DEFAULT_DTYPE
+    if value not in (torch.float32, torch.float64):
+        raise ValueError(
+            f"dtype must be torch.float32 or torch.float64, got {value}"
+        )
+    _DEFAULT_DTYPE = value
+    torch.set_default_dtype(value)
 def manual_seed(seed:int, deterministic:bool=False):
     """
     Set all random seeds for reproducible training runs.

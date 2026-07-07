@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 
-from .utility import get_device
+from .utility import get_device, get_dtype
 
 class HardConstraint:
     """
@@ -66,6 +66,10 @@ class NN(ABC, nn.Module):
         self.hard_constants: Optional[Dict] = None
 
         self._init_history()
+        # Ensure subsequent nn.Linear/Parameter construction uses the
+        # globally configured deepflow dtype (FP32 by default, FP64 when
+        # the user sets df.dtype = torch.float64).
+        torch.set_default_dtype(get_dtype())
         #self._build_network()
 
     @abstractmethod
@@ -410,6 +414,7 @@ class FNN(NN):
         self.activation = activation
         self.hidden_layer = hidden_layer
         self._build_network()
+        self.to(get_dtype())
 
     def _build_network(self) -> None:
         """Builds the feedforward neural network architecture."""
