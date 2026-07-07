@@ -43,7 +43,6 @@ from common_config import (
     EVAL_GRID,
     INTERIOR_POINTS,
     L,
-    LR,
     MU,
     RESULTS_DIR,
     RHO,
@@ -113,8 +112,7 @@ def train_one(dtype, seed, epochs):
 
     # Train
     t_start = time.perf_counter()
-    model, model_best = model0.train_adam(
-        learning_rate=LR,
+    model, model_best = model0.train_lbfgs(
         epochs=epochs,
         calc_loss=calc_loss,
         print_every=max(1, epochs // 10),
@@ -396,7 +394,7 @@ def main():
         "--epochs",
         type=int,
         default=EPOCHS,
-        help=f"Number of Adam epochs. Default: {EPOCHS}",
+        help=f"Number of LBFGS epochs. Default: {EPOCHS}",
     )
     args = parser.parse_args()
 

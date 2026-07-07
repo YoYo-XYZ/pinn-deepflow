@@ -37,7 +37,7 @@ For each precision, the script:
 
 1. Sets `df.dtype = torch.float32` or `df.dtype = torch.float64`.
 2. Builds the same 2D channel-flow problem (geometry, PDE, BCs, sampling).
-3. Trains a `df.PINN(width=32, depth=4)` with Adam for the configured epochs.
+3. Trains a `df.PINN(width=32, depth=4)` with `torch.optim.LBFGS` for the configured epochs.
 4. Repeats for `--num_runs` seeds and reports mean ± std.
 5. Evaluates the trained model on a uniform `[500, 100]` grid and records the
    PDE residual fields.
