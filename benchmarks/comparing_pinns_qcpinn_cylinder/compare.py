@@ -10,16 +10,7 @@ Usage:
     python compare.py
 """
 
-import os
 import sys
-from pathlib import Path
-
-# ---------------------------------------------------------------------------
-# Path setup
-# ---------------------------------------------------------------------------
-_SCRIPT_DIR = Path(__file__).resolve().parent
-if str(_SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPT_DIR))
 
 import numpy as np
 import matplotlib
@@ -76,9 +67,9 @@ def _scalar(d, key, default=float("nan")):
     return float(v.flat[0])
 
 
-def _arr(d, key, default=np.array([])):
+def _arr(d, key, default=None):
     if d is None or key not in d.files:
-        return default
+        return np.array([]) if default is None else default
     return d[key]
 
 
@@ -319,17 +310,20 @@ lines = [
     f" with a circular cylinder centered at ({CYLINDER_CX}, {CYLINDER_CY}),"
     f" radius {CYLINDER_R}.",
     f"- **PDE**: 2D steady incompressible Navier-Stokes; Re = {REYNOLDS}",
-    f"- **Boundary conditions**:",
-    f"  - Inlet (left, x=0): parabolic u(y) = 4·U·y·(H−y)/H², v=0 (U=1, H={CHANNEL_Y[1]})",
-    f"  - Bottom / top walls (y=0, y={CHANNEL_Y[1]}): no-slip (u=v=0)",
-    f"  - Outlet (right, x={CHANNEL_X[1]}): pressure release (p=0)",
-    f"  - Cylinder surface (upper + lower): no-slip (u=v=0)",
+    "- **Boundary conditions**:",
+    "  - Inlet (left, x=0): parabolic u(y) = 4·U·y·(H−y)/H², v=0 (U=1, H="
+    f"{CHANNEL_Y[1]})",
+    "  - Bottom / top walls (y=0, y="
+    f"{CHANNEL_Y[1]}): no-slip (u=v=0)",
+    "  - Outlet (right, x="
+    f"{CHANNEL_X[1]}): pressure release (p=0)",
+    "  - Cylinder surface (upper + lower): no-slip (u=v=0)",
     f"- **Sampling**: LHS initial — {sum(BOUNDARY_POINTS)} boundary points,"
     f" {sum(INTERIOR_POINTS)} interior points",
     f"- **Resampling**: \"randomr\" — full LHS resample every {RESAMPLE_EVERY} L-BFGS epochs",
     f"- **Training**: Adam(lr={LR_ADAM}, {EPOCHS_ADAM} epochs, threshold={THRESHOLD_LBFGS})"
     f" → L-BFGS({EPOCHS_LBFGS} epochs, threshold={THRESHOLD_LBFGS})",
-    f"- **Loss**: `df.calc_loss_simple` (unweighted BC + PDE sum)",
+    "- **Loss**: `df.calc_loss_simple` (unweighted BC + PDE sum)",
     f"- **Seeds**: {SEEDS}",
     f"- **Runs per model**: PINN = {_safe_int(_scalar(pinn_data, 'num_runs', 0), '?')},"
     f" QCPINN = {_safe_int(_scalar(qc_data, 'num_runs', 0), '?')}"
