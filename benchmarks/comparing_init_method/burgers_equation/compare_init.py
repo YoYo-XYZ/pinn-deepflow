@@ -1,33 +1,44 @@
- #!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Compare DeepFlow Burgers-equation performance with Glorot-normal (current default)
 vs the old Kaiming-uniform initialization.
 
-The script temporarily monkey-patches _init_weights to Kaiming, runs a short
-benchmark for both initializers, and prints the metrics side by side.
+The script runs a short benchmark for both initializers and prints the metrics
+side by side.
 """
 
-import os
 import sys
-import time
-import numpy as np
-import torch
-import matplotlib.pyplot as plt
-from torch import sin, pi
+from pathlib import Path
 
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if _SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, _SCRIPT_DIR)
-_PROJECT_ROOT = os.path.abspath(os.path.join(_SCRIPT_DIR, "..", "..", "..", "src"))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
+from torch import pi, sin
 
-import deepflow as df
-from common_config import X_RANGE, Y_RANGE, NU, WIDTH, DEPTH, LR, EPOCHS, BOUNDARY_POINTS, INTERIOR_POINTS, EVAL_GRID, SEED
+_BENCHMARK_DIR = Path(__file__).resolve().parents[1]
+if str(_BENCHMARK_DIR) not in sys.path:
+    sys.path.insert(0, str(_BENCHMARK_DIR))
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+from benchmark_utils import (  # noqa: E402
+    add_project_src,
+    print_summary,
+    run_comparison,
+    save_field_plot,
+)
+
+add_project_src(__file__)
+import deepflow as df  # noqa: E402
+from common_config import (  # noqa: E402
+    BOUNDARY_POINTS,
+    DEPTH,
+    EPOCHS,
+    EVAL_GRID,
+    INTERIOR_POINTS,
+    LR,
+    NU,
+    SEED,
+    WIDTH,
+    X_RANGE,
+    Y_RANGE,
+)
+
 
 def build_domain():
     area = df.geometry.rectangle(list(X_RANGE), list(Y_RANGE))
@@ -45,102 +56,38 @@ def build_domain():
     return domain
 
 
-def train_one(init_name, weight_init, seed):
-    print(f"\n--- Training with {init_name} initialization ---")
-    df.manual_seed(seed)
-
-    domain = build_domain()
-    model0 = df.PINN(
-        width=WIDTH, length=DEPTH,
-        input_vars=["x", "y"], output_vars=["u"],
-        weight_init=weight_init,
+def main():
+    results = run_comparison(
+        df,
+        build_domain,
+        seed=SEED,
+        input_vars=["x", "y"],
+        output_vars=["u"],
+        width=WIDTH,
+        depth=DEPTH,
+        learning_rate=LR,
+        epochs=EPOCHS,
+        eval_grid=EVAL_GRID,
+        residual_keys={"max_pde_residual": "pde_residual"},
+        field_names=["u"],
     )
-    t0 = time.perf_counter()
-    model1, model1_best = model0.train_adam(
-        calc_loss=df.calc_loss_simple(domain),
-        learning_rate=LR, epochs=EPOCHS,
+    print_summary(
+        results,
+        [
+            ("final_total", "Final total loss"),
+            ("final_bc", "Final BC loss"),
+            ("final_pde", "Final PDE loss"),
+            ("max_pde_residual", "Max |PDE residual|"),
+            ("time", "Train time (s)"),
+        ],
     )
-    train_time = time.perf_counter() - t0
-
-    # Evaluate on a uniform grid
-    prediction = domain.area_list[0].evaluate(model1_best)
-    prediction.sampling_area(EVAL_GRID)
-    data = prediction.data_dict
-
-    return {
-            "init": init_name,
-            "time": train_time,
-            "final_total": float(data["total_loss"][-1]),
-            "final_bc": float(data["bc_loss"][-1]),
-            "final_pde": float(data["pde_loss"][-1]),
-            "max_pde_residual": float(np.max(np.abs(data["pde_residual"]))),
-            "x": np.asarray(data["x"]),
-            "y": np.asarray(data["y"]),
-            "u": np.asarray(data["u"]),
-        }
+    save_field_plot(
+        results,
+        "u",
+        Path(__file__).parent / "results" / "init_u_field.png",
+        "u-field figure",
+    )
 
 
-def _scatter_plot(ax, x, y, field, title, cmap="jet", vrange=None):
-    """Scatter plot on given axis (same style as compare.py)."""
-    sc = ax.scatter(x, y, c=field, s=1, cmap=cmap, marker="s")
-    if vrange is not None:
-        sc.set_clim(vrange)
-    ax.set_title(title)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_aspect("equal")
-    plt.colorbar(sc, ax=ax, shrink=0.8)
-
-
-def _shared_range(*arrays):
-    """Return a shared (vmin, vmax) covering all supplied arrays, ignoring NaNs."""
-    flat = [np.asarray(a).ravel() for a in arrays if a is not None and len(np.asarray(a))]
-    if not flat:
-        return None
-    vals = np.concatenate(flat)
-    if len(vals) == 0:
-        return None
-    return float(np.nanmin(vals)), float(np.nanmax(vals))
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    results = [
-        train_one("Glorot-normal", "glorot", SEED),
-        train_one("Kaiming-uniform", "kaiming", SEED),
-    ]
-
-    print("\n" + "=" * 80)
-    print("Summary")
-    print("=" * 80)
-    print(f"{'Metric':<20} {'Glorot-normal':>18} {'Kaiming-uniform':>18} {'Delta':>18}")
-    print("-" * 80)
-    for key, label in [
-        ("final_total", "Final total loss"),
-        ("final_bc", "Final BC loss"),
-        ("final_pde", "Final PDE loss"),
-        ("max_pde_residual", "Max |PDE residual|"),
-        ("time", "Train time (s)"),
-    ]:
-        g = results[0][key]
-        k = results[1][key]
-        delta = ((g - k) / k * 100) if k != 0 and isinstance(g, float) else 0
-        print(f"{label:<20} {g:>18.6e} {k:>18.6e} {delta:>17.1f}%")
-
-    print("=" * 80)
-
-    # ---------------------------------------------------------------------------
-    # u-field visualization (same style as compare.py)
-    # ---------------------------------------------------------------------------
-    fig, axes = plt.subplots(1, 2, figsize=(14, 4))
-    u_range = _shared_range(results[0]["u"], results[1]["u"])
-    for ax, label, r in zip(axes, ["Glorot-normal", "Kaiming-uniform"], results):
-        _scatter_plot(ax, r["x"], r["y"], r["u"], f"u – {label}", cmap="jet", vrange=u_range)
-    plt.tight_layout()
-    out_path = os.path.join(_SCRIPT_DIR, "results", "init_u_field.png")
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
-    print(f"u-field figure saved to: {out_path}")
+    main()

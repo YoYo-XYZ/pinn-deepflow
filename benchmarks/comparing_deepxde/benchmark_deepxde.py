@@ -1,273 +1,182 @@
 #!/usr/bin/env python3
-"""
-Benchmark: 2D steady channel flow using DeepXDE with PyTorch backend.
-
-Matches the setup in ``static/quickstart/code.ipynb`` for a fair comparison
-with the DeepFlow implementation.
-
-Results are saved to ``results/deepxde_results.npz``.
-"""
+"""Benchmark the 2D steady channel flow problem with DeepXDE."""
 
 import os
-import sys
 import time
 import warnings
 
-# ---------------------------------------------------------------------------
-# Ensure imports resolve regardless of the caller's working directory.
-# ---------------------------------------------------------------------------
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if _SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, _SCRIPT_DIR)
+import numpy as np
 
-# ---------------------------------------------------------------------------
-# Set DeepXDE backend to PyTorch **before** importing deepxde
-# ---------------------------------------------------------------------------
+from benchmark_common import RESULTS_DIR, evaluation_grid
+
+# DeepXDE reads its backend during import.
 os.environ["DDE_BACKEND"] = "pytorch"
 
-import numpy as np
-import torch
-import deepxde as dde
+import deepxde as dde  # noqa: E402
+import torch  # noqa: E402
 
-from common_config import (
+from common_config import (  # noqa: E402
+    ACTIVATION,
+    BOUNDARY_POINTS,
+    DEPTH,
+    EPOCHS,
+    EVAL_GRID,
+    INTERIOR_POINTS,
     Lx,
     Ly,
-    Re,
-    WIDTH,
-    DEPTH,
-    ACTIVATION,
     LR,
-    EPOCHS,
-    BOUNDARY_POINTS,
-    INTERIOR_POINTS,
-    EVAL_GRID,
+    Re,
     SEED,
+    WIDTH,
 )
 
-# ---------------------------------------------------------------------------
-# Device selection
-# ---------------------------------------------------------------------------
-if torch.cuda.is_available():
-    device_str = "cuda"
-    try:
-        torch.set_default_device(device_str)
-    except AttributeError:
-        # Older PyTorch versions: set via torch.device context
-        pass
-else:
-    device_str = "cpu"
 
-print("=" * 60)
-print("DeepXDE (PyTorch)  -  2D Steady Channel Flow Benchmark")
-print(f"Device            : {device_str}")
-print("=" * 60)
-
-# ---------------------------------------------------------------------------
-# Reproducibility
-# ---------------------------------------------------------------------------
-np.random.seed(SEED)
-torch.manual_seed(SEED)
-
-# ===========================================================================
-# 1. Geometry
-# ===========================================================================
-geom = dde.geometry.Rectangle(xmin=[0, 0], xmax=[Lx, Ly])
-
-# ===========================================================================
-# 2. PDE — Non-dimensional Navier-Stokes (Re = 100)
-#
-#    Continuity:         ∂u/∂x + ∂v/∂y = 0
-#    X-momentum:   u ∂u/∂x + v ∂u/∂y + ∂p/∂x − (1/Re)(∂²u/∂x² + ∂²u/∂y²) = 0
-#    Y-momentum:   u ∂v/∂x + v ∂v/∂y + ∂p/∂y − (1/Re)(∂²v/∂x² + ∂²v/∂y²) = 0
-# ===========================================================================
 def pde(x, y):
-    """
-    Args:
-        x: Input tensor of shape (N, 2) — columns are (x, y).
-        y: Output tensor of shape (N, 3) — columns are (u, v, p).
-
-    Returns:
-        List of three residual tensors [continuity, x_momentum, y_momentum].
-    """
-    u = y[:, 0:1]
-    v = y[:, 1:2]
-    p = y[:, 2:3]
-
-    # First derivatives
+    """Return continuity, x-momentum, and y-momentum residuals."""
+    u, v = y[:, 0:1], y[:, 1:2]
     u_x = dde.grad.jacobian(y, x, i=0, j=0)
     u_y = dde.grad.jacobian(y, x, i=0, j=1)
     v_x = dde.grad.jacobian(y, x, i=1, j=0)
     v_y = dde.grad.jacobian(y, x, i=1, j=1)
     p_x = dde.grad.jacobian(y, x, i=2, j=0)
     p_y = dde.grad.jacobian(y, x, i=2, j=1)
-
-    # Second derivatives
     u_xx = dde.grad.hessian(y, x, component=0, i=0, j=0)
     u_yy = dde.grad.hessian(y, x, component=0, i=1, j=1)
     v_xx = dde.grad.hessian(y, x, component=1, i=0, j=0)
     v_yy = dde.grad.hessian(y, x, component=1, i=1, j=1)
 
-    nu_inv = 1.0 / Re  # 1/Re = 0.01
+    viscosity = 1.0 / Re
+    return [
+        u_x + v_y,
+        u * u_x + v * u_y + p_x - viscosity * (u_xx + u_yy),
+        u * v_x + v * v_y + p_y - viscosity * (v_xx + v_yy),
+    ]
 
-    continuity    = u_x + v_y
-    x_momentum    = u * u_x + v * u_y + p_x - nu_inv * (u_xx + u_yy)
-    y_momentum    = u * v_x + v * v_y + p_y - nu_inv * (v_xx + v_yy)
 
-    return [continuity, x_momentum, y_momentum]
-
-# ===========================================================================
-# 3. Boundary Conditions
-# ===========================================================================
 def boundary_left(x, on_boundary):
     return on_boundary and np.isclose(x[0], 0.0)
+
 
 def boundary_right(x, on_boundary):
     return on_boundary and np.isclose(x[0], Lx)
 
+
 def boundary_wall(x, on_boundary):
     return on_boundary and (np.isclose(x[1], 0.0) or np.isclose(x[1], Ly))
 
-# Inflow: u=1, v=0
-bc_inlet_u = dde.icbc.DirichletBC(geom, lambda x: 1.0, boundary_left, component=0)
-bc_inlet_v = dde.icbc.DirichletBC(geom, lambda x: 0.0, boundary_left, component=1)
 
-# Walls (no-slip): u=0, v=0
-bc_wall_u = dde.icbc.DirichletBC(geom, lambda x: 0.0, boundary_wall, component=0)
-bc_wall_v = dde.icbc.DirichletBC(geom, lambda x: 0.0, boundary_wall, component=1)
+def build_model():
+    """Build the DeepXDE model and its training data."""
+    geometry = dde.geometry.Rectangle(xmin=[0, 0], xmax=[Lx, Ly])
+    bcs = [
+        dde.icbc.DirichletBC(geometry, lambda x: 1.0, boundary_left, component=0),
+        dde.icbc.DirichletBC(geometry, lambda x: 0.0, boundary_left, component=1),
+        dde.icbc.DirichletBC(geometry, lambda x: 0.0, boundary_wall, component=0),
+        dde.icbc.DirichletBC(geometry, lambda x: 0.0, boundary_wall, component=1),
+        dde.icbc.DirichletBC(geometry, lambda x: 0.0, boundary_right, component=2),
+    ]
+    data = dde.data.PDE(
+        geometry,
+        pde,
+        bcs,
+        num_domain=INTERIOR_POINTS,
+        num_boundary=sum(BOUNDARY_POINTS),
+        num_test=5000,
+    )
+    layers = [2] + [WIDTH] * DEPTH + [3]
+    return dde.Model(data, dde.nn.FNN(layers, ACTIVATION, "Glorot normal"))
 
-# Outflow: p=0
-bc_outlet_p = dde.icbc.DirichletBC(geom, lambda x: 0.0, boundary_right, component=2)
 
-bcs = [bc_inlet_u, bc_inlet_v, bc_wall_u, bc_wall_v, bc_outlet_p]
+def _residuals(model, points):
+    """Evaluate PDE residuals, with a PyTorch fallback for older DeepXDE."""
+    try:
+        values = model.predict(points, operator=pde)
+        if isinstance(values, (list, tuple)):
+            return [np.asarray(value).ravel() for value in values]
+        return [np.asarray(values[:, index]).ravel() for index in range(3)]
+    except Exception:
+        warnings.warn("Direct operator prediction failed; computing residuals manually.")
+        net = getattr(model, "net", None)
+        if net is None:
+            inputs = torch.tensor(points, dtype=torch.float32, requires_grad=True)
+            outputs = torch.tensor(model.predict(points), dtype=torch.float32)
+        else:
+            device = next(net.parameters()).device
+            inputs = torch.tensor(
+                points, dtype=torch.float32, device=device, requires_grad=True
+            )
+            outputs = net(inputs)
+        values = pde(inputs, outputs)
+        return [value.detach().cpu().numpy().ravel() for value in values]
 
-# ===========================================================================
-# 4. PDE Data
-# ===========================================================================
-data = dde.data.PDE(
-    geom,
-    pde,
-    bcs,
-    num_domain=INTERIOR_POINTS,
-    num_boundary=sum(BOUNDARY_POINTS),
-    num_test=5000,
-)
 
-# ===========================================================================
-# 5. Network — FNN with same architecture as DeepFlow
-# ===========================================================================
-layer_sizes = [2] + [WIDTH] * DEPTH + [3]
-net = dde.nn.FNN(layer_sizes, ACTIVATION, "Glorot normal")
+def _total_losses(history, attribute):
+    values = np.asarray(getattr(history, attribute, []))
+    return values.sum(axis=1) if values.ndim == 2 else np.array([])
 
-model = dde.Model(data, net)
 
-# ===========================================================================
-# 6. Compile & Train
-# ===========================================================================
-model.compile("adam", lr=LR)
-
-print(f"\nNetwork        : {WIDTH}x{DEPTH}  {ACTIVATION}  ->  (u, v, p)")
-print(f"Sampling       : BOUNDARY_POINTS={BOUNDARY_POINTS}, INTERIOR={INTERIOR_POINTS}")
-print(f"Training       : Adam, lr={LR}, {EPOCHS} iterations\n")
-
-t_start = time.perf_counter()
-losshistory, train_state = model.train(iterations=EPOCHS, display_every=200)
-train_time_s = time.perf_counter() - t_start
-
-print(f"\nTraining time  : {train_time_s:.2f} s")
-print(f"Best train loss: {train_state.best_loss_train:.6f}")
-print(f"Best test  loss: {train_state.best_loss_test:.6f}")
-
-# ===========================================================================
-# 7. Evaluate on uniform grid (matching DeepFlow EVAL_GRID)
-# ===========================================================================
-print("Evaluating on uniform grid ...")
-x_lin = np.linspace(0, Lx, EVAL_GRID[0])
-y_lin = np.linspace(0, Ly, EVAL_GRID[1])
-X_grid, Y_grid = np.meshgrid(x_lin, y_lin, indexing="ij")
-X_pred = np.hstack([X_grid.reshape(-1, 1), Y_grid.reshape(-1, 1)])
-
-# Predict (u, v, p)
-Y_pred = model.predict(X_pred)
-u_pred = Y_pred[:, 0]
-v_pred = Y_pred[:, 1]
-p_pred = Y_pred[:, 2]
-
-# PDE residuals on the same grid
-continuity_res, x_momentum_res, y_momentum_res = None, None, None
-try:
-    residual_pred = model.predict(X_pred, operator=pde)
-    if isinstance(residual_pred, (list, tuple)):
-        continuity_res = np.asarray(residual_pred[0]).ravel()
-        x_momentum_res = np.asarray(residual_pred[1]).ravel()
-        y_momentum_res = np.asarray(residual_pred[2]).ravel()
+def main():
+    if torch.cuda.is_available():
+        device = "cuda"
+        try:
+            torch.set_default_device(device)
+        except AttributeError:
+            pass
     else:
-        continuity_res = np.asarray(residual_pred[:, 0]).ravel()
-        x_momentum_res = np.asarray(residual_pred[:, 1]).ravel()
-        y_momentum_res = np.asarray(residual_pred[:, 2]).ravel()
-except Exception:
-    # Fallback: compute residuals using a fresh torch graph
-    warnings.warn("Direct operator prediction failed; computing residuals manually.")
-    xt = torch.tensor(X_pred, dtype=torch.float32, requires_grad=True)
-    yt = model.net(xt) if hasattr(model, "net") else model.predict(X_pred)
-    if not isinstance(yt, torch.Tensor):
-        yt = torch.tensor(yt, dtype=torch.float32, requires_grad=True)
-    res_t = pde(xt, yt)
-    continuity_res = res_t[0].detach().cpu().numpy().ravel()
-    x_momentum_res = res_t[1].detach().cpu().numpy().ravel()
-    y_momentum_res = res_t[2].detach().cpu().numpy().ravel()
+        device = "cpu"
 
-if continuity_res is None:
-    continuity_res = np.array([])
-if x_momentum_res is None:
-    x_momentum_res = np.array([])
-if y_momentum_res is None:
-    y_momentum_res = np.array([])
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    print("=" * 60)
+    print("DeepXDE (PyTorch)  -  2D Steady Channel Flow Benchmark")
+    print(f"Device            : {device}")
+    print("=" * 60)
 
-# Loss history
-loss_train = np.array(losshistory.loss_train) if hasattr(losshistory, "loss_train") else None
-loss_test  = np.array(losshistory.loss_test) if hasattr(losshistory, "loss_test") else None
-loss_steps = np.array(losshistory.steps) if hasattr(losshistory, "steps") else None
+    model = build_model()
+    model.compile("adam", lr=LR)
+    print(f"\nNetwork        : {WIDTH}x{DEPTH}  {ACTIVATION}  ->  (u, v, p)")
+    print(f"Sampling       : BOUNDARY_POINTS={BOUNDARY_POINTS}, INTERIOR={INTERIOR_POINTS}")
+    print(f"Training       : Adam, lr={LR}, {EPOCHS} iterations\n")
 
-loss_train_total = None
-loss_test_total = None
-if loss_train is not None and loss_train.ndim == 2:
-    # loss_train shape: (n_iterations, n_loss_terms) — take sum per iteration
-    loss_train_total = loss_train.sum(axis=1)
-if loss_test is not None and loss_test.ndim == 2:
-    loss_test_total = loss_test.sum(axis=1)
+    start = time.perf_counter()
+    history, state = model.train(iterations=EPOCHS, display_every=200)
+    train_time_s = time.perf_counter() - start
+    print(f"\nTraining time  : {train_time_s:.2f} s")
+    print(f"Best train loss: {state.best_loss_train:.6f}")
+    print(f"Best test  loss: {state.best_loss_test:.6f}")
 
-# Final losses
-final_total_loss = float(loss_train_total[-1]) if loss_train_total is not None else float("nan")
+    print("Evaluating on uniform grid ...")
+    x_grid, y_grid, points = evaluation_grid(Lx, Ly, EVAL_GRID)
+    prediction = model.predict(points)
+    residuals = _residuals(model, points)
+    loss_train = _total_losses(history, "loss_train")
+    loss_test = _total_losses(history, "loss_test")
+    loss_steps = np.asarray(getattr(history, "steps", []))
+    final_total_loss = float(loss_train[-1]) if len(loss_train) else float("nan")
 
-# ===========================================================================
-# 8. Save to NPZ
-# ===========================================================================
-_results_dir = os.path.join(os.path.dirname(__file__), "results")
-os.makedirs(_results_dir, exist_ok=True)
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    np.savez(
+        RESULTS_DIR / "deepxde_results.npz",
+        x=x_grid.ravel(),
+        y=y_grid.ravel(),
+        u=prediction[:, 0],
+        v=prediction[:, 1],
+        p=prediction[:, 2],
+        continuity_residual=residuals[0],
+        x_momentum_residual=residuals[1],
+        y_momentum_residual=residuals[2],
+        loss_train=loss_train,
+        loss_test=loss_test,
+        loss_steps=loss_steps,
+        train_time_s=np.float64(train_time_s),
+        final_total_loss=np.float64(final_total_loss),
+        best_loss_train=np.float64(state.best_loss_train),
+        best_loss_test=np.float64(state.best_loss_test),
+        best_step=np.int64(state.best_step),
+    )
+    print("Results saved to results/deepxde_results.npz")
+    print("=" * 60)
 
-np.savez(
-    os.path.join(_results_dir, "deepxde_results.npz"),
-    # Fields on evaluation grid
-    x=X_grid.ravel(),
-    y=Y_grid.ravel(),
-    u=u_pred,
-    v=v_pred,
-    p=p_pred,
-    # PDE residuals
-    continuity_residual=continuity_res,
-    x_momentum_residual=x_momentum_res,
-    y_momentum_residual=y_momentum_res,
-    # Loss history
-    loss_train=loss_train_total if loss_train_total is not None else np.array([]),
-    loss_test=loss_test_total if loss_test_total is not None else np.array([]),
-    loss_steps=loss_steps if loss_steps is not None else np.array([]),
-    # Summary metrics
-    train_time_s=np.float64(train_time_s),
-    final_total_loss=np.float64(final_total_loss),
-    best_loss_train=np.float64(train_state.best_loss_train),
-    best_loss_test=np.float64(train_state.best_loss_test),
-    best_step=np.int64(train_state.best_step),
-)
 
-print("Results saved to results/deepxde_results.npz")
-print("=" * 60)
+if __name__ == "__main__":
+    main()

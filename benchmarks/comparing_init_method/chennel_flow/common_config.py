@@ -22,15 +22,15 @@ Re: float = 100.0
 # ---------------------------------------------------------------------------
 # Neural network architecture
 # ---------------------------------------------------------------------------
-WIDTH: int = 32          # neurons per hidden layer
-DEPTH: int = 4           # number of hidden layers
-ACTIVATION: str = "tanh" # activation function string (for DeepXDE)
+WIDTH: int = 32  # neurons per hidden layer
+DEPTH: int = 4  # number of hidden layers
+ACTIVATION: str = "tanh"  # activation function string (for DeepXDE)
 
 # ---------------------------------------------------------------------------
 # Training hyper-parameters
 # ---------------------------------------------------------------------------
-LR: float = 0.004        # Adam learning rate
-EPOCHS: int = 2000       # training iterations / epochs
+LR: float = 0.004  # Adam learning rate
+EPOCHS: int = 2000  # training iterations / epochs
 
 # ---------------------------------------------------------------------------
 # Sampling – boundary points per side and interior collocation points
@@ -42,7 +42,7 @@ INTERIOR_POINTS: int = 2000
 # ---------------------------------------------------------------------------
 # Evaluation grid resolution (nx, ny)
 # ---------------------------------------------------------------------------
-EVAL_GRID: list = [500, 100]
+EVAL_GRID: list = [200, 40]
 
 # ---------------------------------------------------------------------------
 # Random seed for reproducibility

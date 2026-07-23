@@ -35,8 +35,8 @@ if str(_SCRIPT_DIR) not in sys.path:
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-import deepflow as df
-from common_config import (
+import deepflow as df  # noqa: E402
+from common_config import (  # noqa: E402
     BOUNDARY_POINTS,
     DEPTH,
     EPOCHS,
@@ -51,6 +51,42 @@ from common_config import (
     WIDTH,
     X_RANGE,
     Y_RANGE,
+)
+
+
+RESIDUAL_KEYS = (
+    "pde_residual",
+    "continuity_residual",
+    "x_momentum_residual",
+    "y_momentum_residual",
+)
+AGGREGATE_KEYS = (
+    "train_time_s",
+    "final_total_loss",
+    "final_bc_loss",
+    "final_pde_loss",
+    "max_pde_residual",
+    "mean_abs_pde_residual",
+    "max_continuity_residual",
+    "mean_abs_continuity_residual",
+    "max_x_momentum_residual",
+    "mean_abs_x_momentum_residual",
+    "max_y_momentum_residual",
+    "mean_abs_y_momentum_residual",
+)
+SUMMARY_ROWS = (
+    ("Final total loss", "final_total_loss"),
+    ("Final BC loss", "final_bc_loss"),
+    ("Final PDE loss", "final_pde_loss"),
+    ("Max |PDE residual|", "max_pde_residual"),
+    ("Mean |PDE residual|", "mean_abs_pde_residual"),
+    ("Max |continuity|", "max_continuity_residual"),
+    ("Mean |continuity|", "mean_abs_continuity_residual"),
+    ("Max |x-momentum|", "max_x_momentum_residual"),
+    ("Mean |x-momentum|", "mean_abs_x_momentum_residual"),
+    ("Max |y-momentum|", "max_y_momentum_residual"),
+    ("Mean |y-momentum|", "mean_abs_y_momentum_residual"),
+    ("Train time (s)", "train_time"),
 )
 
 
@@ -124,10 +160,15 @@ def train_one(dtype, seed, epochs):
     prediction.sampling_area(EVAL_GRID)
     data = prediction.data_dict
 
-    continuity = _as_np(data["continuity_residual"])
-    x_momentum = _as_np(data["x_momentum_residual"])
-    y_momentum = _as_np(data["y_momentum_residual"])
-    pde_residual = _as_np(data["pde_residual"])
+    residuals = {key: _as_np(data[key]) for key in RESIDUAL_KEYS}
+    residual_metrics = {
+        metric: value
+        for key, values in residuals.items()
+        for metric, value in (
+            (f"max_{key}", float(np.max(np.abs(values)))),
+            (f"mean_abs_{key}", float(np.mean(np.abs(values)))),
+        )
+    }
 
     return {
         "label": label,
@@ -136,23 +177,13 @@ def train_one(dtype, seed, epochs):
         "final_total_loss": float(data["total_loss"][-1]),
         "final_bc_loss": float(data["bc_loss"][-1]),
         "final_pde_loss": float(data["pde_loss"][-1]),
-        "max_pde_residual": float(np.max(np.abs(pde_residual))),
-        "mean_abs_pde_residual": float(np.mean(np.abs(pde_residual))),
-        "max_continuity_residual": float(np.max(np.abs(continuity))),
-        "mean_abs_continuity_residual": float(np.mean(np.abs(continuity))),
-        "max_x_momentum_residual": float(np.max(np.abs(x_momentum))),
-        "mean_abs_x_momentum_residual": float(np.mean(np.abs(x_momentum))),
-        "max_y_momentum_residual": float(np.max(np.abs(y_momentum))),
-        "mean_abs_y_momentum_residual": float(np.mean(np.abs(y_momentum))),
+        **residual_metrics,
         "x": _as_np(data["x"]),
         "y": _as_np(data["y"]),
         "u": _as_np(data["u"]),
         "v": _as_np(data["v"]),
         "p": _as_np(data["p"]),
-        "pde_residual": pde_residual,
-        "continuity_residual": continuity,
-        "x_momentum_residual": x_momentum,
-        "y_momentum_residual": y_momentum,
+        **residuals,
         "total_loss_history": _history(model, "total_loss"),
         "bc_loss_history": _history(model, "bc_loss"),
         "pde_loss_history": _history(model, "pde_loss"),
@@ -163,22 +194,8 @@ def run_precision_benchmark(dtype, num_runs, epochs):
     """Run multiple training runs for one precision and aggregate results."""
     per_run = [train_one(dtype, SEED + i, epochs) for i in range(num_runs)]
 
-    aggregate_keys = [
-        "train_time_s",
-        "final_total_loss",
-        "final_bc_loss",
-        "final_pde_loss",
-        "max_pde_residual",
-        "mean_abs_pde_residual",
-        "max_continuity_residual",
-        "mean_abs_continuity_residual",
-        "max_x_momentum_residual",
-        "mean_abs_x_momentum_residual",
-        "max_y_momentum_residual",
-        "mean_abs_y_momentum_residual",
-    ]
     aggregates = {}
-    for key in aggregate_keys:
+    for key in AGGREGATE_KEYS:
         values = _as_np([run[key] for run in per_run])
         base = key[:-2] if key.endswith("_s") else key
         aggregates[f"{base}_mean"] = float(values.mean())
@@ -239,22 +256,7 @@ def print_summary(res32, res64):
     print(f"{'Metric':<34} {'FP32':>24} {'FP64':>24} {'Delta':>10}")
     print("-" * 96)
 
-    rows = [
-        ("Final total loss", "final_total_loss"),
-        ("Final BC loss", "final_bc_loss"),
-        ("Final PDE loss", "final_pde_loss"),
-        ("Max |PDE residual|", "max_pde_residual"),
-        ("Mean |PDE residual|", "mean_abs_pde_residual"),
-        ("Max |continuity|", "max_continuity_residual"),
-        ("Mean |continuity|", "mean_abs_continuity_residual"),
-        ("Max |x-momentum|", "max_x_momentum_residual"),
-        ("Mean |x-momentum|", "mean_abs_x_momentum_residual"),
-        ("Max |y-momentum|", "max_y_momentum_residual"),
-        ("Mean |y-momentum|", "mean_abs_y_momentum_residual"),
-        ("Train time (s)", "train_time"),
-    ]
-
-    for label, key in rows:
+    for label, key in SUMMARY_ROWS:
         m32, s32 = res32[f"{key}_mean"], res32[f"{key}_std"]
         m64, s64 = res64[f"{key}_mean"], res64[f"{key}_std"]
         delta = _pct_delta(m32, m64)
@@ -288,18 +290,24 @@ def _scatter(ax, x, y, field, title, cmap="jet", vrange=None):
     plt.colorbar(sc, ax=ax, shrink=0.8)
 
 
-def plot_results(res32, res64):
-    """Generate loss, velocity, pressure, and residual comparison figures."""
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-
+def _save_figure(filename, message, draw):
     fig, axes = plt.subplots(1, 3, figsize=(16, 4))
+    draw(axes)
+    plt.tight_layout()
+    path = RESULTS_DIR / filename
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
+    print(f"{message}: {path}")
+
+
+def _plot_loss_curves(axes, res32, res64):
     for ax, (key, title) in zip(
         axes,
-        [
+        (
             ("total_loss_history", "Total loss"),
             ("bc_loss_history", "BC loss"),
             ("pde_loss_history", "PDE loss"),
-        ],
+        ),
     ):
         ax.semilogy(res32[key], label="FP32")
         ax.semilogy(res64[key], label="FP64")
@@ -308,72 +316,84 @@ def plot_results(res32, res64):
         ax.set_ylabel("Loss")
         ax.legend()
         ax.grid(True, which="both", ls="--", alpha=0.5)
-    plt.tight_layout()
-    loss_path = RESULTS_DIR / "loss_curves.png"
-    fig.savefig(loss_path, dpi=150)
-    plt.close(fig)
-    print(f"Loss-curve figure saved to: {loss_path}")
 
-    speed32 = np.sqrt(res32["u"] ** 2 + res32["v"] ** 2)
-    speed64 = np.sqrt(res64["u"] ** 2 + res64["v"] ** 2)
-    fig, axes = plt.subplots(1, 3, figsize=(16, 4))
-    speed_range = _shared_range(speed32, speed64)
-    _scatter(axes[0], res32["x"], res32["y"], speed32, "|v| - FP32", vrange=speed_range)
-    _scatter(axes[1], res64["x"], res64["y"], speed64, "|v| - FP64", vrange=speed_range)
+
+def _plot_field_comparison(axes, res32, res64, field32, field64, titles):
+    value_range = _shared_range(field32, field64)
+    _scatter(axes[0], res32["x"], res32["y"], field32, titles[0], vrange=value_range)
+    _scatter(axes[1], res64["x"], res64["y"], field64, titles[1], vrange=value_range)
     _scatter(
         axes[2],
         res64["x"],
         res64["y"],
-        speed64 - speed32,
-        "|v| difference (FP64 - FP32)",
+        field64 - field32,
+        titles[2],
         cmap="RdBu_r",
     )
-    plt.tight_layout()
-    velocity_path = RESULTS_DIR / "velocity_magnitude_comparison.png"
-    fig.savefig(velocity_path, dpi=150)
-    plt.close(fig)
-    print(f"Velocity-magnitude figure saved to: {velocity_path}")
 
-    fig, axes = plt.subplots(1, 3, figsize=(16, 4))
-    pressure_range = _shared_range(res32["p"], res64["p"])
-    _scatter(axes[0], res32["x"], res32["y"], res32["p"], "p - FP32", vrange=pressure_range)
-    _scatter(axes[1], res64["x"], res64["y"], res64["p"], "p - FP64", vrange=pressure_range)
-    _scatter(
-        axes[2],
-        res64["x"],
-        res64["y"],
-        res64["p"] - res32["p"],
-        "p difference (FP64 - FP32)",
-        cmap="RdBu_r",
-    )
-    plt.tight_layout()
-    pressure_path = RESULTS_DIR / "pressure_comparison.png"
-    fig.savefig(pressure_path, dpi=150)
-    plt.close(fig)
-    print(f"Pressure figure saved to: {pressure_path}")
 
-    fig, axes = plt.subplots(1, 3, figsize=(16, 4))
-    residuals = [
-        ("continuity_residual", "|continuity|"),
-        ("x_momentum_residual", "|x-momentum|"),
-        ("y_momentum_residual", "|y-momentum|"),
-    ]
-    for ax, (key, title) in zip(axes, residuals):
-        fp32 = np.abs(res32[key])
-        fp64 = np.abs(res64[key])
+def _plot_residual_differences(axes, res32, res64):
+    for ax, (key, title) in zip(
+        axes,
+        (
+            ("continuity_residual", "|continuity|"),
+            ("x_momentum_residual", "|x-momentum|"),
+            ("y_momentum_residual", "|y-momentum|"),
+        ),
+    ):
         _scatter(
             ax,
             res64["x"],
             res64["y"],
-            fp64 - fp32,
+            np.abs(res64[key]) - np.abs(res32[key]),
             f"{title} difference (FP64 - FP32)",
             cmap="RdBu_r",
         )
-    plt.tight_layout()
-    residual_path = RESULTS_DIR / "residual_difference.png"
-    fig.savefig(residual_path, dpi=150)
-    plt.close(fig)
-    print(f"Residual-difference figure saved to: {residual_path}")
+
+
+def plot_results(res32, res64):
+    """Generate loss, velocity, pressure, and residual comparison figures."""
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    _save_figure(
+        "loss_curves.png",
+        "Loss-curve figure saved to",
+        lambda axes: _plot_loss_curves(axes, res32, res64),
+    )
+
+    speed32 = np.sqrt(res32["u"] ** 2 + res32["v"] ** 2)
+    speed64 = np.sqrt(res64["u"] ** 2 + res64["v"] ** 2)
+    _save_figure(
+        "velocity_magnitude_comparison.png",
+        "Velocity-magnitude figure saved to",
+        lambda axes: _plot_field_comparison(
+            axes,
+            res32,
+            res64,
+            speed32,
+            speed64,
+            ("|v| - FP32", "|v| - FP64", "|v| difference (FP64 - FP32)"),
+        ),
+    )
+
+    _save_figure(
+        "pressure_comparison.png",
+        "Pressure figure saved to",
+        lambda axes: _plot_field_comparison(
+            axes,
+            res32,
+            res64,
+            res32["p"],
+            res64["p"],
+            ("p - FP32", "p - FP64", "p difference (FP64 - FP32)"),
+        ),
+    )
+
+    _save_figure(
+        "residual_difference.png",
+        "Residual-difference figure saved to",
+        lambda axes: _plot_residual_differences(axes, res32, res64),
+    )
 
 
 # ---------------------------------------------------------------------------

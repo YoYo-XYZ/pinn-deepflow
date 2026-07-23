@@ -7,7 +7,7 @@ hyperparameters stay consistent across versions of the DeepFlow framework.
 """
 
 from pathlib import Path
-from typing import Tuple
+from typing import List, Tuple
 
 # ---------------------------------------------------------------------------
 # Problem definition
@@ -33,7 +33,7 @@ SEED: int = 69
 # Sampling
 # ---------------------------------------------------------------------------
 # LHS boundary samples: [interior points on IC line, left wall, right wall]
-BOUNDARY_POINTS: list[int] = [1000, 500, 500]
+BOUNDARY_POINTS: List[int] = [1000, 500, 500]
 INTERIOR_POINTS: list[int] = [4000]
 
 # ---------------------------------------------------------------------------

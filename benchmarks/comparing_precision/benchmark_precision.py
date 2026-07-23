@@ -16,15 +16,14 @@ For more statistically robust results, average over multiple runs::
     python benchmarks/comparing_precision/benchmark_precision.py --num_runs 5
 """
 
-import os
+import argparse
 import sys
 import time
-import argparse
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
 from torch import sin, pi
 
 # ---------------------------------------------------------------------------
@@ -37,8 +36,8 @@ if str(_SCRIPT_DIR) not in sys.path:
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-import deepflow as df
-from common_config import (
+import deepflow as df  # noqa: E402
+from common_config import (  # noqa: E402
     X_RANGE,
     Y_RANGE,
     NU,
@@ -51,6 +50,17 @@ from common_config import (
     EVAL_GRID,
     RESULTS_DIR,
 )
+
+
+def _positive_int(value):
+    """Parse a strictly positive command-line integer."""
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as error:
+        raise argparse.ArgumentTypeError("must be a positive integer") from error
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
 
 
 # ---------------------------------------------------------------------------
@@ -77,25 +87,6 @@ def build_domain():
 # ---------------------------------------------------------------------------
 # Training / evaluation helpers
 # ---------------------------------------------------------------------------
-
-def _to_numpy_dict(data_dict):
-    """Convert a dictionary of tensors/lists to numpy arrays."""
-    out = {}
-    for key, value in data_dict.items():
-        try:
-            if isinstance(value, torch.Tensor):
-                out[key] = value.detach().cpu().numpy()
-            elif isinstance(value, list):
-                out[key] = np.asarray(value)
-            elif isinstance(value, np.ndarray):
-                out[key] = value
-            else:
-                out[key] = np.asarray(value)
-        except Exception as e:
-            print(f"Warning: could not convert key '{key}' to numpy: {e}")
-            out[key] = value
-    return out
-
 
 def train_one(dtype, seed, epochs):
     """Train one PINN with the requested floating-point dtype."""
@@ -155,33 +146,29 @@ def run_precision_benchmark(dtype, num_runs, epochs):
     """Run multiple training runs for one precision and aggregate results."""
     per_run = [train_one(dtype, SEED + i, epochs) for i in range(num_runs)]
 
-    times = np.asarray([r["train_time_s"] for r in per_run], dtype=np.float64)
-    final_total = np.asarray([r["final_total_loss"] for r in per_run], dtype=np.float64)
-    final_bc = np.asarray([r["final_bc_loss"] for r in per_run], dtype=np.float64)
-    final_pde = np.asarray([r["final_pde_loss"] for r in per_run], dtype=np.float64)
-    max_res = np.asarray([r["max_pde_residual"] for r in per_run], dtype=np.float64)
-    mean_res = np.asarray([r["mean_abs_pde_residual"] for r in per_run], dtype=np.float64)
+    metric_names = {
+        "train_time_s": "train_time",
+        "final_total_loss": "final_total_loss",
+        "final_bc_loss": "final_bc_loss",
+        "final_pde_loss": "final_pde_loss",
+        "max_pde_residual": "max_pde_residual",
+        "mean_abs_pde_residual": "mean_abs_pde_residual",
+    }
+    metrics = {
+        name: np.asarray([run[name] for run in per_run], dtype=np.float64)
+        for name in metric_names
+    }
 
     # Use median-loss run for representative fields and histories
-    median_idx = int(np.argsort(final_total)[len(final_total) // 2])
+    median_idx = int(
+        np.argsort(metrics["final_total_loss"])[len(per_run) // 2]
+    )
 
-    return {
+    result = {
         "label": per_run[0]["label"],
         "dtype": per_run[0]["dtype"],
         "num_runs": num_runs,
         "epochs": epochs,
-        "train_time_mean": float(times.mean()),
-        "train_time_std": float(times.std(ddof=1)) if num_runs > 1 else 0.0,
-        "final_total_loss_mean": float(final_total.mean()),
-        "final_total_loss_std": float(final_total.std(ddof=1)) if num_runs > 1 else 0.0,
-        "final_bc_loss_mean": float(final_bc.mean()),
-        "final_bc_loss_std": float(final_bc.std(ddof=1)) if num_runs > 1 else 0.0,
-        "final_pde_loss_mean": float(final_pde.mean()),
-        "final_pde_loss_std": float(final_pde.std(ddof=1)) if num_runs > 1 else 0.0,
-        "max_pde_residual_mean": float(max_res.mean()),
-        "max_pde_residual_std": float(max_res.std(ddof=1)) if num_runs > 1 else 0.0,
-        "mean_abs_pde_residual_mean": float(mean_res.mean()),
-        "mean_abs_pde_residual_std": float(mean_res.std(ddof=1)) if num_runs > 1 else 0.0,
         "median_run_idx": median_idx,
         "x": per_run[median_idx]["x"],
         "y": per_run[median_idx]["y"],
@@ -189,9 +176,17 @@ def run_precision_benchmark(dtype, num_runs, epochs):
         "total_loss_history": per_run[median_idx]["total_loss_history"],
         "bc_loss_history": per_run[median_idx]["bc_loss_history"],
         "pde_loss_history": per_run[median_idx]["pde_loss_history"],
-        "train_time_s": times,
-        "final_total_loss_runs": final_total,
     }
+    for name, output_name in metric_names.items():
+        values = metrics[name]
+        result[f"{output_name}_mean"] = float(values.mean())
+        result[f"{output_name}_std"] = (
+            float(values.std(ddof=1)) if num_runs > 1 else 0.0
+        )
+
+    result["train_time_s"] = metrics["train_time_s"]
+    result["final_total_loss_runs"] = metrics["final_total_loss"]
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -217,54 +212,19 @@ def print_summary(res32, res64):
     print(f"{'Metric':<30} {'FP32':>24} {'FP64':>24} {'Delta':>10}")
     print("-" * 90)
 
-    rows = [
-        (
-            "Final total loss",
-            res32["final_total_loss_mean"],
-            res32["final_total_loss_std"],
-            res64["final_total_loss_mean"],
-            res64["final_total_loss_std"],
-        ),
-        (
-            "Final BC loss",
-            res32["final_bc_loss_mean"],
-            res32["final_bc_loss_std"],
-            res64["final_bc_loss_mean"],
-            res64["final_bc_loss_std"],
-        ),
-        (
-            "Final PDE loss",
-            res32["final_pde_loss_mean"],
-            res32["final_pde_loss_std"],
-            res64["final_pde_loss_mean"],
-            res64["final_pde_loss_std"],
-        ),
-        (
-            "Max |PDE residual|",
-            res32["max_pde_residual_mean"],
-            res32["max_pde_residual_std"],
-            res64["max_pde_residual_mean"],
-            res64["max_pde_residual_std"],
-        ),
-        (
-            "Mean |PDE residual|",
-            res32["mean_abs_pde_residual_mean"],
-            res32["mean_abs_pde_residual_std"],
-            res64["mean_abs_pde_residual_mean"],
-            res64["mean_abs_pde_residual_std"],
-        ),
-        (
-            "Train time (s)",
-            res32["train_time_mean"],
-            res32["train_time_std"],
-            res64["train_time_mean"],
-            res64["train_time_std"],
-        ),
+    metrics = [
+        ("Final total loss", "final_total_loss"),
+        ("Final BC loss", "final_bc_loss"),
+        ("Final PDE loss", "final_pde_loss"),
+        ("Max |PDE residual|", "max_pde_residual"),
+        ("Mean |PDE residual|", "mean_abs_pde_residual"),
+        ("Train time (s)", "train_time"),
     ]
 
-    for label, m32, s32, m64, s64 in rows:
-        col32 = _format_mean_std(m32, s32)
-        col64 = _format_mean_std(m64, s64)
+    for label, key in metrics:
+        m32, s32 = res32[f"{key}_mean"], res32[f"{key}_std"]
+        m64, s64 = res64[f"{key}_mean"], res64[f"{key}_std"]
+        col32, col64 = _format_mean_std(m32, s32), _format_mean_std(m64, s64)
         delta = _pct_delta(m32, m64)
         delta_str = f"{delta:+.1f}%" if not np.isnan(delta) else "N/A"
         print(f"{label:<30} {col32:>24} {col64:>24} {delta_str:>10}")
@@ -279,7 +239,6 @@ def plot_results(res32, res64):
     """Generate loss-curve and u-field comparison figures."""
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Loss curves
     fig, axes = plt.subplots(1, 3, figsize=(16, 4))
     histories = [
         ("total_loss_history", "Total loss"),
@@ -300,7 +259,6 @@ def plot_results(res32, res64):
     plt.close(fig)
     print(f"Loss-curve figure saved to: {loss_path}")
 
-    # u-field comparison
     fig, axes = plt.subplots(1, 3, figsize=(16, 4))
     u_range = (
         float(min(res32["u"].min(), res64["u"].min())),
@@ -343,13 +301,13 @@ def main():
     )
     parser.add_argument(
         "--num_runs",
-        type=int,
+        type=_positive_int,
         default=1,
         help="Number of independent runs to average over for each precision. Default: 1",
     )
     parser.add_argument(
         "--epochs",
-        type=int,
+        type=_positive_int,
         default=EPOCHS,
         help=f"Number of LBFGS epochs. Default: {EPOCHS}",
     )
