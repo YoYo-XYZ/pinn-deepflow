@@ -94,18 +94,21 @@ def _residuals(model, points):
         if isinstance(values, (list, tuple)):
             return [np.asarray(value).ravel() for value in values]
         return [np.asarray(values[:, index]).ravel() for index in range(3)]
-    except Exception:
-        warnings.warn("Direct operator prediction failed; computing residuals manually.")
+    except Exception as error:
+        warnings.warn(
+            "Direct operator prediction failed; using model.net for connected residuals."
+        )
         net = getattr(model, "net", None)
         if net is None:
-            inputs = torch.tensor(points, dtype=torch.float32, requires_grad=True)
-            outputs = torch.tensor(model.predict(points), dtype=torch.float32)
-        else:
-            device = next(net.parameters()).device
-            inputs = torch.tensor(
-                points, dtype=torch.float32, device=device, requires_grad=True
-            )
-            outputs = net(inputs)
+            raise RuntimeError(
+                "DeepXDE operator prediction failed and model.net is unavailable; "
+                "cannot compute connected PDE residuals."
+            ) from error
+        device = next(net.parameters()).device
+        inputs = torch.tensor(
+            points, dtype=torch.float32, device=device, requires_grad=True
+        )
+        outputs = net(inputs)
         values = pde(inputs, outputs)
         return [value.detach().cpu().numpy().ravel() for value in values]
 

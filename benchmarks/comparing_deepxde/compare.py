@@ -199,7 +199,13 @@ def _profile(data, coordinate, target):
     u = _array(data, "u")
     coordinate_values = x if coordinate == "x" else y
     profile_values = y if coordinate == "x" else x
-    indices = np.where(np.abs(coordinate_values - target) < 0.02)[0]
+    if not len(coordinate_values):
+        return np.array([]), np.array([])
+    nearest_index = int(np.argmin(np.abs(coordinate_values - target)))
+    nearest_coordinate = coordinate_values[nearest_index]
+    indices = np.where(
+        np.isclose(coordinate_values, nearest_coordinate, rtol=0.0, atol=1e-12)
+    )[0]
     if not len(indices):
         return np.array([]), np.array([])
     order = np.argsort(profile_values[indices])

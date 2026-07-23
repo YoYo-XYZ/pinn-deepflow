@@ -38,7 +38,7 @@ BOUNDARY_POINTS: List[int] = [1000, 1000, 1000, 1000, 1000, 1000]
 INTERIOR_POINTS: List[int] = [4000]
 
 # ---------------------------------------------------------------------------
-# Resampling ("randomr" — periodic full LHS resampling)
+# Resampling (periodic full LHS resampling)
 # ---------------------------------------------------------------------------
 RESAMPLE_EVERY: int = 100  # epochs between resamples
 

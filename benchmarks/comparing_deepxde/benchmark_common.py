@@ -5,7 +5,7 @@ import sys
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_SRC = SCRIPT_DIR.parents[1] / "src"
+PROJECT_SRC = Path(__file__).resolve().parents[2] / "src"
 RESULTS_DIR = SCRIPT_DIR / "results"
 
 if str(PROJECT_SRC) not in sys.path:

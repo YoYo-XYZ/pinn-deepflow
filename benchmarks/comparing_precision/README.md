@@ -36,9 +36,10 @@ For each precision, the script:
 
 1. Sets `df.dtype = torch.float32` or `df.dtype = torch.float64`.
 2. Builds the same 1D Burgers problem (geometry, PDE, BCs, sampling).
-3. Trains a `df.PINN(width=16, depth=4)` with `torch.optim.LBFGS` for the configured epochs.
-4. Repeats for `--num_runs` seeds and reports mean ± std.
-5. Evaluates the trained model on a uniform `[500, 250]` grid and records the
+3. Creates one FP32 baseline per seed, including sampled coordinates and initial model weights.
+4. Casts that baseline to FP32 and FP64, then trains each with `torch.optim.LBFGS` for the configured epochs.
+5. Repeats for `--num_runs` paired seeds and reports mean ± std.
+6. Evaluates the selected best model on one canonical uniform `[500, 250]` grid and records the
    PDE residual field.
 
 The comparison table reports:
@@ -48,8 +49,13 @@ The comparison table reports:
 - Training time
 - Percentage delta (`(FP64 − FP32) / FP32 × 100`)
 
-All per-precision metrics are aggregated over `--num_runs` independent seeds.
-Loss histories and fields shown in the figures come from the median-loss run.
+All per-precision metrics are aggregated over paired seeds. Loss histories and
+fields shown in the figures come from the same representative seed/run index for
+both dtypes.
+
+These results measure training losses and PDE residual behavior on collocation
+and evaluation grids. They do not measure independent solution accuracy against
+a reference solution.
 
 ## Outputs
 

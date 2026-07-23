@@ -10,6 +10,7 @@ to a legacy checkout that does not contain the repository's benchmarks.
 from __future__ import annotations
 
 import argparse
+import inspect
 import subprocess
 import sys
 import time
@@ -36,12 +37,17 @@ from common_config_burgers import (  # noqa: E402
     INTERIOR_POINTS,
     LR,
     NU,
+    NEW_RESULTS_FILE,
     RESULTS_DIR,
     SEED,
     WIDTH,
     X_RANGE,
     Y_RANGE,
 )
+
+
+PYTORCH_DEFAULT_INITIALIZATION = "pytorch_default (weight_init=None)"
+LEGACY_DEFAULT_INITIALIZATION = "legacy_constructor_default"
 
 
 def _get_commit_metadata() -> dict:
@@ -85,16 +91,33 @@ def _build_domain():
     return domain
 
 
+def _build_model():
+    """Build a model using the initialization supported by this DeepFlow."""
+    model_kwargs = {
+        "input_vars": ["x", "y"],
+        "output_vars": ["u"],
+        "width": WIDTH,
+        "length": DEPTH,
+    }
+    try:
+        supports_weight_init = "weight_init" in inspect.signature(df.PINN).parameters
+    except (TypeError, ValueError):
+        supports_weight_init = False
+
+    if supports_weight_init:
+        model_kwargs["weight_init"] = None
+        initialization_protocol = PYTORCH_DEFAULT_INITIALIZATION
+    else:
+        initialization_protocol = LEGACY_DEFAULT_INITIALIZATION
+
+    return df.PINN(**model_kwargs), initialization_protocol
+
+
 def _run_once(run_idx: int, num_runs: int) -> dict:
     run_seed = SEED + run_idx
     df.manual_seed(run_seed)
     domain = _build_domain()
-    model = df.PINN(
-        input_vars=["x", "y"],
-        output_vars=["u"],
-        width=WIDTH,
-        length=DEPTH,
-    )
+    model, initialization_protocol = _build_model()
 
     print(f"\n--- Run {run_idx + 1}/{num_runs} (seed {run_seed}) ---")
     start = time.perf_counter()
@@ -113,6 +136,7 @@ def _run_once(run_idx: int, num_runs: int) -> dict:
         "total_loss": np.asarray(history["total_loss"], dtype=np.float64),
         "bc_loss": np.asarray(history["bc_loss"], dtype=np.float64),
         "pde_loss": np.asarray(history["pde_loss"], dtype=np.float64),
+        "initialization_protocol": initialization_protocol,
     }
 
 
@@ -134,6 +158,11 @@ def _aggregate_results(runs: list[dict], commit_metadata: dict) -> dict:
     final_mean, final_std = _mean_and_std(final_losses)
     first_mean, first_std = _mean_and_std(first_losses)
     median_run = runs[median_idx]
+    initialization_protocols = {
+        run["initialization_protocol"] for run in runs
+    }
+    if len(initialization_protocols) != 1:
+        raise ValueError("Initialization protocol changed between benchmark runs")
 
     return {
         "train_time_s": times,
@@ -157,6 +186,12 @@ def _aggregate_results(runs: list[dict], commit_metadata: dict) -> dict:
         "depth": DEPTH,
         "lr": LR,
         "seed": SEED,
+        "nu": NU,
+        "x_range": np.asarray(X_RANGE, dtype=np.float64),
+        "y_range": np.asarray(Y_RANGE, dtype=np.float64),
+        "boundary_points": np.asarray(BOUNDARY_POINTS, dtype=np.int64),
+        "interior_points": np.asarray(INTERIOR_POINTS, dtype=np.int64),
+        "initialization_protocol": next(iter(initialization_protocols)),
         "run_timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -191,12 +226,14 @@ def main() -> None:
         f"burgers_benchmark_{results['commit_hash'][:7]}.npz"
     )
     np.savez(output_path, **results)
+    np.savez(NEW_RESULTS_FILE, **results)
 
     print("\n" + "=" * 60)
     print("Benchmark complete")
     print("=" * 60)
     print(f"Commit:            {results['commit_hash']}")
     print(f"Commit date:       {results['commit_date']}")
+    print(f"Initialization:    {results['initialization_protocol']}")
     print(f"Number of runs:    {results['num_runs']}")
     print(
         f"Train time (s):    {results['train_time_mean']:.4f} "
@@ -212,6 +249,7 @@ def main() -> None:
     )
     print(f"Median run index:  {results['median_run_idx'] + 1}")
     print(f"Results written to: {output_path}")
+    print(f"Current results:   {NEW_RESULTS_FILE}")
 
 
 if __name__ == "__main__":

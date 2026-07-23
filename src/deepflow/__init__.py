@@ -9,7 +9,11 @@ from .domain import *
 from .physicsinformed import *
 from .pde import *
 from .nn import *
-from .qnn import *
+try:
+    from .qnn import *
+except ImportError as exc:
+    if exc.name != "pennylane":
+        raise
 from .evaluation import *
 from .utility import (
     get_device,

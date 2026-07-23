@@ -146,6 +146,7 @@ def train_one(
     )
     lbfgs_time = time.perf_counter() - start
 
+    final_losses = calc_loss(best_model)
     area_eval = domain.area_list[0].evaluate(best_model)
     area_eval.sampling_area(EVAL_GRID)
     data = area_eval.data_dict
@@ -159,9 +160,9 @@ def train_one(
         "adam_time_s": float(adam_time),
         "lbfgs_time_s": float(lbfgs_time),
         "total_time_s": float(adam_time + lbfgs_time),
-        "final_total_loss": float(data["total_loss"][-1]),
-        "final_bc_loss": float(data["bc_loss"][-1]),
-        "final_pde_loss": float(data["pde_loss"][-1]),
+        "final_total_loss": float(final_losses["total_loss"].detach().cpu().item()),
+        "final_bc_loss": float(final_losses["bc_loss"].detach().cpu().item()),
+        "final_pde_loss": float(final_losses["pde_loss"].detach().cpu().item()),
     }
     for name in RESIDUAL_FIELDS:
         residual = np.asarray(data[f"{name}_residual"])
@@ -206,6 +207,7 @@ def aggregate(
         "epochs_adam": epochs_adam,
         "epochs_lbfgs": epochs_lbfgs,
         "median_run_idx": median_idx,
+        "seeds": np.asarray([run["seed"] for run in per_run], dtype=np.int64),
         "final_total_loss_runs": final_losses,
         "total_time_s_runs": np.asarray([run["total_time_s"] for run in per_run]),
     }

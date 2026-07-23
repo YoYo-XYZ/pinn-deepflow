@@ -30,6 +30,7 @@ from common_config import (
     LR_ADAM,
     EPOCHS_ADAM,
     EPOCHS_LBFGS,
+    THRESHOLD_ADAM,
     THRESHOLD_LBFGS,
     PINN_WIDTH,
     PINN_LENGTH,
@@ -107,6 +108,50 @@ def _pct_delta(a, b):
     return (b - a) / a * 100.0
 
 
+def _required_int(data, key, label):
+    if data is None or key not in data.files or data[key].size != 1:
+        raise ValueError(
+            f"{label} results are missing scalar metadata '{key}'; rerun the benchmark."
+        )
+    return int(data[key].flat[0])
+
+
+def _required_seeds(data, label):
+    if data is None or "seeds" not in data.files:
+        raise ValueError(
+            f"{label} results are missing seed metadata; rerun the benchmark."
+        )
+    return np.asarray(data["seeds"]).reshape(-1)
+
+
+def _validate_matching_runs(pinn, qcpinn):
+    """Reject result files produced with incompatible run configurations."""
+    pinn_runs = _required_int(pinn, "num_runs", "PINN")
+    qcpinn_runs = _required_int(qcpinn, "num_runs", "QCPINN")
+    if pinn_runs != qcpinn_runs:
+        raise ValueError(
+            f"num_runs differs (PINN={pinn_runs}, QCPINN={qcpinn_runs})."
+        )
+
+    pinn_seeds = _required_seeds(pinn, "PINN")
+    qcpinn_seeds = _required_seeds(qcpinn, "QCPINN")
+    if len(pinn_seeds) != pinn_runs or len(qcpinn_seeds) != qcpinn_runs:
+        raise ValueError("seed metadata length does not match num_runs.")
+    if not np.array_equal(pinn_seeds, qcpinn_seeds):
+        raise ValueError(
+            f"seed lists differ (PINN={pinn_seeds.tolist()}, "
+            f"QCPINN={qcpinn_seeds.tolist()})."
+        )
+
+    for key in ("epochs_adam", "epochs_lbfgs"):
+        pinn_epochs = _required_int(pinn, key, "PINN")
+        qcpinn_epochs = _required_int(qcpinn, key, "QCPINN")
+        if pinn_epochs != qcpinn_epochs:
+            raise ValueError(
+                f"{key} differs (PINN={pinn_epochs}, QCPINN={qcpinn_epochs})."
+            )
+
+
 def _scatter(ax, x, y, field, title, cmap="jet", vrange=None):
     sc = ax.scatter(x, y, c=field, s=2, cmap=cmap, marker="s")
     if vrange is not None:
@@ -131,6 +176,13 @@ if pinn_data is None and qc_data is None:
     print("Neither PINN nor QCPINN results found. Run the benchmarks first.")
     sys.exit(1)
 
+if pinn_data is not None and qc_data is not None:
+    try:
+        _validate_matching_runs(pinn_data, qc_data)
+    except ValueError as exc:
+        print(f"[ERROR] Cannot compare results: {exc}")
+        sys.exit(1)
+
 models = [
     ("PINN", pinn_data, "C0"),
     ("QCPINN", qc_data, "C1"),
@@ -151,6 +203,9 @@ print("-" * len(header))
 # Parameter count is a single value, not a mean±std
 pinn_params = _scalar(pinn_data, "n_params")
 qc_params = _scalar(qc_data, "n_params")
+pinn_seeds = _arr(pinn_data, "seeds")
+qc_seeds = _arr(qc_data, "seeds")
+report_seeds = pinn_seeds if len(pinn_seeds) else qc_seeds
 pinn_params_str = str(int(pinn_params)) if not np.isnan(pinn_params) else "N/A"
 qc_params_str = str(int(qc_params)) if not np.isnan(qc_params) else "N/A"
 print(f"{'Parameters':<30} {pinn_params_str:>24} {qc_params_str:>24}")
@@ -320,11 +375,12 @@ lines = [
     "  - Cylinder surface (upper + lower): no-slip (u=v=0)",
     f"- **Sampling**: LHS initial — {sum(BOUNDARY_POINTS)} boundary points,"
     f" {sum(INTERIOR_POINTS)} interior points",
-    f"- **Resampling**: \"randomr\" — full LHS resample every {RESAMPLE_EVERY} L-BFGS epochs",
-    f"- **Training**: Adam(lr={LR_ADAM}, {EPOCHS_ADAM} epochs, threshold={THRESHOLD_LBFGS})"
+    f"- **Resampling**: LHS — full LHS resample every {RESAMPLE_EVERY} L-BFGS epochs",
+    f"- **Training**: Adam(lr={LR_ADAM}, {EPOCHS_ADAM} epochs, threshold={THRESHOLD_ADAM})"
     f" → L-BFGS({EPOCHS_LBFGS} epochs, threshold={THRESHOLD_LBFGS})",
     "- **Loss**: `df.calc_loss_simple` (unweighted BC + PDE sum)",
-    f"- **Seeds**: {SEEDS}",
+    f"- **Seeds**: {report_seeds.tolist() if len(report_seeds) else SEEDS}",
+    "- **QCPINN assumptions**: final `Tanh` is applied to the output layer, so `u`, `v`, and `p` are bounded to [-1, 1]; the quantum layer uses PennyLane `default.qubit` (CPU simulator), with DeepFlow configured for CPU by default.",
     f"- **Runs per model**: PINN = {_safe_int(_scalar(pinn_data, 'num_runs', 0), '?')},"
     f" QCPINN = {_safe_int(_scalar(qc_data, 'num_runs', 0), '?')}"
     f"  (median-loss run used for representative field plots)",

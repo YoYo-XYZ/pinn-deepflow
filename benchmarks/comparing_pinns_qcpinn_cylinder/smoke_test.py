@@ -16,6 +16,7 @@ model0 = df.QCPINN(
     q_layer_iterations=QC_ITERATIONS,
 )
 n_params = count_params(model0)
+assert n_params == 769, f"Expected 769 QCPINN parameters, got {n_params}"
 print(f"QCPINN params: {n_params} (expected 769)")
 
 calc_loss = df.calc_loss_simple(domain)

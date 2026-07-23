@@ -39,7 +39,7 @@ python benchmarks/comparing_pinns_qcpinn_cylinder/run_benchmark.py --compare
 
 1. **Parameter count** — total trainable parameters per model (for the parameter-matched design).
 2. **Training** — Adam (lr=0.004, 2000 epochs, threshold=0.01) → L-BFGS (500 epochs, threshold=0.0001).
-3. **Resampling** — `"randomr"`: full LHS resampling of all collocation + boundary points every 100 L-BFGS epochs (non-adaptive periodic baseline).
+3. **Resampling** — LHS: full LHS resampling of all collocation + boundary points every 100 L-BFGS epochs (non-adaptive periodic baseline).
 4. **Metrics per run** — final total / BC / PDE loss, max & mean absolute continuity / x-momentum / y-momentum residuals, full loss curves, wall-clock time (Adam / L-BFGS / total).
 5. **Aggregation** — mean ± std (ddof=1) across runs; **median-loss run** used for representative field plots and loss-curve plots.
 6. **Visual comparison** — side-by-side u, v, p fields, continuity residual field, outlet velocity profile, loss curves.

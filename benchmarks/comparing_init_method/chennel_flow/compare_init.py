@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Compare DeepFlow channel-flow performance with Glorot-normal (current default)
-vs the old Kaiming-uniform initialization.
+Compare DeepFlow channel-flow performance with Kaiming-uniform (DeepFlow's
+current default) and Glorot-normal (the alternative).
 
-The script runs a short benchmark for both initializers and prints the metrics
-side by side.
+This is a standalone, benchmark-specific comparison. It uses the explicit
+perimeter-weighted random sampling protocol in ``common_config.py`` and is not
+an exact reproduction of the quickstart notebook.
 """
 
 import sys
@@ -25,6 +26,7 @@ add_project_src(__file__)
 import deepflow as df  # noqa: E402
 from common_config import (  # noqa: E402
     BOUNDARY_POINTS,
+    BENCHMARK_METADATA,
     DEPTH,
     EPOCHS,
     EVAL_GRID,
@@ -89,6 +91,7 @@ def main():
             ("max_ymom", "Max |y-momentum|"),
             ("time", "Train time (s)"),
         ],
+        metadata=BENCHMARK_METADATA,
     )
     save_field_plot(
         results,

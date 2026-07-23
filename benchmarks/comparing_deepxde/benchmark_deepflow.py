@@ -63,9 +63,8 @@ def build_model():
     )
 
 
-def _last_loss(data, name):
-    values = data.get(name)
-    return float(values[-1]) if values is not None else float("nan")
+def _loss_value(losses, name):
+    return float(losses[name].detach().cpu().item())
 
 
 def main():
@@ -81,22 +80,25 @@ def main():
     print(f"Sampling       : BOUNDARY_POINTS={boundary_points} (total={sum(boundary_points)}), INTERIOR={INTERIOR_POINTS}")
     print(f"Training       : Adam, lr={LR}, {EPOCHS} epochs\n")
 
+    calc_loss = df.calc_loss_simple(domain)
     start = time.perf_counter()
     _, best_model = model.train_adam(
-        calc_loss=df.calc_loss_simple(domain),
+        calc_loss=calc_loss,
         learning_rate=LR,
         epochs=EPOCHS,
     )
     train_time_s = time.perf_counter() - start
     print(f"\nTraining time  : {train_time_s:.2f} s")
 
+    best_model.eval()
+    best_loss = calc_loss(best_model)
     print("Evaluating on uniform grid ...")
     prediction = domain.area_list[0].evaluate(best_model)
     prediction.sampling_area(EVAL_GRID)
     data = prediction.data_dict
-    final_total = _last_loss(data, "total_loss")
-    final_bc = _last_loss(data, "bc_loss")
-    final_pde = _last_loss(data, "pde_loss")
+    final_total = _loss_value(best_loss, "total_loss")
+    final_bc = _loss_value(best_loss, "bc_loss")
+    final_pde = _loss_value(best_loss, "pde_loss")
     print(f"Final loss     : total={final_total:.6f}  bc={final_bc:.6f}  pde={final_pde:.6f}")
 
     np.savez(

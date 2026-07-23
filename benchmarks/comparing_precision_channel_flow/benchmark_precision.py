@@ -5,6 +5,9 @@ Benchmark: FP32 vs FP64 precision for 2D steady channel flow using DeepFlow.
 This mirrors ``benchmarks/comparing_precision/benchmark_precision.py``, but uses
 steady Navier-Stokes channel flow instead of Burgers.
 
+The reported quantities measure training losses and PDE residuals; no independent
+reference solution is used to measure solution accuracy.
+
 Usage
 -----
 Run from the repository root::
@@ -90,11 +93,59 @@ SUMMARY_ROWS = (
 )
 
 
+def _positive_int(value):
+    """Parse a strictly positive command-line integer."""
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as error:
+        raise argparse.ArgumentTypeError("must be a positive integer") from error
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
 # ---------------------------------------------------------------------------
 # Problem construction
 # ---------------------------------------------------------------------------
 
-def build_domain():
+def _unique_geometries(domain):
+    """Iterate over each sampled geometry once (areas also own their bounds)."""
+    geometries = []
+    seen = set()
+    for geometry in domain.bound_list + domain.area_list:
+        if id(geometry) not in seen:
+            seen.add(id(geometry))
+            geometries.append(geometry)
+    return geometries
+
+
+def _capture_coordinates(domain):
+    """Capture sampled coordinates as CPU FP32 tensors for both precision runs."""
+    return tuple(
+        (
+            geometry.X.detach().cpu().clone(),
+            geometry.Y.detach().cpu().clone(),
+        )
+        for geometry in _unique_geometries(domain)
+    )
+
+
+def _apply_coordinates(domain, coordinates, dtype):
+    """Restore baseline coordinates and prepare them in the requested dtype."""
+    geometries = _unique_geometries(domain)
+    if len(geometries) != len(coordinates):
+        raise ValueError("Baseline and target domains have different geometry layouts.")
+
+    for geometry, (x, y) in zip(geometries, coordinates):
+        geometry.X = x.to(dtype=dtype).clone()
+        geometry.Y = y.to(dtype=dtype).clone()
+        if hasattr(geometry, "sampled_area"):
+            geometry.sampled_area = (geometry.X, geometry.Y)
+    for geometry in geometries:
+        geometry.process_coordinates()
+
+
+def build_domain(sampled_coordinates=None):
     """Build the steady 2D channel-flow domain (geometry, PDE, BCs)."""
     rect = df.geometry.rectangle(list(X_RANGE), list(Y_RANGE))
     domain = df.domain(rect)
@@ -106,7 +157,11 @@ def build_domain():
     domain.bound_list[3].define_bc({"u": 0, "v": 0})
 
     domain.area_list[0].define_pde(df.pde.NavierStokes(U=U, L=L, mu=MU, rho=RHO))
-    domain.sampling_random(BOUNDARY_POINTS, INTERIOR_POINTS)
+    if sampled_coordinates is None:
+        domain.sampling_random(BOUNDARY_POINTS, INTERIOR_POINTS)
+    else:
+        _apply_coordinates(domain, sampled_coordinates, df.dtype)
+        domain.sampling_option = "paired_baseline"
     return domain
 
 
@@ -115,49 +170,125 @@ def build_domain():
 # ---------------------------------------------------------------------------
 
 def _as_np(values):
+    """Convert tensors without erasing their native floating-point dtype."""
     if isinstance(values, torch.Tensor):
-        return values.detach().cpu().numpy().astype(np.float64, copy=False)
-    return np.asarray(values, dtype=np.float64)
+        return values.detach().cpu().numpy()
+    return np.asarray(values)
 
 
 def _history(model, key):
     return _as_np(model.loss_history.get(key, []))
 
 
-def train_one(dtype, seed, epochs):
-    """Train one channel-flow PINN with the requested floating-point dtype."""
-    label = "FP32" if dtype == torch.float32 else "FP64"
-    print(f"\n--- Training {label} (seed {seed}) ---")
+def _seed(seed):
+    """Seed every RNG used by the benchmark and request deterministic kernels."""
+    df.manual_seed(seed, deterministic=True)
 
-    # Set global precision for this run
-    df.dtype = dtype
 
-    # Reproducibility
-    df.manual_seed(seed)
+def _synchronize_cuda():
+    """Synchronize only when this benchmark is actually running on CUDA."""
+    if torch.cuda.is_available() and str(df.device).startswith("cuda"):
+        torch.cuda.synchronize()
 
-    # Build problem and model
+
+def _build_baseline(seed):
+    """Create one FP32 domain/model baseline for a paired seed."""
+    df.dtype = torch.float32
+    _seed(seed)
     domain = build_domain()
-    model0 = df.PINN(
+    model = df.PINN(
         input_vars=["x", "y"],
         output_vars=["u", "v", "p"],
         width=WIDTH,
         length=DEPTH,
     )
+    return {
+        "coordinates": _capture_coordinates(domain),
+        "model_state": {
+            key: value.detach().cpu().clone()
+            for key, value in model.state_dict().items()
+        },
+    }
+
+
+def _build_model(dtype, model_state):
+    """Build a model and load the shared FP32 state cast to ``dtype``."""
+    model = df.PINN(
+        input_vars=["x", "y"],
+        output_vars=["u", "v", "p"],
+        width=WIDTH,
+        length=DEPTH,
+    )
+    cast_state = {
+        key: value.to(dtype=dtype) if value.is_floating_point() else value.clone()
+        for key, value in model_state.items()
+    }
+    model.load_state_dict(cast_state)
+    return model
+
+
+def build_evaluation_grid():
+    """Create one uniform FP32 grid whose coordinates are shared by both dtypes."""
+    previous_dtype = df.dtype
+    df.dtype = torch.float32
+    try:
+        area = df.geometry.rectangle(list(X_RANGE), list(Y_RANGE))
+        area.sampling_area(EVAL_GRID)
+        return (
+            area.X.detach().cpu().clone(),
+            area.Y.detach().cpu().clone(),
+        )
+    finally:
+        df.dtype = previous_dtype
+
+
+def _set_evaluation_grid(domain, evaluation_grid, dtype):
+    """Put the canonical grid on the evaluation area in the requested dtype."""
+    area = domain.area_list[0]
+    area.X = evaluation_grid[0].to(dtype=dtype).clone()
+    area.Y = evaluation_grid[1].to(dtype=dtype).clone()
+    area.sampled_area = (area.X, area.Y)
+    area.process_coordinates()
+
+
+def train_one(dtype, seed, epochs, baseline=None, evaluation_grid=None):
+    """Train one channel-flow PINN with the requested floating-point dtype."""
+    label = "FP32" if dtype == torch.float32 else "FP64"
+    print(f"\n--- Training {label} (seed {seed}) ---")
+
+    if baseline is None:
+        baseline = _build_baseline(seed)
+    if evaluation_grid is None:
+        evaluation_grid = build_evaluation_grid()
+
+    # Set global precision and restore the shared baseline in this dtype.
+    df.dtype = dtype
+    _seed(seed)
+
+    # Build problem and model
+    domain = build_domain(sampled_coordinates=baseline["coordinates"])
+    model0 = _build_model(dtype, baseline["model_state"])
 
     calc_loss = df.calc_loss_simple(domain)
 
     # Train
+    _synchronize_cuda()
     t_start = time.perf_counter()
     model, model_best = model0.train_lbfgs(
         epochs=epochs,
         calc_loss=calc_loss,
         print_every=max(1, epochs // 10),
     )
+    _synchronize_cuda()
     train_time_s = time.perf_counter() - t_start
 
-    # Evaluate on a uniform grid
+    # Recompute reported losses on the model selected by train_lbfgs.
+    model_best.eval()
+    best_losses = calc_loss(model_best)
+
+    # Evaluate both dtypes on the same canonical grid.
+    _set_evaluation_grid(domain, evaluation_grid, dtype)
     prediction = domain.area_list[0].evaluate(model_best)
-    prediction.sampling_area(EVAL_GRID)
     data = prediction.data_dict
 
     residuals = {key: _as_np(data[key]) for key in RESIDUAL_KEYS}
@@ -173,10 +304,11 @@ def train_one(dtype, seed, epochs):
     return {
         "label": label,
         "dtype": str(dtype),
+        "seed": int(seed),
         "train_time_s": float(train_time_s),
-        "final_total_loss": float(data["total_loss"][-1]),
-        "final_bc_loss": float(data["bc_loss"][-1]),
-        "final_pde_loss": float(data["pde_loss"][-1]),
+        "final_total_loss": float(best_losses["total_loss"].detach().cpu().item()),
+        "final_bc_loss": float(best_losses["bc_loss"].detach().cpu().item()),
+        "final_pde_loss": float(best_losses["pde_loss"].detach().cpu().item()),
         **residual_metrics,
         "x": _as_np(data["x"]),
         "y": _as_np(data["y"]),
@@ -190,9 +322,37 @@ def train_one(dtype, seed, epochs):
     }
 
 
-def run_precision_benchmark(dtype, num_runs, epochs):
+def _representative_run_idx(per_run, representative_run_idx=None):
+    if representative_run_idx is None:
+        final_total = _as_np([run["final_total_loss"] for run in per_run])
+        representative_run_idx = int(np.argsort(final_total)[len(per_run) // 2])
+    if not 0 <= representative_run_idx < len(per_run):
+        raise ValueError("representative_run_idx is outside the available runs.")
+    return representative_run_idx
+
+
+def run_precision_benchmark(
+    dtype,
+    num_runs,
+    epochs,
+    paired_runs=None,
+    evaluation_grid=None,
+    representative_run_idx=None,
+):
     """Run multiple training runs for one precision and aggregate results."""
-    per_run = [train_one(dtype, SEED + i, epochs) for i in range(num_runs)]
+    if paired_runs is None:
+        if evaluation_grid is None:
+            evaluation_grid = build_evaluation_grid()
+        per_run = []
+        for i in range(num_runs):
+            seed = SEED + i
+            baseline = _build_baseline(seed)
+            per_run.append(train_one(dtype, seed, epochs, baseline, evaluation_grid))
+    else:
+        dtype_key = "fp32" if dtype == torch.float32 else "fp64"
+        per_run = [paired_run[dtype_key] for paired_run in paired_runs]
+        if len(per_run) != num_runs:
+            raise ValueError("paired_runs does not match num_runs.")
 
     aggregates = {}
     for key in AGGREGATE_KEYS:
@@ -202,8 +362,7 @@ def run_precision_benchmark(dtype, num_runs, epochs):
         aggregates[f"{base}_std"] = float(values.std(ddof=1)) if num_runs > 1 else 0.0
         aggregates[f"{key}_runs"] = values
 
-    final_total = _as_np([run["final_total_loss"] for run in per_run])
-    median_idx = int(np.argsort(final_total)[len(final_total) // 2])
+    median_idx = _representative_run_idx(per_run, representative_run_idx)
     representative = per_run[median_idx]
 
     return {
@@ -212,6 +371,10 @@ def run_precision_benchmark(dtype, num_runs, epochs):
         "num_runs": num_runs,
         "epochs": epochs,
         "median_run_idx": median_idx,
+        "representative_run_idx": median_idx,
+        "representative_seed": representative["seed"],
+        "run_seeds": np.asarray([run["seed"] for run in per_run], dtype=np.int64),
+        "run_indices": np.arange(num_runs, dtype=np.int64),
         **aggregates,
         **{
             key: representative[key]
@@ -269,7 +432,8 @@ def print_summary(res32, res64):
         )
 
     print("=" * 96)
-    print("Interpretation: negative Delta for losses/residuals means FP64 is lower/better.")
+    print("Interpretation: negative Delta for training losses/residuals means FP64 is lower/better.")
+    print("These metrics measure training and PDE residual behavior, not independent solution accuracy.")
     print("Positive Delta for time means FP64 is slower.")
     print("=" * 96)
 
@@ -406,13 +570,13 @@ def main():
     )
     parser.add_argument(
         "--num_runs",
-        type=int,
+        type=_positive_int,
         default=1,
         help="Number of independent runs to average over for each precision. Default: 1",
     )
     parser.add_argument(
         "--epochs",
-        type=int,
+        type=_positive_int,
         default=EPOCHS,
         help=f"Number of LBFGS epochs. Default: {EPOCHS}",
     )
@@ -426,8 +590,50 @@ def main():
     print(f"Epochs per run: {args.epochs}")
     print(f"Base seed: {SEED}")
 
-    res32 = run_precision_benchmark(torch.float32, args.num_runs, args.epochs)
-    res64 = run_precision_benchmark(torch.float64, args.num_runs, args.epochs)
+    # Build one FP32 baseline per seed, then run both dtypes from each baseline.
+    evaluation_grid = build_evaluation_grid()
+    paired_runs = []
+    for i in range(args.num_runs):
+        seed = SEED + i
+        baseline = _build_baseline(seed)
+        paired_runs.append(
+            {
+                "fp32": train_one(
+                    torch.float32, seed, args.epochs, baseline, evaluation_grid
+                ),
+                "fp64": train_one(
+                    torch.float64, seed, args.epochs, baseline, evaluation_grid
+                ),
+            }
+        )
+
+    paired_final_total = np.asarray(
+        [
+            (run["fp32"]["final_total_loss"] + run["fp64"]["final_total_loss"])
+            / 2.0
+            for run in paired_runs
+        ],
+        dtype=np.float64,
+    )
+    representative_run_idx = int(
+        np.argsort(paired_final_total)[args.num_runs // 2]
+    )
+    res32 = run_precision_benchmark(
+        torch.float32,
+        args.num_runs,
+        args.epochs,
+        paired_runs=paired_runs,
+        evaluation_grid=evaluation_grid,
+        representative_run_idx=representative_run_idx,
+    )
+    res64 = run_precision_benchmark(
+        torch.float64,
+        args.num_runs,
+        args.epochs,
+        paired_runs=paired_runs,
+        evaluation_grid=evaluation_grid,
+        representative_run_idx=representative_run_idx,
+    )
 
     print_summary(res32, res64)
 

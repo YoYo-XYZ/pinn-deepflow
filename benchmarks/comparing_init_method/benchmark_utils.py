@@ -7,7 +7,22 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-INITIALIZATIONS = (("Glorot-normal", "glorot"), ("Kaiming-uniform", "kaiming"))
+# DeepFlow's evaluator uses the Matplotlib-compatible plotting API. Some
+# environments expose an incompatible ``ultraplot`` stub, so use Matplotlib
+# for these standalone benchmarks when the required API is absent.
+try:
+    import ultraplot
+except ImportError:
+    pass
+else:
+    if not hasattr(ultraplot, "Figure"):
+        sys.modules["ultraplot"] = plt
+
+INITIALIZATIONS = (("Kaiming-uniform", "kaiming"), ("Glorot-normal", "glorot"))
+INITIALIZATION_ROLES = {
+    "Kaiming-uniform": "DeepFlow current default",
+    "Glorot-normal": "alternative",
+}
 
 
 def add_project_src(script_file):
@@ -38,6 +53,8 @@ def train_one(
 ):
     """Train one initialization and return the benchmark result dictionary."""
     print(f"\n--- Training with {init_name} initialization ---")
+    # Reset before each run so both initializers receive the same sampled
+    # training domain and the same random starting point.
     df.manual_seed(seed)
 
     domain = build_domain()
@@ -56,6 +73,12 @@ def train_one(
     )
     train_time = time.perf_counter() - start
 
+    # Recompute losses for the returned best model on the fixed training
+    # domain. This must happen before sampling the separate evaluation grid,
+    # which replaces the area's current coordinates.
+    best_model.eval()
+    best_loss = df.calc_loss_simple(domain)(best_model)
+
     prediction = domain.area_list[0].evaluate(best_model)
     prediction.sampling_area(eval_grid)
     data = prediction.data_dict
@@ -63,9 +86,10 @@ def train_one(
     result = {
         "init": init_name,
         "time": train_time,
-        "final_total": float(data["total_loss"][-1]),
-        "final_bc": float(data["bc_loss"][-1]),
-        "final_pde": float(data["pde_loss"][-1]),
+        "seed": seed,
+        "final_total": float(best_loss["total_loss"].detach().cpu().item()),
+        "final_bc": float(best_loss["bc_loss"].detach().cpu().item()),
+        "final_pde": float(best_loss["pde_loss"].detach().cpu().item()),
     }
     result.update(
         {
@@ -92,7 +116,7 @@ def run_comparison(
     residual_keys,
     field_names,
 ):
-    """Run the standard Glorot-versus-Kaiming comparison."""
+    """Run the standard Kaiming-default-versus-Glorot comparison."""
     return [
         train_one(
             df,
@@ -114,12 +138,24 @@ def run_comparison(
     ]
 
 
-def print_summary(results, metrics):
-    """Print the two-initialization comparison table."""
+def print_summary(results, metrics, metadata=None):
+    """Print the comparison table and the protocol limitations."""
     first, second = results
     print("\n" + "=" * 80)
     print("Summary")
     print("=" * 80)
+    print(
+        "Initializer roles : "
+        f"{first['init']} = {INITIALIZATION_ROLES.get(first['init'], 'comparison arm')}; "
+        f"{second['init']} = {INITIALIZATION_ROLES.get(second['init'], 'comparison arm')}"
+    )
+    if metadata:
+        for label, value in metadata.items():
+            print(f"{label:<19}: {value}")
+    print(
+        "Statistical limit : one paired seed only; deltas are descriptive and "
+        "do not estimate across-seed variation."
+    )
     print(f"{'Metric':<20} {first['init']:>18} {second['init']:>18} {'Delta':>18}")
     print("-" * 80)
     for key, label in metrics:

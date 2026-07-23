@@ -3,7 +3,8 @@
 ## Setup
 
 - **PDE**: 1D Burgers equation,  $u_t + u u_x = \nu u_{xx}$  with  $\nu = \frac{0.01}{\pi}$
-- **Spatial domain**:  $x \in [-1.0, 1.0]$
+- **Coordinates**: `x` is the spatial coordinate; `y` is time ($t$ in the PDE notation).
+- **Domain**:  $x \in [-1.0, 1.0]$,  $y=t \in [0.0, 1.0]$
 - **Network**:  16x4 fully-connected network with Tanh activation
 - **Optimizer**: Adam, learning rate = 0.004
 - **Epochs**: 2000
@@ -17,6 +18,7 @@
 |---|---|---|
 | Commit hash | `dd3efd0827b6233403a5eb844f29f43e9f3a46d1` | `f387a505ab9f390587ed99e8fa90fd0bfe2f1c95` |
 | Commit date | 2026-04-08 14:10:25 +0800 | 2026-07-03 15:40:16 +0800 |
+| Initialization protocol | not recorded | not recorded |
 | Number of runs | 3 | 3 |
 | Train time (s) | 24.5459 ± 0.4217 | 18.5266 ± 0.4839 |
 | Time per epoch (ms) | 12.2730 | 9.2633 |

@@ -37,17 +37,17 @@ def main():
         help="Run the comparison script (compare.py).",
     )
     parser.add_argument(
-        "--all", action="store_true", default=True,
+        "--all", action="store_true",
         help="Run all benchmarks and comparison (default).",
     )
     parser.add_argument(
         "--num_runs", type=int, default=None,
-        help="Override the default number of runs (forwarded to both benchmarks).",
+        help="Override the default number of runs for selected benchmarks.",
     )
     args = parser.parse_args()
 
     # Default to --all if no specific flag was given
-    if not any([args.pinn, args.qcpinn, args.compare]):
+    if not any([args.pinn, args.qcpinn, args.compare, args.all]):
         args.all = True
     if args.all:
         args.pinn = True
@@ -63,7 +63,7 @@ def main():
         print(f"Running {label} ...")
         print("=" * 60)
         cmd = [sys.executable, str(_SCRIPT_DIR / script_name)]
-        if args.num_runs is not None:
+        if args.num_runs is not None and script_name != "compare.py":
             cmd += ["--num_runs", str(args.num_runs)]
         rc = subprocess.call(cmd, cwd=str(_SCRIPT_DIR))
         if rc != 0:
