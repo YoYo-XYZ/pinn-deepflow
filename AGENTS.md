@@ -1,19 +1,17 @@
-# AGENTS.md
+# Repository Guidelines
 
-## 1. Think Before Coding
+## Project Structure & Module Organization
 
-State assumptions explicitly. If unclear, ask. Present alternatives; don't pick silently. Prefer simpler approaches.
+DeepFlow is a Python package using a `src` layout. Core APIs and implementations live in `src/deepflow/` (`geometry.py`, `domain.py`, `pde.py`, `nn.py`, `physicsinformed.py`, and related utilities). Regression and unit tests are in `tests/`; runnable scientific examples are grouped under `examples/`, while comparative experiments and benchmark scripts are under `EXPERIMENTS/` and `benchmarks/`. User documentation and the MkDocs site are in `docs/`; images and other site assets are in `static/`.
 
-## 2. Simplicity First
+The intended and correct usage of the DeepFlow API is demonstrated in `examples/`.
+
+## Coding Style & Naming Conventions
+
+### 1. Simplicity First
 
 Minimum code that solves the problem. No speculative features, no single-use abstractions, no unrequested config. If 200 lines could be 50, rewrite.
 
-## 3. Surgical Changes
+### 2. Surgical Changes
 
 Touch only what you must. Don't improve adjacent code or refactor unrelated things. Match existing style. Remove only the dead code your changes create.
-
-## 4. Goal-Driven Execution
-
-Define success criteria up front. Turn tasks into verifiable goals: add validation → test invalid inputs; fix bug → reproduce then pass; refactor → tests pass before and after. For multi-step work, list steps with verify checks.
-
-Every changed line should trace directly to the request.
