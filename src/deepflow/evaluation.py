@@ -51,17 +51,24 @@ class Evaluator(Visualizer):
         self.geometry.sampling_area(res_list, scheme)
         self.postprocess()
 
-    def define_time(self, range_t: Union[float, int, List[float]], sampling_scheme: str = "uniform") -> None:
+    def define_time(
+        self,
+        range_t: Union[float, int, List[float]],
+        sampling_scheme: str = "uniform",
+        expo_scaling: Optional[bool] = None,
+    ) -> None:
         """Defines time coordinates for transient problems."""
-        self.geometry.define_time(range_t, sampling_scheme=sampling_scheme, expo_scaling=False)
+        self.geometry.define_time(
+            range_t,
+            sampling_scheme=sampling_scheme,
+            expo_scaling=expo_scaling,
+        )
         self.postprocess()
     def postprocess(self) -> None:
         """
         Aggregates model predictions, residuals, and coordinates, 
         then converts them to NumPy for visualization.
         """
-        self.geometry.scheme = "uniform"
-        self.geometry.expo_scaling = False
         self.geometry.process_coordinates()
 
         self._create_data_dict()

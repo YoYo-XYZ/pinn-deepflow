@@ -3,6 +3,7 @@ import types
 
 import torch
 
+from . import utility as _utility
 from .geometry import *
 from .domain import *
 from .physicsinformed import *
@@ -11,7 +12,6 @@ from .nn import *
 from .qnn import *
 from .evaluation import *
 from .utility import (
-    device,
     get_device,
     get_dtype,
     set_dtype,
@@ -21,7 +21,15 @@ from .utility import (
 
 
 class _DeepFlowModule(types.ModuleType):
-    """Module wrapper that makes ``df.dtype`` a readable/writable property."""
+    """Module wrapper that exposes writable global configuration properties."""
+
+    @property
+    def device(self):
+        return _utility.get_device()
+
+    @device.setter
+    def device(self, value) -> None:
+        _utility.device = value
 
     @property
     def dtype(self) -> torch.dtype:
