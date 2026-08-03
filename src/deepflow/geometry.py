@@ -1,4 +1,3 @@
-import copy
 from typing import List, Tuple, Callable, Optional, Union, Dict, Any
 
 import torch
@@ -185,21 +184,32 @@ class Area(PhysicsAttach):
     dim = 2
     axes = list(range(dim))
 
-    def __init__(self, bound_list: List[Bound], bounds_negative: Optional[List[Bound]] = None):
+    def __init__(
+        self,
+        bound_list: List[Bound],
+        bounds_negative: Optional[List[Bound]] = None,
+        *,
+        contains_fn: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
+        ranges: Optional[Dict[int, Tuple[float, float]]] = None,
+    ):
         super().__init__()
-        self.ranges = {}
         self.bound_list = bound_list
         self.negative_bound_list = bounds_negative
+        self._contains_fn = contains_fn
         
-        # Calculate bounding box for the entire area
-        for ax in self.axes:
-            range_list = []
-            for bound in bound_list:
-                range_list += bound.ranges[ax]
-            self.ranges[ax] = (min(range_list), max(range_list))
+        if ranges is None:
+            self.ranges = {}
+            for ax in self.axes:
+                range_list = []
+                for bound in bound_list:
+                    range_list += bound.ranges[ax]
+                self.ranges[ax] = (min(range_list), max(range_list))
+        else:
+            self.ranges = ranges
             
         self._postprocess()
-        self.checkbound()
+        if self._contains_fn is None:
+            self.checkbound()
 
     def _postprocess(self):
         self.lengths = {}
@@ -253,6 +263,35 @@ class Area(PhysicsAttach):
                     else:
                         bound.reject_above = True
 
+    def contains(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Return a boolean mask selecting points inside or on the area."""
+        if not isinstance(x, torch.Tensor) or not isinstance(y, torch.Tensor):
+            raise TypeError("x and y must be torch tensors")
+        if x.shape != y.shape:
+            raise ValueError("x and y must have the same shape")
+        if x.device != y.device or x.dtype != y.dtype:
+            raise ValueError("x and y must have the same device and dtype")
+        if not x.is_floating_point():
+            raise TypeError("x and y must be floating-point tensors")
+
+        if self._contains_fn is not None:
+            mask = self._contains_fn(x, y)
+        else:
+            reject_masks = [bound.mask_area(x, y) for bound in self.bound_list]
+            mask = ~torch.stack(reject_masks, dim=0).any(dim=0)
+
+            if self.negative_bound_list is not None:
+                neg_masks = [bound.mask_area(x, y) for bound in self.negative_bound_list]
+                mask &= ~torch.stack(neg_masks, dim=0).all(dim=0)
+
+        if not isinstance(mask, torch.Tensor):
+            raise TypeError("contains function must return a torch tensor")
+        if mask.shape != x.shape or mask.dtype != torch.bool:
+            raise TypeError(
+                "contains function must return a boolean tensor with the same shape as x and y"
+            )
+        return mask
+
     def sampling_area(self, n_points_square: Union[int, List[int]], scheme = 'uniform') -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Samples points within the area.
@@ -294,14 +333,7 @@ class Area(PhysicsAttach):
             X = X.reshape(-1)
             Y = Y.reshape(-1)
 
-        # Apply Masks
-        reject_mask_list = [bound.mask_area(X, Y) for bound in self.bound_list]
-        self.reject_mask = torch.stack(reject_mask_list, dim=0).any(dim=0)
-
-        if self.negative_bound_list is not None:
-            neg_masks = [b.mask_area(X, Y) for b in self.negative_bound_list]
-            negative_reject_mask = torch.stack(neg_masks, dim=0).all(dim=0)
-            self.reject_mask = self.reject_mask | negative_reject_mask
+        self.reject_mask = ~self.contains(X, Y)
             
         self.X, self.Y = X[~self.reject_mask], Y[~self.reject_mask]
         self.sampled_area = (self.X, self.Y)
@@ -325,16 +357,57 @@ class Area(PhysicsAttach):
 
     def __sub__(self, other_area: 'Area') -> 'Area':
         """Boolean subtraction of geometry."""
-        bound_list = copy.deepcopy(other_area.bound_list)
-        for bound in bound_list:
-            bound.reject_above = not bound.reject_above
-        return Area(self.bound_list, bound_list)
+        if not isinstance(other_area, Area):
+            return NotImplemented
 
-    def __add__(self, other_bound: 'Bound') -> 'Area':
-        """Merge a boundary with an area"""
-        new_bound_list = self.bound_list.copy()
-        new_bound_list.append(other_bound)
-        return Area(new_bound_list)
+        negative_bound_list = list(self.negative_bound_list or [])
+        negative_bound_list.extend(other_area.bound_list)
+
+        return Area(
+            self.bound_list.copy(),
+            negative_bound_list,
+            contains_fn=lambda x, y: self.contains(x, y) & ~other_area.contains(x, y),
+            ranges=self.ranges.copy(),
+        )
+
+    def __or__(self, other_area: 'Area') -> 'Area':
+        """Boolean union of two areas."""
+        if not isinstance(other_area, Area):
+            return NotImplemented
+
+        ranges = {
+            ax: (
+                min(self.ranges[ax][0], other_area.ranges[ax][0]),
+                max(self.ranges[ax][1], other_area.ranges[ax][1]),
+            )
+            for ax in self.axes
+        }
+        negative_bound_list = [
+            *(self.negative_bound_list or []),
+            *(other_area.negative_bound_list or []),
+        ]
+
+        return Area(
+            [*self.bound_list, *other_area.bound_list],
+            negative_bound_list or None,
+            contains_fn=lambda x, y: self.contains(x, y) | other_area.contains(x, y),
+            ranges=ranges,
+        )
+
+    def __add__(self, other: Union['Area', 'Bound']) -> 'Area':
+        """Union areas, or retain the legacy boundary-addition behavior."""
+        if isinstance(other, Area):
+            return self | other
+        if isinstance(other, Bound):
+            new_bound_list = self.bound_list.copy()
+            new_bound_list.append(other)
+            return Area(
+                new_bound_list,
+                list(self.negative_bound_list or []) or None,
+                contains_fn=self.contains,
+                ranges=self.ranges.copy(),
+            )
+        return NotImplemented
     
     def __iter__(self):
         return iter(self.bound_list)
@@ -378,6 +451,9 @@ class Area(PhysicsAttach):
 
 def circle(x: float, y: float, r: float) -> Area:
     """Creates a circular Area."""
+    if r <= 0:
+        raise ValueError("radius must be positive")
+
     def func_up(X_tensor):
         return (r**2 - (X_tensor - x)**2)**0.5 + y
     def func_down(X_tensor):
@@ -395,7 +471,11 @@ def circle(x: float, y: float, r: float) -> Area:
     bound_down = Bound([x - r, x + r], func_down, ref_axis='x')
     bound_down.define_func([0, torch.pi], func_n_x_down, func_n_y_down, ref_axis='t')
 
-    return Area([bound_up, bound_down])
+    return Area(
+        [bound_up, bound_down],
+        contains_fn=lambda X, Y: (X - x).square() + (Y - y).square() <= r**2,
+        ranges={0: (x - r, x + r), 1: (y - r, y + r)},
+    )
 
 def rectangle(x_range: List[float], y_range: List[float]) -> Area:
     """Creates a rectangular Area."""
@@ -437,11 +517,71 @@ def polygon(*pos: List[float]) -> Area:
     Creates a polygon from a sequence of vertex coordinates.
     Vertices should be ordered (clockwise or counter-clockwise).
     """
+    if len(pos) < 3:
+        raise ValueError("polygon requires at least three vertices")
+
+    vertices = torch.as_tensor(pos, dtype=get_dtype())
+    if vertices.ndim != 2 or vertices.shape[1] != 2:
+        raise ValueError("polygon vertices must have shape (n, 2)")
+    if not torch.isfinite(vertices).all():
+        raise ValueError("polygon vertices must be finite")
+
     bound_list = []
     for i in range(len(pos)):
         # Connect current point to the previous point
         bound_list.append(line(pos[i], pos[i-1]))
-    return Area(bound_list)
+
+    ranges = {
+        0: (vertices[:, 0].min().item(), vertices[:, 0].max().item()),
+        1: (vertices[:, 1].min().item(), vertices[:, 1].max().item()),
+    }
+    return Area(
+        bound_list,
+        contains_fn=lambda x, y: _polygon_contains(vertices, x, y),
+        ranges=ranges,
+    )
+
+def _polygon_contains(
+    vertices: torch.Tensor,
+    x: torch.Tensor,
+    y: torch.Tensor,
+) -> torch.Tensor:
+    """Vectorized even-odd containment test for a simple polygon."""
+    vertices = vertices.to(dtype=x.dtype, device=x.device)
+    x1 = vertices[:, 0]
+    y1 = vertices[:, 1]
+    x2 = torch.roll(x1, shifts=-1)
+    y2 = torch.roll(y1, shifts=-1)
+
+    px = x.unsqueeze(-1)
+    py = y.unsqueeze(-1)
+    dy = y2 - y1
+    safe_dy = torch.where(dy == 0, torch.ones_like(dy), dy)
+
+    crosses_y = (y1 > py) != (y2 > py)
+    intersection_x = x1 + (py - y1) * (x2 - x1) / safe_dy
+    crossing_count = (crosses_y & (px < intersection_x)).sum(dim=-1)
+    inside = crossing_count.remainder(2).bool()
+
+    dx = x2 - x1
+    cross_product = (px - x1) * dy - (py - y1) * dx
+    coordinate_scale = torch.maximum(px.abs(), py.abs())
+    coordinate_scale = torch.maximum(
+        coordinate_scale,
+        torch.maximum(
+            torch.maximum(x1.abs(), x2.abs()),
+            torch.maximum(y1.abs(), y2.abs()),
+        ),
+    )
+    tolerance = torch.finfo(x.dtype).eps * 16 * (coordinate_scale + 1)
+    on_segment = (
+        (cross_product.abs() <= tolerance * (dx.abs() + dy.abs() + 1))
+        & (px >= torch.minimum(x1, x2) - tolerance)
+        & (px <= torch.maximum(x1, x2) + tolerance)
+        & (py >= torch.minimum(y1, y2) - tolerance)
+        & (py <= torch.maximum(y1, y2) + tolerance)
+    ).any(dim=-1)
+    return inside | on_segment
 
 def curve(range_val: List[float], *func, ref_axis='x') -> Bound:
     return Bound(range_val, *func, ref_axis=ref_axis)
