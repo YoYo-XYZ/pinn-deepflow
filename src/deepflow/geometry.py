@@ -370,27 +370,29 @@ class Area(PhysicsAttach):
             ranges=self.ranges.copy(),
         )
 
-    def __or__(self, other_area: 'Area') -> 'Area':
-        """Boolean union of two areas."""
-        if not isinstance(other_area, Area):
+    def __or__(self, other: Union['Area', 'Bound']) -> 'Area':
+        """Union areas, or attach a boundary without changing membership."""
+        if isinstance(other, Bound):
+            return self + other
+        if not isinstance(other, Area):
             return NotImplemented
 
         ranges = {
             ax: (
-                min(self.ranges[ax][0], other_area.ranges[ax][0]),
-                max(self.ranges[ax][1], other_area.ranges[ax][1]),
+                min(self.ranges[ax][0], other.ranges[ax][0]),
+                max(self.ranges[ax][1], other.ranges[ax][1]),
             )
             for ax in self.axes
         }
         negative_bound_list = [
             *(self.negative_bound_list or []),
-            *(other_area.negative_bound_list or []),
+            *(other.negative_bound_list or []),
         ]
 
         return Area(
-            [*self.bound_list, *other_area.bound_list],
+            [*self.bound_list, *other.bound_list],
             negative_bound_list or None,
-            contains_fn=lambda x, y: self.contains(x, y) | other_area.contains(x, y),
+            contains_fn=lambda x, y: self.contains(x, y) | other.contains(x, y),
             ranges=ranges,
         )
 

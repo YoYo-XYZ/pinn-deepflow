@@ -103,6 +103,20 @@ def test_area_add_bound_retains_legacy_behavior():
     assert _contains(combined, [(0.5, 0.25), (2, 2)]).tolist() == [True, False]
 
 
+def test_area_or_bound_matches_area_add_bound():
+    area = geometry.rectangle([0, 1], [0, 1])
+    extra_bound = geometry.line_horizontal(0.5, [0, 1])
+    added = area + extra_bound
+    combined = area | extra_bound
+    points = torch.tensor([[0.5, 0.25], [2, 2]], dtype=torch.float32)
+
+    assert len(combined.bound_list) == len(added.bound_list)
+    assert torch.equal(
+        combined.contains(points[:, 0], points[:, 1]),
+        added.contains(points[:, 0], points[:, 1]),
+    )
+
+
 def test_sampling_area_filters_candidates_through_contains():
     area = geometry.rectangle([0, 2], [0, 2]) - geometry.circle(1, 1, 0.5)
 
