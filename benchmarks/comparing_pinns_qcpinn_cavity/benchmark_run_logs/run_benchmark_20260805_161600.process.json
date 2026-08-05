@@ -1,0 +1,8 @@
+{
+  "stdout": "C:\\Users\\thamm\\OneDrive\\Documents\\1 - Projects\\0 - STEM\\2 - Numerical Physics\\9 - PINNs\\pinn-deepflow\\benchmarks\\comparing_pinns_qcpinn_cavity\\benchmark_run_logs\\run_benchmark_20260805_161600.stdout.log",
+  "started": "2026-08-05T16:16:00.7130712+08:00",
+  "stderr": "C:\\Users\\thamm\\OneDrive\\Documents\\1 - Projects\\0 - STEM\\2 - Numerical Physics\\9 - PINNs\\pinn-deepflow\\benchmarks\\comparing_pinns_qcpinn_cavity\\benchmark_run_logs\\run_benchmark_20260805_161600.stderr.log",
+  "working_directory": "C:\\Users\\thamm\\OneDrive\\Documents\\1 - Projects\\0 - STEM\\2 - Numerical Physics\\9 - PINNs\\pinn-deepflow",
+  "pid": 36340,
+  "command": "python benchmarks/comparing_pinns_qcpinn_cavity/run_benchmark.py --all --num_runs 1"
+}

@@ -1,0 +1,3 @@
+2026-08-05T16:16:00.6518869+08:00
+Command: python benchmarks/comparing_pinns_qcpinn_cavity/run_benchmark.py --all --num_runs 1
+WorkingDirectory: C:\Users\thamm\OneDrive\Documents\1 - Projects\0 - STEM\2 - Numerical Physics\9 - PINNs\pinn-deepflow
