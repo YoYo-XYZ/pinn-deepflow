@@ -21,7 +21,7 @@
 | Model | Architecture | Parameters |
 |-------|--------------|------------|
 | **PINN** | `PINN(width=48, length=4)` -- 4x48-neuron hidden layers, Tanh | 7347 |
-| **QCPINN** | `QCPINN(pre=[50], post=[50], nqubits=4, q_layer_iterations=10)` | N/A |
+| **QCPINN** | `QCPINN(pre=[32], post=[32], nqubits=4, q_layer_iterations=10)` | N/A |
 
 ## Summary Table
 

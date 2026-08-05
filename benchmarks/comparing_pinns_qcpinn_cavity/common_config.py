@@ -64,9 +64,9 @@ CFD_GRID_CONVERGENCE_FILENAME: str = "cfd_grid_convergence.npz"
 # ---------------------------------------------------------------------------
 # Network architectures
 # ---------------------------------------------------------------------------
-# QCPINN: pre=[50], post=[50], nqubits=4, q_layer_iterations=10 -> 877 params.
-QC_PRE: List[int] = [50]
-QC_POST: List[int] = [50]
+# QCPINN: pre=[32], post=[32], nqubits=4, q_layer_iterations=10 -> 607 params.
+QC_PRE: List[int] = [32]
+QC_POST: List[int] = [32]
 QC_NQUBITS: int = 4
 QC_ITERATIONS: int = 10
 

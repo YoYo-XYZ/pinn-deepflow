@@ -84,7 +84,7 @@ scalar results are aggregated as mean +/- standard deviation across runs.
 | Model | Configuration | Parameters |
 |-------|---------------|------------|
 | PINN | `PINN(width=32, length=4)` with direct `(u,v,p)` outputs | 3,363 |
-| QCPINN | `QCPINN(pre=[50], post=[50], nqubits=4, q_layer_iterations=10)` | 877 |
+| QCPINN | `QCPINN(pre=[32], post=[32], nqubits=4, q_layer_iterations=10)` | 607 |
 
 The paper's reported 6,594-parameter PINN uses separate pressure and
 stream-function models. The direct `(u,v,p)` DeepFlow adaptation therefore has

@@ -24,8 +24,8 @@ model0 = df.QCPINN(
     q_layer_iterations=QC_ITERATIONS,
 )
 n_params = count_params(model0)
-assert n_params == 877, f"Expected 877 QCPINN parameters, got {n_params}"
-print(f"QCPINN params: {n_params} (expected 877)")
+assert n_params == 607, f"Expected 607 QCPINN parameters, got {n_params}"
+print(f"QCPINN params: {n_params} (expected 607)")
 
 calc_loss = df.calc_loss_simple(domain)
 model, model_best = model0.train_adam(
