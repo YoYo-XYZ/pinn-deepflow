@@ -125,6 +125,81 @@ class NavierStokes(PDE):
                 new_inputs[key] = val
         return new_inputs
 
+
+class StreamFunctionNavierStokes(PDE):
+    """
+    Steady incompressible Navier-Stokes equations using ``psi`` and ``p``.
+
+    The velocity is derived from the stream function using
+    ``u = dpsi/dy`` and ``v = -dpsi/dx``.  Continuity is therefore satisfied
+    identically, and the PDE contributes only the two momentum residuals.
+    This formulation currently supports steady problems with ``x`` and ``y``
+    coordinates only.
+    """
+    def __init__(self, mu: float, rho: float, U: float = 1.0, L: float = 1.0):
+        super().__init__()
+        self.U = U
+        self.L = L
+        self.mu = mu
+        self.rho = rho
+        self.Re = (rho * U * L) / mu
+
+        self.scale_map = {
+            'x': self.L, 'y': self.L,
+            'u': self.U, 'v': self.U,
+            'psi': self.U * self.L,
+            'p': self.rho * (self.U**2),
+        }
+
+    def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, ...]:
+        if 't' in inputs_dict:
+            raise ValueError(
+                "StreamFunctionNavierStokes supports steady problems only; "
+                "remove the 't' input or use NavierStokes."
+            )
+
+        x, y = inputs_dict['x'], inputs_dict['y']
+        psi, p = inputs_dict['psi'], inputs_dict['p']
+
+        # Keep x and y as the differentiation inputs.  They are the original
+        # coordinate leaves used by the model, which is required for the
+        # higher-order derivatives below.
+        psi_x, psi_y = calc_grads(psi, (x, y))
+        u = psi_y
+        v = -psi_x
+
+        u_x, u_y = calc_grads(u, (x, y))
+        v_x, v_y = calc_grads(v, (x, y))
+        p_x, p_y = calc_grads(p, (x, y))
+
+        u_xx = calc_grad(u_x, x)
+        u_yy = calc_grad(u_y, y)
+        v_xx = calc_grad(v_x, x)
+        v_yy = calc_grad(v_y, y)
+
+        x_momentum_residual = (u * u_x) + (v * u_y) + p_x - ((u_xx + u_yy) / self.Re)
+        y_momentum_residual = (u * v_x) + (v * v_y) + p_y - ((v_xx + v_yy) / self.Re)
+
+        self.residual_fields = (x_momentum_residual, y_momentum_residual)
+        self.var.update(
+            x=x, y=y, psi=psi, u=u, v=v, p=p,
+            psi_x=psi_x, psi_y=psi_y,
+            u_x=u_x, u_y=u_y, v_x=v_x, v_y=v_y,
+            p_x=p_x, p_y=p_y,
+            continuity_residual=u_x + v_y,
+            x_momentum_residual=x_momentum_residual,
+            y_momentum_residual=y_momentum_residual,
+        )
+
+        return self.residual_fields
+
+    def nondimensionalize_inputs(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """Scale physical inputs to non-dimensional form."""
+        return {
+            key: val / self.scale_map[key] if key in self.scale_map else val
+            for key, val in inputs.items()
+        }
+
 class HeatEquation(PDE):
     """
     2D Heat Equation: u_t = alpha * (u_xx + u_yy)

@@ -96,6 +96,9 @@ def manual_seed(seed:int, deterministic:bool=False):
 def calc_grad(y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     """
     Calculates the gradient of tensor y with respect to tensor x.
+
+    If ``y`` does not depend on ``x``, return a zero tensor with the same
+    shape, device, and dtype as ``x``.
     """
     grad = torch.autograd.grad(
         outputs=y,
@@ -104,7 +107,7 @@ def calc_grad(y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
         create_graph=True,
         allow_unused=True
     )[0]
-    return grad
+    return grad if grad is not None else torch.zeros_like(x)
 
 def calc_grads(y: torch.Tensor, x_list: Union[Tuple[torch.Tensor, ...], List[torch.Tensor]]) -> Tuple[torch.Tensor, ...]:
     """

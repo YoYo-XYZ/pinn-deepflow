@@ -71,6 +71,23 @@ class NavierStokes(U, L, mu, rho)
 ```
 2D Incompressible Navier-Stokes equations.
 
+### `StreamFunctionNavierStokes`
+```python
+class StreamFunctionNavierStokes(mu, rho, U=1.0, L=1.0)
+```
+Steady 2D incompressible Navier-Stokes equations with model outputs `psi` and
+`p`. The velocity is derived as `u = psi_y` and `v = -psi_x`, so continuity is
+satisfied identically. The model can be constructed as follows:
+
+```python
+pinn = df.PINN(input_vars=["x", "y"], output_vars=["psi", "p"])
+pde = df.StreamFunctionNavierStokes(mu=0.01, rho=1.0)
+```
+
+This formulation returns the two momentum residuals and currently supports
+steady problems only. Derived `u` and `v` fields are available during PDE
+evaluation for plotting streamlines.
+
 ### `BurgersEquation1D`
 ```python
 class BurgersEquation1D(nu)
