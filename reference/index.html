@@ -17,7 +17,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -25,7 +25,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -813,6 +813,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#streamfunctionnavierstokes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StreamFunctionNavierStokes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#burgersequation1d" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1064,6 +1075,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#streamfunctionnavierstokes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StreamFunctionNavierStokes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#burgersequation1d" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1211,17 +1233,29 @@ Creates a circular area.</p>
 <p><div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">NavierStokes</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="n">mu</span><span class="p">,</span> <span class="n">rho</span><span class="p">)</span>
 </code></pre></div>
 2D Incompressible Navier-Stokes equations.</p>
+<h3 id="streamfunctionnavierstokes"><code>StreamFunctionNavierStokes</code></h3>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">StreamFunctionNavierStokes</span><span class="p">(</span><span class="n">mu</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">L</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</code></pre></div>
+Steady 2D incompressible Navier-Stokes equations with model outputs <code>psi</code> and
+<code>p</code>. The velocity is derived as <code>u = psi_y</code> and <code>v = -psi_x</code>, so continuity is
+satisfied identically. The model can be constructed as follows:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">pinn</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">PINN</span><span class="p">(</span><span class="n">input_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">output_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;psi&quot;</span><span class="p">,</span> <span class="s2">&quot;p&quot;</span><span class="p">])</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">pde</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">StreamFunctionNavierStokes</span><span class="p">(</span><span class="n">mu</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</code></pre></div>
+<p>This formulation returns the two momentum residuals and currently supports
+steady problems only. Derived <code>u</code> and <code>v</code> fields are available during PDE
+evaluation for plotting streamlines.</p>
 <h3 id="burgersequation1d"><code>BurgersEquation1D</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">BurgersEquation1D</span><span class="p">(</span><span class="n">nu</span><span class="p">)</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">BurgersEquation1D</span><span class="p">(</span><span class="n">nu</span><span class="p">)</span>
 </code></pre></div>
 1D Burgers' equation.</p>
 <h3 id="heatequation"><code>HeatEquation</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">HeatEquation</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">HeatEquation</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
 </code></pre></div>
 2D Heat equation.</p>
 <h2 id="neural-network">Neural Network</h2>
 <h3 id="pinn"><code>PINN</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">PINN</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">input_vars</span><span class="p">,</span> <span class="n">output_vars</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Tanh</span><span class="p">())</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">PINN</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">input_vars</span><span class="p">,</span> <span class="n">output_vars</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Tanh</span><span class="p">())</span>
 </code></pre></div>
 Physics-Informed Neural Network model.</p>
 <p><strong>Methods:</strong>
@@ -1291,7 +1325,7 @@ Physics-Informed Neural Network model.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "navigation.tabs", "navigation.sections", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../javascripts/mathjax.js"></script>
       
