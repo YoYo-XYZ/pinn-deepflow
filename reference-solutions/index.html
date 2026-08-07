@@ -822,6 +822,9 @@ condition.  A pressure field without a pressure Dirichlet condition is
 normalized to zero mean after each Navier–Stokes solve; the normalization mode
 is recorded in <code>reference.metadata["pressure_gauge"]</code>.</p>
 <h2 id="usage">Usage</h2>
+<p>The primary FEM workflow returns a geometry-aware <code>GroupEvaluator</code>.  It
+uses the existing domain samplers when resolutions are supplied and reuses
+already sampled coordinates otherwise:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">deepflow</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">df</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
@@ -831,10 +834,19 @@ is recorded in <code>reference.metadata["pressure_gauge"]</code>.</p>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">bound</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s2">&quot;u&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;v&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">area</span><span class="o">.</span><span class="n">define_pde</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">NavierStokes</span><span class="p">(</span><span class="n">mu</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">1.0</span><span class="p">))</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">solver</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">ReferenceSolver</span><span class="p">(</span><span class="n">mesh_size</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">boundary_resolution</span><span class="o">=</span><span class="mi">128</span><span class="p">)</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">reference</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]))</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">reference</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">reference</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">solve_fem</span><span class="p">(</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">mesh_size</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">boundary_resolution</span><span class="o">=</span><span class="mi">128</span><span class="p">,</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">area_sampling_res</span><span class="o">=</span><span class="p">[</span><span class="mi">300</span><span class="p">,</span> <span class="mi">150</span><span class="p">],</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">bound_sampling_res</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="p">)</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">reference</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s2">&quot;u_ref&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="nb">print</span><span class="p">(</span><span class="n">reference</span><span class="o">.</span><span class="n">metadata</span><span class="p">)</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="c1"># FEM data is kept per geometry and uses the ``*_ref`` suffix.</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="n">u</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;u_ref&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="n">x</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="n">y</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p>Heat, wave, transient Navier–Stokes, and 1-D Burgers problems require a time
 interval and initial data.  Set <code>time_step</code> to control the stored snapshots;
@@ -842,9 +854,17 @@ the default stores 100 uniform steps.  Transient <code>evaluate</code> calls lin
 interpolate between snapshots.  Burgers follows DeepFlow's existing convention
 that <code>x</code> is space and <code>y</code> is time, so <code>reference.evaluate(x, y)</code> is a valid
 transient query for that PDE.  Other transient PDEs use <code>t=...</code>.</p>
-<p>The reference object retains the FEM fields in memory, so repeated queries do
-not solve the PDE again.  <code>metadata</code> contains mesh statistics, iteration
-counts, residual diagnostics, time values, and convergence status.</p>
+<p>The returned group exposes the advanced point-query and export object as
+<code>reference.reference_solution</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">solution</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">values</span> <span class="o">=</span> <span class="n">solution</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]))</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">solution</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
+</code></pre></div>
+<p><code>ReferenceSolver(...).solve(domain)</code> remains available when direct access to
+the low-level <code>ReferenceSolution</code> is preferred.  The reference object retains
+the FEM fields in memory, so repeated queries do not solve the PDE again.
+<code>metadata</code> contains mesh statistics, iteration counts, residual diagnostics,
+time values, and convergence status.</p>
 
 
 
