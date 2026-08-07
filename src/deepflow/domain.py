@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from .geometry import Area, Bound
 try:
     import ultraplot as plt
@@ -7,6 +9,10 @@ import torch
 import sympy as sp
 from .nn import HardConstraint
 from .geometry import CustomData
+
+if TYPE_CHECKING:
+    from .evaluation import GroupEvaluator
+
 
 def domain(*geometries):
     bound_list = []
@@ -30,6 +36,14 @@ def domain(*geometries):
             raise TypeError(f"Expected Bound or Area, got {type(geometry)}")
     return ProblemDomain(bound_list, area_list)
 
+
+def __getattr__(name):
+    """Expose a lazy patch seam without importing the reference backend."""
+    if name == "ReferenceSolver":
+        return None
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 class ProblemDomain():
     def __init__(self, bound_list:list[Bound], area_list:list[Area]):
         self.bound_list = bound_list
@@ -45,6 +59,31 @@ class ProblemDomain():
         from .evaluation import GroupEvaluator
 
         return GroupEvaluator(model, self)
+
+    def solve_fem(
+        self,
+        mesh_size=None,
+        boundary_resolution=128,
+        time_step=None,
+        tolerance=1e-8,
+        max_iterations=200,
+        area_sampling_res=None,
+        bound_sampling_res=None,
+    ) -> "GroupEvaluator":
+        """Solve the domain with the optional NGSolve FEM backend."""
+        from .fem import solve_fem as _solve_fem
+
+        return _solve_fem(
+            self,
+            mesh_size=mesh_size,
+            boundary_resolution=boundary_resolution,
+            time_step=time_step,
+            tolerance=tolerance,
+            max_iterations=max_iterations,
+            area_sampling_res=area_sampling_res,
+            bound_sampling_res=bound_sampling_res,
+            reference_solver=globals().get("ReferenceSolver"),
+        )
 
     def __str__(self):
         return f"""number of bound : {[f'{i}: {len(bound.X)}' for i, bound in enumerate(self.bound_list)]}

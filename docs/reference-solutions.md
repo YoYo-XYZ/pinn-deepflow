@@ -31,6 +31,10 @@ is recorded in `reference.metadata["pressure_gauge"]`.
 
 ## Usage
 
+The primary FEM workflow returns a geometry-aware `GroupEvaluator`.  It
+uses the existing domain samplers when resolutions are supplied and reuses
+already sampled coordinates otherwise:
+
 ```python
 import numpy as np
 import deepflow as df
@@ -41,10 +45,19 @@ for bound in domain.bound_list:
     bound.define_bc({"u": 0, "v": 0})
 area.define_pde(df.NavierStokes(mu=1.0, rho=1.0))
 
-solver = df.ReferenceSolver(mesh_size=0.05, boundary_resolution=128)
-reference = solver.solve(domain)
-values = reference.evaluate(np.array([0.25, 0.5]), np.array([0.5, 0.5]))
-reference.export_npz("reference.npz", x=[0.25, 0.5], y=[0.5, 0.5])
+reference = domain.solve_fem(
+    mesh_size=0.05,
+    boundary_resolution=128,
+    area_sampling_res=[300, 150],
+    bound_sampling_res=200,
+)
+reference.area_evaluators[0].plot_color("u_ref")
+print(reference.metadata)
+
+# FEM data is kept per geometry and uses the ``*_ref`` suffix.
+u = reference.area_evaluators[0].data_dict["u_ref"]
+x = reference.area_evaluators[0].data_dict["x"]
+y = reference.area_evaluators[0].data_dict["y"]
 ```
 
 Heat, wave, transient Navier–Stokes, and 1-D Burgers problems require a time
@@ -54,6 +67,17 @@ interpolate between snapshots.  Burgers follows DeepFlow's existing convention
 that `x` is space and `y` is time, so `reference.evaluate(x, y)` is a valid
 transient query for that PDE.  Other transient PDEs use `t=...`.
 
-The reference object retains the FEM fields in memory, so repeated queries do
-not solve the PDE again.  `metadata` contains mesh statistics, iteration
-counts, residual diagnostics, time values, and convergence status.
+The returned group exposes the advanced point-query and export object as
+`reference.reference_solution`:
+
+```python
+solution = reference.reference_solution
+values = solution.evaluate(np.array([0.25, 0.5]), np.array([0.5, 0.5]))
+solution.export_npz("reference.npz", x=[0.25, 0.5], y=[0.5, 0.5])
+```
+
+`ReferenceSolver(...).solve(domain)` remains available when direct access to
+the low-level `ReferenceSolution` is preferred.  The reference object retains
+the FEM fields in memory, so repeated queries do not solve the PDE again.
+`metadata` contains mesh statistics, iteration counts, residual diagnostics,
+time values, and convergence status.

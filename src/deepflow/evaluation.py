@@ -181,6 +181,158 @@ class Evaluator(Visualizer):
         return ani
 
 
+class ReferenceEvaluator(Evaluator):
+    """Evaluate a solved :class:`ReferenceSolution` on one geometry.
+
+    Reference evaluators deliberately do not calculate PINN residuals or copy
+    model training history.  They retain the FEM solution and re-query it
+    whenever the geometry is sampled again or its time coordinates change.
+    """
+
+    def __init__(self, reference_solution, geometry: Area | Bound | CustomData) -> None:
+        self.model = None
+        self.reference_solution = reference_solution
+        self.geometry = geometry
+        self.data_dict: Dict[str, Any] = {}
+        self.is_postprocessed = False
+        self.metadata = reference_solution.metadata
+
+        if getattr(self.geometry, "X", None) is not None:
+            self.postprocess()
+
+    @staticmethod
+    def _as_numpy(value) -> np.ndarray:
+        if isinstance(value, torch.Tensor):
+            return value.detach().cpu().numpy()
+        return np.asarray(value)
+
+    @staticmethod
+    def _same_coordinates(current, processed) -> bool:
+        if current is None or processed is None:
+            return False
+        current_array = ReferenceEvaluator._as_numpy(current)
+        processed_array = ReferenceEvaluator._as_numpy(processed)
+        return (
+            current_array.shape == processed_array.shape
+            and np.array_equal(current_array, processed_array)
+        )
+
+    def _prepare_coordinates(self) -> None:
+        """Process only when the public coordinates changed.
+
+        ``PhysicsAttach.process_coordinates`` regenerates time samples when a
+        ``range_t`` is present.  Avoiding an unconditional call preserves
+        existing time coordinates when ``solve_fem`` is asked to reuse them.
+        """
+        if getattr(self.geometry, "X", None) is None or getattr(
+            self.geometry, "Y", None
+        ) is None:
+            raise ValueError(
+                "Cannot evaluate an unsampled geometry: coordinates X and Y "
+                "must be defined first."
+            )
+
+        x_processed = getattr(self.geometry, "X_", None)
+        y_processed = getattr(self.geometry, "Y_", None)
+        if not self._same_coordinates(self.geometry.X, x_processed) or not self._same_coordinates(
+            self.geometry.Y, y_processed
+        ):
+            self.geometry.process_coordinates()
+            return
+
+        if getattr(self.reference_solution, "is_transient", False) and not getattr(
+            self.reference_solution, "time_from_y", False
+        ):
+            t_values = self._time_values()
+            if t_values is None:
+                if getattr(self.geometry, "range_t", None) is not None:
+                    self.geometry.process_coordinates()
+            else:
+                try:
+                    np.broadcast(
+                        np.empty(np.shape(t_values)),
+                        np.empty(np.shape(self.geometry.X)),
+                    )
+                except ValueError:
+                    if getattr(self.geometry, "range_t", None) is not None:
+                        self.geometry.process_coordinates()
+
+    def _time_values(self):
+        for name in ("T", "t", "T_"):
+            value = getattr(self.geometry, name, None)
+            if value is not None:
+                return value
+        return None
+
+    def define_time(
+        self,
+        range_t: Union[float, int, List[float]],
+        sampling_scheme: str = "uniform",
+        expo_scaling: Optional[bool] = None,
+    ) -> None:
+        """Update time coordinates and immediately re-query the FEM fields."""
+        self.geometry.define_time(
+            range_t,
+            sampling_scheme=sampling_scheme,
+            expo_scaling=expo_scaling,
+        )
+        self.geometry.process_coordinates()
+        self.postprocess()
+
+    def _create_data_dict(self) -> Dict[str, Any]:
+        self._prepare_coordinates()
+
+        x = self._as_numpy(self.geometry.X)
+        y = self._as_numpy(self.geometry.Y)
+        solution = self.reference_solution
+        fields = getattr(solution, "fields", None)
+        if fields is None:
+            fields = solution.declared_fields
+        fields = tuple(fields)
+
+        if getattr(solution, "is_transient", False) and not getattr(
+            solution, "time_from_y", False
+        ):
+            time_values = self._time_values()
+            if time_values is None:
+                raise ValueError(
+                    "Transient FEM evaluation requires existing time "
+                    "coordinates on every geometry."
+                )
+            try:
+                np.broadcast(
+                    np.empty(np.shape(time_values)),
+                    np.empty(np.shape(self.geometry.X)),
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    "Transient FEM time coordinates must align with the "
+                    "geometry's spatial coordinates."
+                ) from exc
+            t = self._as_numpy(time_values)
+            values = solution.evaluate(x, y, t=t, fields=fields)
+        else:
+            t = None
+            values = solution.evaluate(x, y, fields=fields)
+
+        data_dict = {
+            f"{name}_ref": np.asarray(value)
+            for name, value in values.items()
+        }
+        data_dict["x"] = x
+        data_dict["y"] = y
+        if t is not None:
+            data_dict["t"] = t
+
+        self.data_dict = self._convert_to_numpy(data_dict)
+        return self.data_dict
+
+    def postprocess(self) -> None:
+        self._create_data_dict()
+        self.is_postprocessed = True
+        Visualizer.__init__(self, self.data_dict)
+
+
 class GroupEvaluator:
     """
     Coordinates geometry-specific :class:`Evaluator` instances for a domain.
@@ -190,9 +342,18 @@ class GroupEvaluator:
     types and therefore expose different residual fields.
     """
 
-    def __init__(self, pinns_model: PINN, domain) -> None:
+    def __init__(
+        self,
+        pinns_model: PINN,
+        domain,
+        *,
+        reference_solution=None,
+    ) -> None:
         self.model = pinns_model
         self.domain = domain
+        self.reference_solution = reference_solution
+        if reference_solution is not None:
+            self.metadata = reference_solution.metadata
 
         self._area_entries = self._unique_entries(
             getattr(domain, "area_list", [])
@@ -206,12 +367,23 @@ class GroupEvaluator:
 
         self._validate_sampled()
 
+        evaluator_type = (
+            ReferenceEvaluator if reference_solution is not None else Evaluator
+        )
         self.area_evaluators = [
-            Evaluator(self.model, geometry)
+            (
+                evaluator_type(reference_solution, geometry)
+                if reference_solution is not None
+                else evaluator_type(self.model, geometry)
+            )
             for _, geometry in self._area_entries
         ]
         self.bound_evaluators = [
-            Evaluator(self.model, geometry)
+            (
+                evaluator_type(reference_solution, geometry)
+                if reference_solution is not None
+                else evaluator_type(self.model, geometry)
+            )
             for _, geometry in self._bound_entries
         ]
 

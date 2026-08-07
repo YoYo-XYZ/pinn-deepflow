@@ -80,6 +80,11 @@ class ReferenceSolution:
     def is_transient(self) -> bool:
         return self._snapshots is not None
 
+    @property
+    def time_from_y(self) -> bool:
+        """Whether the existing ``y`` coordinate carries transient time."""
+        return self._time_from_y
+
     @staticmethod
     def _evaluate_ngsolve_field(mesh, field, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         """Evaluate a scalar NGSolve field point by point.
@@ -107,7 +112,47 @@ class ReferenceSolution:
             mask = self._area.contains(x_tensor, y_tensor)
         except Exception as exc:
             raise ValueError("Could not validate query points against the PDE area.") from exc
-        return np.asarray(mask.detach().cpu(), dtype=bool)
+        inside = np.asarray(mask.detach().cpu(), dtype=bool)
+        if inside.all():
+            return inside
+
+        boundary_points = []
+        for bound in list(getattr(self._area, "bound_list", []) or []) + list(
+            getattr(self._area, "negative_bound_list", []) or []
+        ):
+            bound_x = getattr(bound, "X", None)
+            bound_y = getattr(bound, "Y", None)
+            if bound_x is None or bound_y is None:
+                continue
+            bound_points = np.column_stack(
+                [
+                    np.asarray(bound_x.detach().cpu() if isinstance(bound_x, torch.Tensor) else bound_x),
+                    np.asarray(bound_y.detach().cpu() if isinstance(bound_y, torch.Tensor) else bound_y),
+                ]
+            )
+            if bound_points.size:
+                boundary_points.append(bound_points)
+
+        if not boundary_points:
+            return inside
+
+        query_points = np.column_stack([np.asarray(x), np.asarray(y)])
+        scale = max(
+            1.0,
+            float(np.max(np.abs(query_points))) if query_points.size else 1.0,
+        )
+        tolerance = 1.0e-7 * scale
+        boundary_keys = {
+            tuple(key)
+            for points in boundary_points
+            for key in np.rint(points / tolerance).astype(np.int64)
+        }
+        query_keys = np.rint(query_points / tolerance).astype(np.int64)
+        boundary_mask = np.asarray(
+            [tuple(key) in boundary_keys for key in query_keys],
+            dtype=bool,
+        )
+        return inside | boundary_mask
 
     def _select_fields(self, fields: Optional[Iterable[str]]) -> Tuple[str, ...]:
         if fields is None:
