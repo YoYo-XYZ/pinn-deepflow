@@ -40,6 +40,12 @@ class ProblemDomain():
             if isinstance(g, CustomData):
                 g.process_coordinates()
 
+    def evaluate(self, model):
+        """Evaluate every unique sampled geometry in the domain."""
+        from .evaluation import GroupEvaluator
+
+        return GroupEvaluator(model, self)
+
     def __str__(self):
         return f"""number of bound : {[f'{i}: {len(bound.X)}' for i, bound in enumerate(self.bound_list)]}
 number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list)]}"""

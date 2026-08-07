@@ -29,6 +29,7 @@ The main class managing the physics problem.
 - `sampling_random(bound_sampling_res, area_sampling_res)`: Samples points randomly.
 - `sampling_lhs(bound_sampling_res, area_sampling_res)`: Samples points using Latin Hypercube Sampling.
 - `sampling_R3(bound_sampling_res, area_sampling_res)`: Samples points using R3 refinement.
+- `evaluate(model)`: Returns a structured `GroupEvaluator` for all unique sampled geometries.
 - `show_setup()`: Plots the domain geometry and boundary conditions.
 - `show_coordinates(display_physics=False)`: Plots the sampled collocation points.
 
@@ -128,4 +129,35 @@ Returned by `domain.area_list[i].evaluate(model)`.
 - `plot_streamline(u, v)`: Plot streamlines.
 - `plot_loss_curve()`: Plot loss history.
 - `plot_animate(...)`: Create animation (for transient problems).
+
+### `GroupEvaluator`
+
+Returned by `domain.evaluate(model)`.
+
+`GroupEvaluator` keeps one `Evaluator` per unique geometry instead of merging
+fields from different physics types into one data dictionary.
+
+```python
+results = domain.evaluate(model)
+
+area_prediction = results.area_evaluators[0]
+bound_prediction = results.get_evaluator(domain.bound_list[0])
+```
+
+**Attributes and methods:**
+- `area_evaluators`: Evaluators aligned with the unique entries in `domain.area_list`.
+- `bound_evaluators`: Evaluators aligned with the unique entries in `domain.bound_list`.
+- `get_evaluator(geometry)`: Select an evaluator using the original geometry object.
+- `postprocess()` / `refresh()`: Recompute all child results after model or sample changes.
+- `sampling_area(...)` and `sampling_line(...)`: Broadcast sampling to compatible child geometries.
+- `define_time(...)`: Broadcast time-coordinate configuration to all child geometries.
+- `plot_color("u")` / `plot_scatter("u")`: Plot all child geometries that contain `u` in one combined scatter plot.
+- `plot_color("u", geometry=area)`: Delegate visualization to one selected child evaluator.
+
+All included geometries must have sampled coordinates before
+`domain.evaluate(model)` is called.
+
+Aggregate color plots skip child evaluators that do not contain the requested
+field or coordinate keys. The temporary concatenated data is used only for the
+plot and is not stored on `GroupEvaluator`.
 
