@@ -29,5 +29,10 @@ dependencies = [
     "scipy>=1.5.0"
 ]
 
+[project.optional-dependencies]
+cfd = [
+    "ngsolve>=6.2; python_version >= '3.10'",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]

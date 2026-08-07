@@ -41,6 +41,7 @@ DeepFlow is a user-friendly framework for solving PDEs, with a focus on fluid dy
 - **Neural Network Architectures**: Fully connected feedforward networks (FNN).
 - **Optimizers**: Adam, L-BFGS
 - **Backend**: PyTorch
+- **Optional FEM reference backend**: NGSolve/Netgen via `pip install "deepflow[cfd]"`
 
 ## Installation
 
@@ -48,6 +49,13 @@ You can install DeepFlow via pip:
 
 ```bash
 pip install deepflow
+```
+
+NGSolve reference solutions are optional and are loaded only when used.  In a
+supported Python 3.10+ environment, install them with:
+
+```bash
+pip install "deepflow[cfd]"
 ```
 
 For development or to build from source:

@@ -45,3 +45,12 @@ class _DeepFlowModule(types.ModuleType):
 
 
 sys.modules[__name__].__class__ = _DeepFlowModule
+
+
+def __getattr__(name):
+    """Load optional reference-solver symbols without importing NGSolve."""
+    if name in {"ReferenceSolver", "ReferenceSolution"}:
+        from .reference import ReferenceSolver, ReferenceSolution
+
+        return {"ReferenceSolver": ReferenceSolver, "ReferenceSolution": ReferenceSolution}[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

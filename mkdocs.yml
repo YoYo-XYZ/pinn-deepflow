@@ -48,3 +48,4 @@ nav:                           # Your menu structure – edit as you add pages
     - Transient Channel Flow: channel_flow_transient.md
     - 2D Heat Equation: heat_eq.md
   - API: reference.md
+  - NGSolve reference solutions: reference-solutions.md
