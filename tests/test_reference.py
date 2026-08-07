@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 
+import numpy as np
 import pytest
 
 
@@ -25,6 +26,31 @@ def test_custom_pde_is_rejected_before_optional_backend_load():
     area.define_pde(df.CustomPDE(lambda _: (0,)))
     with pytest.raises(NotImplementedError, match="CustomPDE"):
         df.ReferenceSolver().solve(df.domain(area))
+
+
+def test_reference_solution_accepts_float32_curved_boundary_queries():
+    import deepflow as df
+    from deepflow.reference import ReferenceSolution
+
+    area = df.geometry.circle(0.2, 0.2, 0.05)
+    for bound in area.bound_list:
+        bound.sampling_line(64)
+        bound.process_coordinates()
+
+    solution = ReferenceSolution(
+        area=area,
+        mesh=None,
+        fields={"u": object()},
+        field_evaluator=lambda field, x, y: np.zeros_like(x),
+    )
+
+    for bound in area.bound_list:
+        values = solution.evaluate(
+            bound.X.numpy(),
+            bound.Y.numpy(),
+            fields=["u"],
+        )
+        assert values["u"].shape == bound.X.shape
 
 
 def test_rectangle_circle_polygon_and_hole_meshes():

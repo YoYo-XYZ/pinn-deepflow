@@ -126,8 +126,18 @@ class ReferenceSolution:
                 continue
             bound_points = np.column_stack(
                 [
-                    np.asarray(bound_x.detach().cpu() if isinstance(bound_x, torch.Tensor) else bound_x),
-                    np.asarray(bound_y.detach().cpu() if isinstance(bound_y, torch.Tensor) else bound_y),
+                    np.asarray(
+                        bound_x.detach().cpu()
+                        if isinstance(bound_x, torch.Tensor)
+                        else bound_x,
+                        dtype=float,
+                    ),
+                    np.asarray(
+                        bound_y.detach().cpu()
+                        if isinstance(bound_y, torch.Tensor)
+                        else bound_y,
+                        dtype=float,
+                    ),
                 ]
             )
             if bound_points.size:
@@ -136,7 +146,12 @@ class ReferenceSolution:
         if not boundary_points:
             return inside
 
-        query_points = np.column_stack([np.asarray(x), np.asarray(y)])
+        query_points = np.column_stack(
+            [
+                np.asarray(x, dtype=float),
+                np.asarray(y, dtype=float),
+            ]
+        )
         scale = max(
             1.0,
             float(np.max(np.abs(query_points))) if query_points.size else 1.0,
