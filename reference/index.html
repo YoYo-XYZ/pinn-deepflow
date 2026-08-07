@@ -12,6 +12,8 @@
         <link rel="prev" href="../heat_eq/">
       
       
+        <link rel="next" href="../reference-solutions/">
+      
       
         
       
@@ -252,6 +254,25 @@
     
   
   API
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../reference-solutions/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  NGSolve reference solutions
 
       </a>
     </li>
@@ -901,6 +922,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#groupevaluator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GroupEvaluator
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -910,6 +942,33 @@
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference-solutions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGSolve reference solutions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1163,6 +1222,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#groupevaluator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GroupEvaluator
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1207,6 +1277,7 @@ The main class managing the physics problem.</p>
 - <code>sampling_random(bound_sampling_res, area_sampling_res)</code>: Samples points randomly.
 - <code>sampling_lhs(bound_sampling_res, area_sampling_res)</code>: Samples points using Latin Hypercube Sampling.
 - <code>sampling_R3(bound_sampling_res, area_sampling_res)</code>: Samples points using R3 refinement.
+- <code>evaluate(model)</code>: Returns a structured <code>GroupEvaluator</code> for all unique sampled geometries.
 - <code>show_setup()</code>: Plots the domain geometry and boundary conditions.
 - <code>show_coordinates(display_physics=False)</code>: Plots the sampled collocation points.</p>
 <h3 id="calc_loss_simple"><code>calc_loss_simple</code></h3>
@@ -1273,6 +1344,29 @@ Physics-Informed Neural Network model.</p>
 - <code>plot_streamline(u, v)</code>: Plot streamlines.
 - <code>plot_loss_curve()</code>: Plot loss history.
 - <code>plot_animate(...)</code>: Create animation (for transient problems).</p>
+<h3 id="groupevaluator"><code>GroupEvaluator</code></h3>
+<p>Returned by <code>domain.evaluate(model)</code>.</p>
+<p><code>GroupEvaluator</code> keeps one <code>Evaluator</code> per unique geometry instead of merging
+fields from different physics types into one data dictionary.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">results</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">area_prediction</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">bound_prediction</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">get_evaluator</span><span class="p">(</span><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+</code></pre></div>
+<p><strong>Attributes and methods:</strong>
+- <code>area_evaluators</code>: Evaluators aligned with the unique entries in <code>domain.area_list</code>.
+- <code>bound_evaluators</code>: Evaluators aligned with the unique entries in <code>domain.bound_list</code>.
+- <code>get_evaluator(geometry)</code>: Select an evaluator using the original geometry object.
+- <code>postprocess()</code> / <code>refresh()</code>: Recompute all child results after model or sample changes.
+- <code>sampling_area(...)</code> and <code>sampling_line(...)</code>: Broadcast sampling to compatible child geometries.
+- <code>define_time(...)</code>: Broadcast time-coordinate configuration to all child geometries.
+- <code>plot_color("u")</code> / <code>plot_scatter("u")</code>: Plot all child geometries that contain <code>u</code> in one combined scatter plot.
+- <code>plot_color("u", geometry=area)</code>: Delegate visualization to one selected child evaluator.</p>
+<p>All included geometries must have sampled coordinates before
+<code>domain.evaluate(model)</code> is called.</p>
+<p>Aggregate color plots skip child evaluators that do not contain the requested
+field or coordinate keys. The temporary concatenated data is used only for the
+plot and is not stored on <code>GroupEvaluator</code>.</p>
 
 
 
