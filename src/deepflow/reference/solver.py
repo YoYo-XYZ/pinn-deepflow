@@ -2,7 +2,7 @@
 
 import math
 import numbers
-from typing import Dict, Iterable, Mapping, Optional, Sequence, Tuple
+from typing import Mapping, Optional, Tuple
 
 import numpy as np
 
@@ -422,22 +422,9 @@ class ReferenceSolver:
         self.time_step = None if time_step is None else float(time_step)
         self.tolerance = float(tolerance)
         self.max_iterations = max_iterations
-        self._cache: Dict[tuple, ReferenceSolution] = {}
 
     def clear_cache(self):
-        """Forget in-memory solutions held by this solver."""
-        self._cache.clear()
-
-    def _cache_key(self, domain, pde):
-        return (
-            id(domain),
-            id(pde),
-            self.mesh_size,
-            self.boundary_resolution,
-            self.time_step,
-            self.tolerance,
-            self.max_iterations,
-        )
+        """Retain the historical cache API; solutions are not solver-cached."""
 
     def solve(self, domain) -> ReferenceSolution:
         """Solve the PDE attached to one ``ProblemDomain`` area."""
@@ -449,9 +436,6 @@ class ReferenceSolver:
             )
         pde_area = pde_areas[0]
         pde = pde_area.PDE
-        key = self._cache_key(domain, pde)
-        if key in self._cache:
-            return self._cache[key]
 
         if isinstance(pde, CustomPDE):
             raise UnsupportedReferencePDE(
@@ -508,7 +492,6 @@ class ReferenceSolver:
                     f"Unsupported reference PDE: {pde.__class__.__name__}."
                 )
 
-        self._cache[key] = solution
         return solution
 
     @staticmethod

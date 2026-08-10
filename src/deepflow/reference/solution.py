@@ -248,13 +248,25 @@ class ReferenceSolution:
         if not self.is_transient:
             values = self._evaluate_snapshot(self._fields, x_flat, y_flat, selected)
         else:
-            if np.any(t_flat < self._times[0] - 1.0e-12) or np.any(
-                t_flat > self._times[-1] + 1.0e-12
-            ):
+            time_start = self._times[0]
+            time_end = self._times[-1]
+            time_tolerance = 1.0e-7 * max(
+                1.0, float(np.max(np.abs(self._times)))
+            )
+            near_start = np.isclose(
+                t_flat, time_start, rtol=0.0, atol=time_tolerance
+            )
+            near_end = np.isclose(
+                t_flat, time_end, rtol=0.0, atol=time_tolerance
+            )
+            out_of_range = ((t_flat < time_start) & ~near_start) | (
+                (t_flat > time_end) & ~near_end
+            )
+            if np.any(out_of_range):
                 raise ValueError(
                     f"Transient query times must lie in [{self._times[0]}, {self._times[-1]}]."
                 )
-            t_flat = np.clip(t_flat, self._times[0], self._times[-1])
+            t_flat = np.clip(t_flat, time_start, time_end)
             upper = np.searchsorted(self._times, t_flat, side="right")
             upper = np.clip(upper, 1, len(self._times) - 1)
             lower = upper - 1

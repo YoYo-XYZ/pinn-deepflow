@@ -1,7 +1,7 @@
 """Conversion of DeepFlow boundaries into a Netgen 2-D geometry."""
 
 from dataclasses import dataclass
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Sequence
 
 import numpy as np
 
