@@ -80,9 +80,16 @@ QCPINN breakdown:
 - **Total**: **769** (within 3.4% of the classical PINN)
 
 Quantum circuit (`src/deepflow/qnn.py::_qcpinn_circuit`):
-1. `AngleEmbedding(inputs, rotation="Y")` on `nqubits=4` qubits
-2. Per cascade layer: `RX(θ)` + `RY(φ)` on each qubit, then ring of `CRX(ψ)` entangling gates
+1. `AngleEmbedding(inputs, rotation="X")` on `nqubits=4` qubits
+2. Per cascade layer: `RX(θ)` on every qubit, then `RZ(φ)` on every qubit, followed by a trainable `CRX(ψ)` ring
 3. Measure `⟨PauliZ⟩` on each qubit → `nqubits` classical outputs
+
+`q_layer_type="cascade"` is the default and matches the published QCPINN
+cascade ansatz. The selectable `q_layer_type="hea"` mode instead applies
+trainable `RX-RY-RZ` rotations on every qubit followed by fixed linear
+nearest-neighbor CNOTs (`i -> i+1`, without wraparound), matching the pictured
+HEA topology. Both modes use `(q_layer_iterations, 3, nqubits)` trainable
+weights. The pictured HEA is not the paper's separate `layered` ansatz.
 
 ### Problem setup
 

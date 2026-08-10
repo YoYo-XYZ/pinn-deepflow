@@ -8,12 +8,17 @@ import pennylane as qml
 
 
 # ---------------------------------------------------------------------------
-# Module-level quantum circuit for QCPINN (must be at module scope for
+# Module-level quantum circuits for QCPINN (must be at module scope for
 # pickling / deepcopy / multiprocessing compatibility).
 # ---------------------------------------------------------------------------
 
 def _qcpinn_circuit(inputs, weights):
-    """Quantum circuit for QCPINN.
+    """Published QCPINN cascade circuit.
+
+    This is the cascade ansatz from the QCPINN reference implementation:
+    X-angle embedding, RX and RZ rotations on every qubit, followed by a
+    trainable CRX ring.  The three rows of ``weights`` correspond to RX, RZ,
+    and CRX parameters respectively.
 
     Number of qubits and layer count are inferred from the *runtime shapes* of the
     tensors so that no closure over instance state is needed and the
@@ -22,16 +27,48 @@ def _qcpinn_circuit(inputs, weights):
     nqubits = inputs.shape[-1]
     n_layers = weights.shape[0]
 
-    qml.AngleEmbedding(inputs, wires=range(nqubits), rotation="Y")
+    qml.AngleEmbedding(inputs, wires=range(nqubits), rotation="X")
+
+    for layer in range(n_layers):
+        for i in range(nqubits):
+            qml.RX(weights[layer, 0, i], wires=i)
+        for i in range(nqubits):
+            qml.RZ(weights[layer, 1, i], wires=i)
+        qml.CRX(weights[layer, 2, 0], wires=[nqubits - 1, 0])
+        for i in range(1, nqubits):
+            qml.CRX(weights[layer, 2, i], wires=[i - 1, i])
+
+    return [qml.expval(qml.PauliZ(i)) for i in range(nqubits)]
+
+
+def _qcpinn_hea_circuit(inputs, weights):
+    """Pictured HEA circuit with fixed linear nearest-neighbor CNOTs.
+
+    Each layer applies trainable RX, RY, and RZ rotations to every qubit,
+    followed by CNOTs from qubit ``i`` to ``i + 1`` for ``i < nqubits - 1``.
+    The angle embedding is retained so this mode is a drop-in QCPINN
+    alternative; the HEA topology refers to the trainable ansatz block.
+    """
+    nqubits = inputs.shape[-1]
+    n_layers = weights.shape[0]
+
+    qml.AngleEmbedding(inputs, wires=range(nqubits), rotation="X")
 
     for layer in range(n_layers):
         for i in range(nqubits):
             qml.RX(weights[layer, 0, i], wires=i)
             qml.RY(weights[layer, 1, i], wires=i)
-        for i in range(nqubits):
-            qml.CRX(weights[layer, 2, i], wires=[i, (i - 1) % nqubits])
+            qml.RZ(weights[layer, 2, i], wires=i)
+        for i in range(nqubits - 1):
+            qml.CNOT(wires=[i, i + 1])
 
     return [qml.expval(qml.PauliZ(i)) for i in range(nqubits)]
+
+
+_QCPINN_LAYER_TYPES = {
+    "cascade": _qcpinn_circuit,
+    "hea": _qcpinn_hea_circuit,
+}
 
 
 class QPINN(NN):
@@ -149,7 +186,13 @@ class QCPINN(NN):
         self.hidden_layer_pre = hidden_layer_pre if hidden_layer_pre is not None else []
         self.hidden_layer_post = hidden_layer_post if hidden_layer_post is not None else []
         self.activation = activation
-        self.q_layer_type = q_layer_type
+        if not isinstance(q_layer_type, str) or q_layer_type.lower() not in _QCPINN_LAYER_TYPES:
+            supported = ", ".join(sorted(_QCPINN_LAYER_TYPES))
+            raise ValueError(
+                f"Unsupported q_layer_type={q_layer_type!r}. "
+                f"Expected one of: {supported}."
+            )
+        self.q_layer_type = q_layer_type.lower()
         self.q_layer_iterations = q_layer_iterations
         self._build_network()
         self.to(get_dtype())
@@ -157,7 +200,11 @@ class QCPINN(NN):
     def _qnn_setup(self):
         qml_device = qml.device("default.qubit", wires=self.nqubits)
 
-        qnode = qml.QNode(_qcpinn_circuit, qml_device, interface="torch")
+        qnode = qml.QNode(
+            _QCPINN_LAYER_TYPES[self.q_layer_type],
+            qml_device,
+            interface="torch",
+        )
         qlayer = qml.qnn.TorchLayer(
             qnode,
             weight_shapes={"weights": (self.q_layer_iterations, 3, self.nqubits)},
