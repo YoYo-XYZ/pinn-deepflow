@@ -39,20 +39,21 @@ EVAL_GRID: List[int] = [50, 50]
 CENTERLINE_POINTS: int = 50
 
 # ---------------------------------------------------------------------------
-# CFD reference
+# FEM reference
 # ---------------------------------------------------------------------------
-CFD_DEFAULT_GRID: Tuple[int, int] = (101, 101)
-CFD_REFINED_GRID: Tuple[int, int] = (201, 201)
-CFD_MAX_ITERATIONS: int = 10000
-CFD_TOLERANCE: float = 1.0e-8
-CFD_LINEAR_TOLERANCE: float = 1.0e-9
-CFD_LINEAR_MAX_ITERATIONS: int = 500
-CFD_ALPHA_U: float = 0.7
-CFD_ALPHA_V: float = 0.7
-CFD_ALPHA_P: float = 0.3
-CFD_REFERENCE_FILENAME: str = "cfd_reference.npz"
-CFD_REFINED_FILENAME: str = "cfd_reference_201.npz"
-CFD_GRID_CONVERGENCE_FILENAME: str = "cfd_grid_convergence.npz"
+FEM_DEFAULT_GRID: Tuple[int, int] = (101, 101)
+FEM_REFINED_GRID: Tuple[int, int] = (201, 201)
+FEM_COARSE_MESH_SIZE: float = 0.05
+FEM_REFINED_MESH_SIZE: float = 0.025
+FEM_BOUNDARY_RESOLUTION: int = 128
+FEM_MAX_ITERATIONS: int = 200
+FEM_TOLERANCE: float = 1.0e-5
+
+# Keep the historical filenames so existing comparison commands and artifacts
+# remain compatible after changing the reference backend.
+FEM_REFERENCE_FILENAME: str = "cfd_reference.npz"
+FEM_REFINED_FILENAME: str = "cfd_reference_201.npz"
+FEM_GRID_CONVERGENCE_FILENAME: str = "cfd_grid_convergence.npz"
 
 # ---------------------------------------------------------------------------
 # Network architectures

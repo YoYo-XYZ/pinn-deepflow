@@ -9,7 +9,7 @@ lid-driven cavity at **Re = 10**:
 4. QCPINN with stream-function `(psi,p)` outputs (PSIP)
 
 The UVP and PSIP formulations use the same cavity, sampling, optimizer, seed,
-and CFD reference. PSIP derives velocity as `u=psi_y` and `v=-psi_x`, so its
+and DeepFlow FEM reference. PSIP derives velocity as `u=psi_y` and `v=-psi_x`, so its
 continuity equation is satisfied analytically.
 
 ## Configuration
@@ -37,7 +37,7 @@ From the repository root:
 # Smoke test all four domains, models, residuals, and evaluations
 python benchmarks/comparing_pinns_qcpinn_formulations_cavity/smoke_test.py
 
-# Full fresh CFD reference, four setup runs, plots, and report
+# Full fresh FEM reference, four setup runs, plots, and report
 python benchmarks/comparing_pinns_qcpinn_formulations_cavity/run_benchmark.py --all
 
 # Reduced pipeline check
@@ -58,11 +58,15 @@ Results are written to `results/`:
 
 - Four `*_results.npz` files containing metadata, aggregate metrics, the
   representative fields, residual fields, histories, and centerline profiles.
-- Fresh 101x101 and 201x201 CFD references plus grid-convergence metrics.
-- Common field, residual, loss, centerline, and CFD-error figures.
+- Fresh 101x101 and 201x201 DeepFlow FEM references plus grid-convergence metrics.
+- Common field, residual, loss, centerline, and FEM-error figures.
 - `benchmark_report.md` with the four-cell summary and factorized comparisons.
 
 Raw UVP and PSIP PDE totals are not directly apples-to-apples because UVP has
 three residual equations and PSIP has two. The report includes PDE loss per
-residual, equation-wise residuals, solution fields, and CFD errors for the
+residual, equation-wise residuals, solution fields, and FEM errors for the
 cross-formulation comparison.
+
+The reference stage requires the optional NGSolve/Netgen dependency used by
+DeepFlow's `domain.solve_fem()` backend. The legacy `cfd_reference*.npz`
+filenames are retained for compatibility with existing comparison artifacts.

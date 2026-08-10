@@ -35,7 +35,7 @@ def main():
     )
     parser.add_argument(
         "--reference", action="store_true",
-        help="Generate fresh 101x101 and 201x201 CFD references.",
+        help="Generate fresh 101x101 and 201x201 FEM references.",
     )
     parser.add_argument(
         "--compare", action="store_true",
@@ -43,7 +43,7 @@ def main():
     )
     parser.add_argument(
         "--all", action="store_true",
-        help="Run the CFD reference, all four setups, and comparison (default).",
+        help="Run the FEM reference, all four setups, and comparison (default).",
     )
     parser.add_argument(
         "--num_runs", type=int, default=None,
@@ -98,7 +98,7 @@ def main():
             raise SystemExit(return_code)
 
     if args.reference:
-        _run("reference.py", "fresh finite-volume CFD reference")
+        _run("reference.py", "fresh DeepFlow FEM reference")
     if args.pinn_uvp:
         _run("benchmark_pinn_uvp.py", "PINN-UVP benchmark", benchmark=True)
     if args.pinn_psip:

@@ -25,7 +25,7 @@
 
 ## Training and Residual Summary
 
-Raw UVP and PSIP PDE totals are not directly comparable because UVP has three residual equations and PSIP has two. PDE loss per residual and the field/CFD errors are the preferred cross-formulation measures.
+Raw UVP and PSIP PDE totals are not directly comparable because UVP has three residual equations and PSIP has two. PDE loss per residual and the field/FEM errors are the preferred cross-formulation measures.
 
 | Setup | Total loss | PDE loss | PDE/residual | Max continuity | Max x-momentum | Max y-momentum | Total time (s) |
 |-------|-----------:|---------:|-------------:|---------------:|----------------:|----------------:|---------------:|
@@ -34,25 +34,28 @@ Raw UVP and PSIP PDE totals are not directly comparable because UVP has three re
 | PINN-PSIP | 4.116827e-02 | 1.790553e-03 | 8.952764e-04 | 1.859665e-05 | 3.205223e-01 | 2.528000e-01 | 1.205272e+02 |
 | QCPINN-PSIP | 8.118057e-02 | 5.855738e-03 | 2.927869e-03 | 1.907349e-06 | 4.533823e-01 | 3.601607e-01 | 1.318631e+04 |
 
-## Error Against Fresh CFD Reference
+## Error Against Fresh FEM Reference
 
 | Setup | Relative L2 u | Relative L2 v | Relative L2 speed | Relative L2 p | u centerline RMSE | v centerline RMSE |
 |-------|---------------:|---------------:|------------------:|--------------:|------------------:|------------------:|
-| PINN-UVP | 1.290967e-01 | 1.394434e-01 | 9.294361e-02 | 2.825045e-01 | 2.463206e-02 | 7.050883e-03 |
-| QCPINN-UVP | 7.370388e-01 | 9.601011e-01 | 4.402403e-01 | 8.644590e-01 | 1.184368e-01 | 1.091278e-01 |
-| PINN-PSIP | 1.881750e-01 | 2.009442e-01 | 1.241867e-01 | 3.851071e-01 | 3.211750e-02 | 7.790516e-03 |
-| QCPINN-PSIP | 4.994660e-01 | 5.207378e-01 | 3.040372e-01 | 6.999197e-01 | 7.029594e-02 | 2.875472e-02 |
+| PINN-UVP | 1.260116e-01 | 1.345894e-01 | 1.003764e-01 | 9.394633e-01 | 2.241226e-02 | 4.003284e-03 |
+| QCPINN-UVP | 6.149888e-01 | 9.639083e-01 | 4.073290e-01 | 9.915384e-01 | 1.157350e-01 | 1.063921e-01 |
+| PINN-PSIP | 1.735881e-01 | 1.991972e-01 | 1.292376e-01 | 9.570061e-01 | 3.002855e-02 | 3.587150e-03 |
+| QCPINN-PSIP | 4.187042e-01 | 5.228302e-01 | 2.837881e-01 | 9.830414e-01 | 6.735210e-02 | 2.677960e-02 |
 
 ### Factorized Interpretation
 
-At fixed formulation, compare PINN-UVP with QCPINN-UVP and PINN-PSIP with QCPINN-PSIP. At fixed model family, compare UVP with PSIP. These comparisons use the same sampling, optimizer, seed, and CFD reference.
+At fixed formulation, compare PINN-UVP with QCPINN-UVP and PINN-PSIP with QCPINN-PSIP. At fixed model family, compare UVP with PSIP. These comparisons use the same sampling, optimizer, seed, and FEM reference.
 
-### CFD Reference Diagnostics
+### FEM Reference Diagnostics
 
-- **Grid**: 101 x 101 cells
-- **Iterations**: 3623
-- **Final residual**: 9.985816e-09
+- **Grid**: 101 x 101 samples
+- **FEM mesh size**: 0.05
+- **FEM elements**: 4334
+- **Iterations**: 5
+- **Final residual**: 5.480848e-07
 - **Converged**: True
+- **Pressure gauge**: corner_anchored
 
 ## Generated Artifacts
 
@@ -62,8 +65,8 @@ At fixed formulation, compare PINN-UVP with QCPINN-UVP and PINN-PSIP with QCPINN
 - `compare_psi_field.png` -- stream-function fields
 - `compare_continuity_residual.png`, `compare_x_momentum_residual.png`, `compare_y_momentum_residual.png` -- residual fields
 - `compare_centerline_profiles.png` -- centerline velocity profiles
-- `cfd_reference_fields.png` and `compare_*_cfd_errors.png` -- CFD fields and setup errors
-- `cfd_grid_convergence.npz` -- coarse/refined CFD differences
+- `cfd_reference_fields.png` and `compare_*_cfd_errors.png` -- FEM fields and setup errors
+- `cfd_grid_convergence.npz` -- coarse/refined FEM differences
 
 ## Reproducibility
 

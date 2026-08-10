@@ -14,8 +14,8 @@ from common_config import (
     BOUNDARY_POINTS,
     CAVITY_X,
     CAVITY_Y,
-    CFD_GRID_CONVERGENCE_FILENAME,
-    CFD_REFERENCE_FILENAME,
+    FEM_GRID_CONVERGENCE_FILENAME,
+    FEM_REFERENCE_FILENAME,
     EPOCHS_ADAM,
     EPOCHS_LBFGS,
     INTERIOR_POINTS,
@@ -324,12 +324,12 @@ def _reference_metrics(cfd_data, model_data):
     return metrics, fields, interior
 
 
-def _plot_cfd_reference(cfd_data):
+def _plot_fem_reference(cfd_data):
     fig, axes = plt.subplots(1, 3, figsize=(16, 4), constrained_layout=True)
     for ax, field, title in zip(
         axes,
         ("u", "v", "p"),
-        ("u velocity -- CFD", "v velocity -- CFD", "Pressure -- CFD"),
+        ("u velocity -- FEM", "v velocity -- FEM", "Pressure -- FEM"),
     ):
         values = _arr(cfd_data, field)
         value_range = np.percentile(values, [2.0, 98.0]) if field == "p" else None
@@ -346,14 +346,14 @@ def _plot_cfd_reference(cfd_data):
     print("  -> cfd_reference_fields.png")
 
 
-def _plot_model_cfd_errors(label, model_data, cfd_data):
+def _plot_model_fem_errors(label, model_data, cfd_data):
     _, fields, interior = _reference_metrics(cfd_data, model_data)
     fig, axes = plt.subplots(1, 3, figsize=(16, 4), constrained_layout=True)
     x, y, _, _ = _reference_on_model_grid(cfd_data, model_data, "u")
     for ax, field, title in zip(
         axes,
         ("u", "v", "p"),
-        (f"{label} - CFD: u", f"{label} - CFD: v", f"{label} - CFD: p"),
+        (f"{label} - FEM: u", f"{label} - FEM: v", f"{label} - FEM: p"),
     ):
         model_values, reference_values = fields[field]
         difference = np.where(interior, model_values - reference_values, np.nan)
@@ -386,14 +386,14 @@ def _plot_centerlines(data_by_setup, cfd_data):
         axes[0].plot(
             _arr(cfd_data, "vertical_u"),
             _arr(cfd_data, "vertical_y"),
-            label="CFD",
+            label="FEM",
             color="black",
             linestyle="--",
         )
         axes[1].plot(
             _arr(cfd_data, "horizontal_x"),
             _arr(cfd_data, "horizontal_v"),
-            label="CFD",
+            label="FEM",
             color="black",
             linestyle="--",
         )
@@ -473,7 +473,7 @@ def _write_report(data_by_setup, cfd_data, reference_metrics):
         "",
         "Raw UVP and PSIP PDE totals are not directly comparable because UVP has "
         "three residual equations and PSIP has two. PDE loss per residual and "
-        "the field/CFD errors are the preferred cross-formulation measures.",
+        "the field/FEM errors are the preferred cross-formulation measures.",
         "",
         "| Setup | Total loss | PDE loss | PDE/residual | Max continuity | Max x-momentum | Max y-momentum | Total time (s) |",
         "|-------|-----------:|---------:|-------------:|---------------:|----------------:|----------------:|---------------:|",
@@ -492,7 +492,7 @@ def _write_report(data_by_setup, cfd_data, reference_metrics):
     if reference_metrics:
         lines += [
             "",
-            "## Error Against Fresh CFD Reference",
+            "## Error Against Fresh FEM Reference",
             "",
             "| Setup | Relative L2 u | Relative L2 v | Relative L2 speed | Relative L2 p | u centerline RMSE | v centerline RMSE |",
             "|-------|---------------:|---------------:|------------------:|--------------:|------------------:|------------------:|",
@@ -515,19 +515,22 @@ def _write_report(data_by_setup, cfd_data, reference_metrics):
             "At fixed formulation, compare PINN-UVP with QCPINN-UVP and "
             "PINN-PSIP with QCPINN-PSIP. At fixed model family, compare UVP "
             "with PSIP. These comparisons use the same sampling, optimizer, "
-            "seed, and CFD reference.",
+            "seed, and FEM reference.",
         ]
-        cfd_path = RESULTS_DIR / CFD_REFERENCE_FILENAME
+        cfd_path = RESULTS_DIR / FEM_REFERENCE_FILENAME
         if cfd_path.is_file():
             with np.load(cfd_path) as cfd:
                 lines += [
                     "",
-                    "### CFD Reference Diagnostics",
+                    "### FEM Reference Diagnostics",
                     "",
-                    f"- **Grid**: {_safe_int(_scalar(cfd, 'nx'))} x {_safe_int(_scalar(cfd, 'ny'))} cells",
+                    f"- **Grid**: {_safe_int(_scalar(cfd, 'nx'))} x {_safe_int(_scalar(cfd, 'ny'))} samples",
+                    f"- **FEM mesh size**: {_scalar(cfd, 'mesh_size'):.6g}",
+                    f"- **FEM elements**: {_safe_int(_scalar(cfd, 'mesh_elements'))}",
                     f"- **Iterations**: {_safe_int(_scalar(cfd, 'iterations'))}",
                     f"- **Final residual**: {_scalar(cfd, 'final_residual'):.6e}",
                     f"- **Converged**: {bool(_scalar(cfd, 'converged'))}",
+                    f"- **Pressure gauge**: {_text(cfd, 'pressure_gauge')}",
                 ]
 
     lines += [
@@ -540,8 +543,8 @@ def _write_report(data_by_setup, cfd_data, reference_metrics):
         "- `compare_psi_field.png` -- stream-function fields",
         "- `compare_continuity_residual.png`, `compare_x_momentum_residual.png`, `compare_y_momentum_residual.png` -- residual fields",
         "- `compare_centerline_profiles.png` -- centerline velocity profiles",
-        "- `cfd_reference_fields.png` and `compare_*_cfd_errors.png` -- CFD fields and setup errors",
-        f"- `{CFD_GRID_CONVERGENCE_FILENAME}` -- coarse/refined CFD differences",
+        "- `cfd_reference_fields.png` and `compare_*_cfd_errors.png` -- FEM fields and setup errors",
+        f"- `{FEM_GRID_CONVERGENCE_FILENAME}` -- coarse/refined FEM differences",
         "",
         "## Reproducibility",
         "",
@@ -563,7 +566,7 @@ def main():
             (label, _load(RESULTS_DIR / filename), formulation, model, color)
         )
     _validate_results(data_by_setup)
-    cfd_data = _load(RESULTS_DIR / CFD_REFERENCE_FILENAME)
+    cfd_data = _load(RESULTS_DIR / FEM_REFERENCE_FILENAME)
 
     print("=" * 105)
     print("PINN/QCPINN x UVP/PSIP -- Re=10 Cavity Benchmark")
@@ -584,7 +587,7 @@ def main():
     reference_metrics = {}
     if cfd_data is not None:
         print(
-            f"CFD reference: {_safe_int(_scalar(cfd_data, 'nx'))} x "
+            f"FEM reference: {_safe_int(_scalar(cfd_data, 'nx'))} x "
             f"{_safe_int(_scalar(cfd_data, 'ny'))}, "
             f"converged={bool(_scalar(cfd_data, 'converged'))}"
         )
@@ -598,7 +601,7 @@ def main():
                 f"p={metrics['l2_relative_p']:.6e}"
             )
     else:
-        print("[WARN] CFD reference is unavailable; CFD metrics will be skipped.")
+        print("[WARN] FEM reference is unavailable; FEM metrics will be skipped.")
 
     print("\nGenerating comparison plots ...")
     _plot_loss_curves(data_by_setup)
@@ -629,9 +632,9 @@ def main():
     )
     _plot_centerlines(data_by_setup, cfd_data)
     if cfd_data is not None:
-        _plot_cfd_reference(cfd_data)
+        _plot_fem_reference(cfd_data)
         for label, data, _, _, _ in data_by_setup:
-            _plot_model_cfd_errors(label, data, cfd_data)
+            _plot_model_fem_errors(label, data, cfd_data)
 
     print("\nWriting Markdown report ...")
     _write_report(data_by_setup, cfd_data, reference_metrics)
