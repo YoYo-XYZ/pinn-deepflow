@@ -20,19 +20,9 @@ from common_config import (
     INTERIOR_POINTS,
     LID_VELOCITY,
     MU,
-    PINN_LENGTH,
-    PINN_WIDTH,
-    QC_ITERATIONS,
-    QC_NQUBITS,
-    QC_POST,
-    QC_PRE,
     REYNOLDS,
     REPORT_FILE,
-    RESAMPLE_EVERY,
     RESULTS_DIR,
-    SEEDS,
-    THRESHOLD_ADAM,
-    THRESHOLD_LBFGS,
 )
 
 
@@ -41,27 +31,6 @@ SETUPS = (
     ("QCPINN-UVP", "QCPINN", "UVP", "qcpinn_uvp_results.npz", "C1"),
     ("PINN-PSIP", "PINN", "PSIP", "pinn_psip_results.npz", "C2"),
     ("QCPINN-PSIP", "QCPINN", "PSIP", "qcpinn_psip_results.npz", "C3"),
-)
-
-
-LEGACY_PLOT_FILES = (
-    "compare_u_field.png",
-    "compare_v_field.png",
-    "compare_velocity_magnitude.png",
-    "compare_p_field.png",
-    "compare_psi_field.png",
-    "compare_continuity_residual.png",
-    "compare_x_momentum_residual.png",
-    "compare_y_momentum_residual.png",
-)
-
-
-LEGACY_FEM_PLOT_FILES = (
-    "cfd_reference_fields.png",
-    "compare_pinn_uvp_cfd_errors.png",
-    "compare_qcpinn_uvp_cfd_errors.png",
-    "compare_pinn_psip_cfd_errors.png",
-    "compare_qcpinn_psip_cfd_errors.png",
 )
 
 
@@ -590,12 +559,6 @@ def _write_report(data_by_setup, cfd_data, reference_metrics):
         if EPOCHS_ADAM == 0
         else f"Adam({EPOCHS_ADAM} epochs) -> L-BFGS({EPOCHS_LBFGS} epochs)"
     )
-    resampling_text = (
-        "disabled (fixed collocation set)"
-        if RESAMPLE_EVERY is None
-        else f"uniform resample every {RESAMPLE_EVERY} L-BFGS epochs"
-    )
-
     lines = [
         "# Benchmark Report: PINN/QCPINN × UVP/PSIP",
         "",
@@ -611,7 +574,7 @@ def _write_report(data_by_setup, cfd_data, reference_metrics):
         "top lid `psi_x=0, psi_y=1`, and `p=0` at the lower-left corner.",
         f"- **Sampling**: uniform -- {sum(BOUNDARY_POINTS)} boundary points, "
         f"{interior_count} interior points",
-        f"- **Resampling**: {resampling_text}",
+        "- **Resampling**: disabled (fixed collocation set)",
         f"- **Training**: {training_text}",
         "- **Loss**: raw `df.calc_loss_simple` (unweighted BC + PDE sum)",
         f"- **Seeds**: {report_seeds.tolist()}",
@@ -758,17 +721,6 @@ def _write_report(data_by_setup, cfd_data, reference_metrics):
     print(f"  -> {REPORT_FILE}")
 
 
-def _remove_legacy_plots(include_fem):
-    filenames = list(LEGACY_PLOT_FILES)
-    if include_fem:
-        filenames.extend(LEGACY_FEM_PLOT_FILES)
-    for filename in filenames:
-        path = RESULTS_DIR / filename
-        if path.is_file():
-            path.unlink()
-            print(f"  removed obsolete plot: {filename}")
-
-
 def main():
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     data_by_setup = []
@@ -821,8 +773,6 @@ def main():
     _plot_centerlines(data_by_setup, cfd_data)
     if cfd_data is not None:
         _plot_fem_reference_and_errors(data_by_setup, cfd_data)
-
-    _remove_legacy_plots(include_fem=cfd_data is not None)
 
     print("\nWriting Markdown report ...")
     _write_report(data_by_setup, cfd_data, reference_metrics)

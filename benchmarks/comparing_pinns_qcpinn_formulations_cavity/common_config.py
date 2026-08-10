@@ -1,7 +1,7 @@
 """Shared configuration for the four-cell cavity benchmark."""
 
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 # ---------------------------------------------------------------------------
 # Problem definition
@@ -22,14 +22,10 @@ REYNOLDS: float = RHO * U_INF * L_CHAR / MU
 BOUNDARY_POINTS: List[int] = [50, 50, 50, 50, 1]
 INTERIOR_POINTS: List[List[int]] = [[50, 50]]
 
-RESAMPLE_EVERY: Optional[int] = None
-
 LR_ADAM: float = 0.004
 EPOCHS_ADAM: int = 0
-THRESHOLD_ADAM: Optional[float] = None
 
 EPOCHS_LBFGS: int = 100
-THRESHOLD_LBFGS: Optional[float] = None
 DEFAULT_NUM_RUNS: int = 1
 
 # ---------------------------------------------------------------------------

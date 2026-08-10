@@ -28,12 +28,9 @@ from common_config import (  # noqa: E402
     L_CHAR,
     LR_ADAM,
     MU,
-    RESAMPLE_EVERY,
     RESULTS_DIR,
     RHO,
     SEEDS,
-    THRESHOLD_ADAM,
-    THRESHOLD_LBFGS,
     U_INF,
 )
 
@@ -82,14 +79,6 @@ def _make_pde(formulation: str):
     raise ValueError(f"Unknown formulation: {formulation}")
 
 
-def output_variables(formulation: str):
-    if formulation == "uvp":
-        return ["u", "v", "p"]
-    if formulation == "psip":
-        return ["psi", "p"]
-    raise ValueError(f"Unknown formulation: {formulation}")
-
-
 def build_domain(
     formulation: str,
     boundary_points: Optional[List[int]] = None,
@@ -116,65 +105,27 @@ def build_domain(
         raise ValueError(f"Unknown formulation: {formulation}")
 
     domain.bound_list[4].define_bc({"p": 0})
-    domain.sampling_uniform(
-        list(boundary_points), _area_sampling_resolutions(interior_points)
-    )
+    domain.sampling_uniform(list(boundary_points), interior_points)
     return domain
-
-
-def _area_sampling_resolutions(interior_points):
-    if len(interior_points) == 2 and all(
-        isinstance(value, int) for value in interior_points
-    ):
-        return [interior_points]
-    return interior_points
-
-
-def resample_callback(
-    domain,
-    boundary_points: List[int] = BOUNDARY_POINTS,
-    interior_points: List[object] = INTERIOR_POINTS,
-):
-    """Return the optional fixed-grid resampling callback."""
-    def resample(epoch, _model):
-        if RESAMPLE_EVERY is not None and epoch > 0 and epoch % RESAMPLE_EVERY == 0:
-            domain.sampling_uniform(
-                list(boundary_points), _area_sampling_resolutions(interior_points)
-            )
-
-    return resample
 
 
 def count_params(model) -> int:
     return int(sum(p.numel() for p in model.parameters() if p.requires_grad))
 
 
-def _evaluate_fields(model, geometry, formulation: str) -> Dict[str, np.ndarray]:
-    """Evaluate physical fields, deriving velocity for the stream form."""
-    geometry.process_coordinates()
-    outputs = geometry.process_model(model)
-    values = {
-        key: value.detach().cpu().numpy()
-        for key, value in outputs.items()
-    }
-    if formulation == "psip":
-        pde = _make_pde(formulation)
-        pde.compute_residuals(geometry.model_inputs | geometry.model_outputs)
-        values["u"] = pde.var["u"].detach().cpu().numpy()
-        values["v"] = pde.var["v"].detach().cpu().numpy()
-    values["x"] = geometry.X.detach().cpu().numpy()
-    values["y"] = geometry.Y.detach().cpu().numpy()
-    return values
+def _evaluate_line(model, geometry, formulation: str) -> Dict[str, np.ndarray]:
+    """Evaluate a centerline through DeepFlow's public evaluator API."""
+    geometry.define_pde(_make_pde(formulation))
+    geometry.sampling_line(CENTERLINE_POINTS)
+    return geometry.evaluate(model).data_dict
 
 
 def _evaluate_centerlines(model, formulation: str):
     vertical = df.geometry.line_vertical(0.5, list(CAVITY_Y))
-    vertical.sampling_line(CENTERLINE_POINTS)
-    vertical_data = _evaluate_fields(model, vertical, formulation)
+    vertical_data = _evaluate_line(model, vertical, formulation)
 
     horizontal = df.geometry.line_horizontal(0.5, list(CAVITY_X))
-    horizontal.sampling_line(CENTERLINE_POINTS)
-    horizontal_data = _evaluate_fields(model, horizontal, formulation)
+    horizontal_data = _evaluate_line(model, horizontal, formulation)
     return vertical_data, horizontal_data
 
 
@@ -209,8 +160,6 @@ def train_one(
         calc_loss=calc_loss,
         learning_rate=LR_ADAM,
         epochs=epochs_adam,
-        threshold_loss=THRESHOLD_ADAM,
-        do_between_epochs=None,
         print_every=max(1, epochs_adam // 10),
     )
     adam_time = time.perf_counter() - start
@@ -219,12 +168,6 @@ def train_one(
     _, best_model = adam_best.train_lbfgs(
         calc_loss=calc_loss,
         epochs=epochs_lbfgs,
-        threshold_loss=THRESHOLD_LBFGS,
-        do_between_epochs=resample_callback(
-            domain,
-            boundary_points=boundary_points or BOUNDARY_POINTS,
-            interior_points=interior_points or INTERIOR_POINTS,
-        ),
         print_every=max(1, epochs_lbfgs // 10),
     )
     lbfgs_time = time.perf_counter() - start
