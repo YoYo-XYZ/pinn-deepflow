@@ -144,6 +144,16 @@ def _symmetric_range(*arrays):
     return -radius, radius
 
 
+def _field_values(data, field):
+    if field == "velocity_magnitude":
+        u = _arr(data, "u")
+        v = _arr(data, "v")
+        if not u.size or not v.size:
+            return np.array([])
+        return np.sqrt(u**2 + v**2)
+    return _arr(data, field)
+
+
 def _grid_field(data, field, values=None):
     """Return sorted grid coordinates and a 2D field for contour plots."""
     x = np.asarray(_arr(data, "x")).reshape(-1)
@@ -193,7 +203,7 @@ def _contour_plot(ax, x, y, values, title, cmap="viridis", vrange=None):
 def _plot_field(filename, field, title, data_by_setup, absolute=False, cmap="viridis"):
     plotted = []
     for _, data, _, _, _ in data_by_setup:
-        values = _arr(data, field)
+        values = _field_values(data, field)
         if values.size:
             plotted.append(np.abs(values) if absolute else values)
     value_range = _shared_range(*plotted)
@@ -202,11 +212,11 @@ def _plot_field(filename, field, title, data_by_setup, absolute=False, cmap="vir
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
     for ax, (label, data, _, _, _) in zip(axes.flat, data_by_setup):
-        if field not in data.files:
+        values = _field_values(data, field)
+        if not values.size:
             ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
             ax.set_title(f"{title} -- {label}")
             continue
-        values = _arr(data, field)
         if absolute:
             values = np.abs(values)
         x, y, grid = _grid_field(data, field, values=values)
@@ -539,7 +549,7 @@ def _write_report(data_by_setup, cfd_data, reference_metrics):
         "",
         "- `pinn_uvp_results.npz`, `qcpinn_uvp_results.npz`, `pinn_psip_results.npz`, `qcpinn_psip_results.npz` -- setup results",
         "- `compare_loss_curves.png` -- loss histories for all four setups",
-        "- `compare_u_field.png`, `compare_v_field.png`, `compare_p_field.png` -- common fields",
+        "- `compare_u_field.png`, `compare_v_field.png`, `compare_velocity_magnitude.png`, `compare_p_field.png` -- common fields",
         "- `compare_psi_field.png` -- stream-function fields",
         "- `compare_continuity_residual.png`, `compare_x_momentum_residual.png`, `compare_y_momentum_residual.png` -- residual fields",
         "- `compare_centerline_profiles.png` -- centerline velocity profiles",
@@ -607,6 +617,12 @@ def main():
     _plot_loss_curves(data_by_setup)
     _plot_field("compare_u_field.png", "u", "u velocity", data_by_setup)
     _plot_field("compare_v_field.png", "v", "v velocity", data_by_setup)
+    _plot_field(
+        "compare_velocity_magnitude.png",
+        "velocity_magnitude",
+        "Velocity magnitude",
+        data_by_setup,
+    )
     _plot_field("compare_p_field.png", "p", "Pressure", data_by_setup)
     _plot_psi_field(data_by_setup)
     _plot_field(

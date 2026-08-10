@@ -35,7 +35,7 @@ def main():
     )
     parser.add_argument(
         "--reference", action="store_true",
-        help="Generate fresh 101x101 and 201x201 FEM references.",
+        help="Generate the FEM reference and coarse/refined convergence metrics.",
     )
     parser.add_argument(
         "--compare", action="store_true",

@@ -61,7 +61,7 @@ At fixed formulation, compare PINN-UVP with QCPINN-UVP and PINN-PSIP with QCPINN
 
 - `pinn_uvp_results.npz`, `qcpinn_uvp_results.npz`, `pinn_psip_results.npz`, `qcpinn_psip_results.npz` -- setup results
 - `compare_loss_curves.png` -- loss histories for all four setups
-- `compare_u_field.png`, `compare_v_field.png`, `compare_p_field.png` -- common fields
+- `compare_u_field.png`, `compare_v_field.png`, `compare_velocity_magnitude.png`, `compare_p_field.png` -- common fields
 - `compare_psi_field.png` -- stream-function fields
 - `compare_continuity_residual.png`, `compare_x_momentum_residual.png`, `compare_y_momentum_residual.png` -- residual fields
 - `compare_centerline_profiles.png` -- centerline velocity profiles

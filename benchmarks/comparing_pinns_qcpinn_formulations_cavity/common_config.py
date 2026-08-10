@@ -52,7 +52,6 @@ FEM_TOLERANCE: float = 1.0e-5
 # Keep the historical filenames so existing comparison commands and artifacts
 # remain compatible after changing the reference backend.
 FEM_REFERENCE_FILENAME: str = "cfd_reference.npz"
-FEM_REFINED_FILENAME: str = "cfd_reference_201.npz"
 FEM_GRID_CONVERGENCE_FILENAME: str = "cfd_grid_convergence.npz"
 
 # ---------------------------------------------------------------------------
