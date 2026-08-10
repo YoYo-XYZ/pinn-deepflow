@@ -1,9 +1,0 @@
-{
-  "launcher_pid": 24276,
-  "started": "2026-08-05T16:14:17.5177047+08:00",
-  "stdout": "C:\\Users\\thamm\\OneDrive\\Documents\\1 - Projects\\0 - STEM\\2 - Numerical Physics\\9 - PINNs\\pinn-deepflow\\benchmarks\\comparing_pinns_qcpinn_cavity\\results\\automation_20260805_161417_stdout.log",
-  "stderr": "C:\\Users\\thamm\\OneDrive\\Documents\\1 - Projects\\0 - STEM\\2 - Numerical Physics\\9 - PINNs\\pinn-deepflow\\benchmarks\\comparing_pinns_qcpinn_cavity\\results\\automation_20260805_161417_stderr.log",
-  "meta": "C:\\Users\\thamm\\OneDrive\\Documents\\1 - Projects\\0 - STEM\\2 - Numerical Physics\\9 - PINNs\\pinn-deepflow\\benchmarks\\comparing_pinns_qcpinn_cavity\\results\\automation_20260805_161417_run.json",
-  "command": "python benchmarks/comparing_pinns_qcpinn_cavity/run_benchmark.py --all --num_runs 1",
-  "wrapper_command": "$p = Start-Process -FilePath 'C:\\Users\\thamm\\AppData\\Local\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\\python.exe' -ArgumentList '-u \"C:\\Users\\thamm\\OneDrive\\Documents\\1 - Projects\\0 - STEM\\2 - Numerical Physics\\9 - PINNs\\pinn-deepflow\\benchmarks\\comparing_pinns_qcpinn_cavity\\run_benchmark.py\" --all --num_runs 1' -WorkingDirectory 'C:\\Users\\thamm\\OneDrive\\Documents\\1 - Projects\\0 - STEM\\2 - Numerical Physics\\9 - PINNs\\pinn-deepflow' -RedirectStandardOutput 'C:\\Users\\thamm\\OneDrive\\Documents\\1 - Projects\\0 - STEM\\2 - Numerical Physics\\9 - PINNs\\pinn-deepflow\\benchmarks\\comparing_pinns_qcpinn_cavity\\results\\automation_20260805_161417_stdout.log' -RedirectStandardError 'C:\\Users\\thamm\\OneDrive\\Documents\\1 - Projects\\0 - STEM\\2 - Numerical Physics\\9 - PINNs\\pinn-deepflow\\benchmarks\\comparing_pinns_qcpinn_cavity\\results\\automation_20260805_161417_stderr.log' -WindowStyle Hidden -PassThru; Wait-Process -Id $p.Id"
-}
