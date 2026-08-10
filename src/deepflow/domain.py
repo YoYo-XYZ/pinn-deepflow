@@ -37,13 +37,6 @@ def domain(*geometries):
     return ProblemDomain(bound_list, area_list)
 
 
-def __getattr__(name):
-    """Expose a lazy patch seam without importing the reference backend."""
-    if name == "ReferenceSolver":
-        return None
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
 class ProblemDomain():
     def __init__(self, bound_list:list[Bound], area_list:list[Area]):
         self.bound_list = bound_list
@@ -82,7 +75,6 @@ class ProblemDomain():
             max_iterations=max_iterations,
             area_sampling_res=area_sampling_res,
             bound_sampling_res=bound_sampling_res,
-            reference_solver=globals().get("ReferenceSolver"),
         )
 
     def __str__(self):

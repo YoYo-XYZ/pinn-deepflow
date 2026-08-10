@@ -28,6 +28,17 @@ def test_custom_pde_is_rejected_before_optional_backend_load():
         df.ReferenceSolver().solve(df.domain(area))
 
 
+@pytest.mark.parametrize("boundary_resolution", [3, 4.5, None])
+def test_reference_solver_validates_boundary_resolution(boundary_resolution):
+    import deepflow as df
+
+    with pytest.raises(
+        ValueError,
+        match="boundary_resolution must be an integer >= 4",
+    ):
+        df.ReferenceSolver(boundary_resolution=boundary_resolution)
+
+
 def test_reference_solution_accepts_float32_curved_boundary_queries():
     import deepflow as df
     from deepflow.reference import ReferenceSolution
@@ -51,6 +62,53 @@ def test_reference_solution_accepts_float32_curved_boundary_queries():
             fields=["u"],
         )
         assert values["u"].shape == bound.X.shape
+
+
+def test_reference_solution_uses_a_single_defensive_query_cache():
+    import deepflow as df
+    from deepflow.reference import ReferenceSolution
+
+    area = df.geometry.rectangle([0, 1], [0, 1])
+    calls = []
+
+    def evaluate_field(field, x, y):
+        calls.append((x.copy(), y.copy()))
+        return np.full_like(x, field, dtype=float)
+
+    solution = ReferenceSolution(
+        area=area,
+        mesh=None,
+        fields={"u": 2.0},
+        field_evaluator=evaluate_field,
+    )
+
+    first = solution.evaluate([0.25], [0.25])
+    first["u"][0] = 99.0
+    repeated = solution.evaluate([0.25], [0.25])
+    np.testing.assert_allclose(repeated["u"], [2.0])
+    assert len(calls) == 1
+
+    solution.evaluate([0.5], [0.5])
+    solution.evaluate([0.25], [0.25])
+    assert len(calls) == 3
+
+
+def test_reference_solution_rejects_inconsistent_snapshot_fields():
+    import deepflow as df
+    from deepflow.reference import ReferenceSolution
+
+    area = df.geometry.rectangle([0, 1], [0, 1])
+    with pytest.raises(
+        ValueError,
+        match="All transient snapshots must contain the same fields",
+    ):
+        ReferenceSolution(
+            area=area,
+            mesh=None,
+            snapshots=[{"u": 0.0}, {"v": 1.0}],
+            times=[0.0, 1.0],
+            field_evaluator=lambda field, x, y: np.full_like(x, field),
+        )
 
 
 def test_rectangle_circle_polygon_and_hole_meshes():

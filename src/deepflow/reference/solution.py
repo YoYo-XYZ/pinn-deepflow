@@ -43,7 +43,8 @@ class ReferenceSolution:
             lambda field, x, y: self._evaluate_ngsolve_field(self.mesh, field, x, y)
         )
         self._time_from_y = bool(time_from_y)
-        self._query_cache: Dict[tuple, Dict[str, np.ndarray]] = {}
+        self._query_cache_key = None
+        self._query_cache_values: Optional[Dict[str, np.ndarray]] = None
 
         if self._snapshots is not None:
             if len(self._snapshots) != len(self._times):
@@ -51,6 +52,14 @@ class ReferenceSolution:
             if len(self._times) == 0 or np.any(np.diff(self._times) <= 0):
                 raise ValueError("Snapshot times must be strictly increasing.")
             field_names = tuple(self._snapshots[0].keys())
+            expected_fields = set(field_names)
+            if any(
+                set(snapshot) != expected_fields
+                for snapshot in self._snapshots[1:]
+            ):
+                raise ValueError(
+                    "All transient snapshots must contain the same fields."
+                )
         else:
             field_names = tuple(self._fields.keys())
 
@@ -242,8 +251,11 @@ class ReferenceSolution:
             self._array_key(y_array),
             self._array_key(t_array),
         )
-        if key in self._query_cache:
-            return {name: value.copy() for name, value in self._query_cache[key].items()}
+        if key == self._query_cache_key and self._query_cache_values is not None:
+            return {
+                name: value.copy()
+                for name, value in self._query_cache_values.items()
+            }
 
         if not self.is_transient:
             values = self._evaluate_snapshot(self._fields, x_flat, y_flat, selected)
@@ -308,7 +320,10 @@ class ReferenceSolution:
             name: np.asarray(value, dtype=float).reshape(query_shape)
             for name, value in values.items()
         }
-        self._query_cache[key] = {name: value.copy() for name, value in values.items()}
+        self._query_cache_key = key
+        self._query_cache_values = {
+            name: value.copy() for name, value in values.items()
+        }
         return values
 
     def export_npz(self, path, x, y, t=None, fields=None) -> None:

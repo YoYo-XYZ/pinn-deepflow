@@ -411,6 +411,8 @@ class ReferenceSolver:
     ):
         if mesh_size is not None and (not np.isfinite(mesh_size) or mesh_size <= 0):
             raise ValueError("mesh_size must be positive")
+        if not isinstance(boundary_resolution, int) or boundary_resolution < 4:
+            raise ValueError("boundary_resolution must be an integer >= 4")
         if time_step is not None and (not np.isfinite(time_step) or time_step <= 0):
             raise ValueError("time_step must be positive")
         if tolerance <= 0 or not np.isfinite(tolerance):

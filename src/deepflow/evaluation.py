@@ -12,6 +12,80 @@ from .nn import PINN
 from .geometry import Area, Bound, CustomData
 from .visualization import Visualizer
 
+
+def _unique_geometry_entries(geometries):
+    """Return first-occurrence ``(index, geometry)`` pairs by identity."""
+    seen = set()
+    entries = []
+    for index, geometry in enumerate(geometries):
+        geometry_id = id(geometry)
+        if geometry_id in seen:
+            continue
+        seen.add(geometry_id)
+        entries.append((index, geometry))
+    return entries
+
+
+def _validate_sampled_entries(bound_entries, area_entries, operation: str) -> None:
+    """Raise a focused error when an included geometry lacks coordinates."""
+    missing = []
+    for category, entries in (("bound", bound_entries), ("area", area_entries)):
+        for index, geometry in entries:
+            if (
+                getattr(geometry, "X", None) is None
+                or getattr(geometry, "Y", None) is None
+            ):
+                missing.append(f"{category}[{index}] ({type(geometry).__name__})")
+
+    if missing:
+        raise ValueError(
+            "Cannot evaluate unsampled domain geometries: "
+            f"{', '.join(missing)}. Sample every geometry before calling "
+            f"{operation}()."
+        )
+
+
+def _normalize_resolutions(
+    resolution,
+    count: int,
+    name: str,
+    *,
+    allow_area_pair: bool = False,
+) -> list:
+    """Normalize scalar or aligned resolution values for child geometries."""
+    if count == 0:
+        return []
+
+    if not isinstance(resolution, (list, tuple)):
+        return [resolution] * count
+
+    values = list(resolution)
+    if count == 1:
+        if len(values) == 1:
+            return [values[0]]
+        if allow_area_pair and len(values) == 2:
+            return [values]
+        raise ValueError(
+            f"{name} must be a scalar, a single resolution, or a "
+            "two-value [nx, ny] resolution for one Area."
+        )
+
+    if len(values) != count:
+        raise ValueError(
+            f"{name} must contain one resolution per child geometry "
+            f"(expected {count}, got {len(values)})."
+        )
+
+    if not allow_area_pair and any(
+        isinstance(value, (list, tuple)) for value in values
+    ):
+        raise ValueError(
+            f"{name} must contain scalar point counts for Bound children."
+        )
+
+    return values
+
+
 class Evaluator(Visualizer):
     """
     Evaluates a PINN model against a given geometry and prepares data for visualization.
@@ -237,7 +311,7 @@ class ReferenceEvaluator(Evaluator):
         if not self._same_coordinates(self.geometry.X, x_processed) or not self._same_coordinates(
             self.geometry.Y, y_processed
         ):
-            self.geometry.process_coordinates()
+            self._process_coordinates_preserving_time()
             return
 
         if getattr(self.reference_solution, "is_transient", False) and not getattr(
@@ -246,7 +320,7 @@ class ReferenceEvaluator(Evaluator):
             t_values = self._time_values()
             if t_values is None:
                 if getattr(self.geometry, "range_t", None) is not None:
-                    self.geometry.process_coordinates()
+                    self._process_coordinates_preserving_time()
             else:
                 try:
                     np.broadcast(
@@ -255,7 +329,7 @@ class ReferenceEvaluator(Evaluator):
                     )
                 except ValueError:
                     if getattr(self.geometry, "range_t", None) is not None:
-                        self.geometry.process_coordinates()
+                        self._process_coordinates_preserving_time()
 
     def _time_values(self):
         for name in ("T", "t", "T_"):
@@ -263,6 +337,38 @@ class ReferenceEvaluator(Evaluator):
             if value is not None:
                 return value
         return None
+
+    def _process_coordinates_preserving_time(self) -> None:
+        """Process coordinates without replacing already aligned time data."""
+        existing_time = self._time_values()
+        existing_shape = (
+            None
+            if existing_time is None
+            else tuple(self._as_numpy(existing_time).shape)
+        )
+
+        self.geometry.process_coordinates()
+
+        if (
+            existing_time is None
+            or existing_shape is None
+            or existing_shape != tuple(self._as_numpy(self.geometry.X).shape)
+        ):
+            return
+
+        self.geometry.t = existing_time
+        self.geometry.T = existing_time
+        if isinstance(existing_time, torch.Tensor):
+            restored = existing_time.detach().clone()
+            if isinstance(getattr(self.geometry, "X_", None), torch.Tensor):
+                restored = restored.to(self.geometry.X_.device)
+            self.geometry.T_ = restored.requires_grad_()
+            if isinstance(
+                getattr(self.geometry, "inputs_tensor_dict", None), dict
+            ):
+                self.geometry.inputs_tensor_dict["t"] = self.geometry.T_
+        else:
+            self.geometry.T_ = existing_time
 
     def define_time(
         self,
@@ -355,10 +461,10 @@ class GroupEvaluator:
         if reference_solution is not None:
             self.metadata = reference_solution.metadata
 
-        self._area_entries = self._unique_entries(
+        self._area_entries = _unique_geometry_entries(
             getattr(domain, "area_list", [])
         )
-        self._bound_entries = self._unique_entries(
+        self._bound_entries = _unique_geometry_entries(
             getattr(domain, "bound_list", [])
         )
 
@@ -399,41 +505,13 @@ class GroupEvaluator:
             *self.area_evaluators,
         ]
 
-    @staticmethod
-    def _unique_entries(geometries):
-        """Return first-occurrence ``(index, geometry)`` pairs by identity."""
-        seen = set()
-        entries = []
-        for index, geometry in enumerate(geometries):
-            geometry_id = id(geometry)
-            if geometry_id in seen:
-                continue
-            seen.add(geometry_id)
-            entries.append((index, geometry))
-        return entries
-
     def _validate_sampled(self) -> None:
         """Raise a clear error when any included geometry lacks coordinates."""
-        missing = []
-        for category, entries in (
-            ("bound", self._bound_entries),
-            ("area", self._area_entries),
-        ):
-            for index, geometry in entries:
-                if (
-                    getattr(geometry, "X", None) is None
-                    or getattr(geometry, "Y", None) is None
-                ):
-                    missing.append(
-                        f"{category}[{index}] ({type(geometry).__name__})"
-                    )
-
-        if missing:
-            joined = ", ".join(missing)
-            raise ValueError(
-                "Cannot evaluate unsampled domain geometries: "
-                f"{joined}. Sample every geometry before calling evaluate()."
-            )
+        _validate_sampled_entries(
+            self._bound_entries,
+            self._area_entries,
+            "evaluate",
+        )
 
     def get_evaluator(self, geometry) -> Evaluator:
         """Return the child evaluator for an original geometry object."""
@@ -466,56 +544,9 @@ class GroupEvaluator:
         """Alias for :meth:`postprocess`."""
         self.postprocess()
 
-    @staticmethod
-    def _normalize_resolutions(
-        resolution,
-        count: int,
-        name: str,
-        *,
-        allow_area_pair: bool = False,
-    ) -> list:
-        """
-        Normalize scalar or aligned resolution values for child geometries.
-
-        With one Area, ``[nx, ny]`` remains a valid area resolution.  With
-        multiple Areas, nested values are required for per-area ``[nx, ny]``
-        resolutions, while a flat list is interpreted as one scalar per Area.
-        """
-        if count == 0:
-            return []
-
-        if not isinstance(resolution, (list, tuple)):
-            return [resolution] * count
-
-        values = list(resolution)
-        if count == 1:
-            if len(values) == 1:
-                return [values[0]]
-            if allow_area_pair and len(values) == 2:
-                return [values]
-            raise ValueError(
-                f"{name} must be a scalar, a single resolution, or a "
-                "two-value [nx, ny] resolution for one Area."
-            )
-
-        if len(values) != count:
-            raise ValueError(
-                f"{name} must contain one resolution per child geometry "
-                f"(expected {count}, got {len(values)})."
-            )
-
-        if not allow_area_pair and any(
-            isinstance(value, (list, tuple)) for value in values
-        ):
-            raise ValueError(
-                f"{name} must contain scalar point counts for Bound children."
-            )
-
-        return values
-
     def sampling_line(self, n_points, scheme: str = "uniform") -> None:
         """Sample and refresh every Bound child."""
-        resolutions = self._normalize_resolutions(
+        resolutions = _normalize_resolutions(
             n_points,
             len(self.bound_evaluators),
             "n_points",
@@ -538,7 +569,7 @@ class GroupEvaluator:
             )
             if isinstance(geometry, Area)
         ]
-        resolutions = self._normalize_resolutions(
+        resolutions = _normalize_resolutions(
             res_list,
             len(area_pairs),
             "res_list",

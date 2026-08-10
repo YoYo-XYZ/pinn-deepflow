@@ -1,9 +1,9 @@
 import os
 import sys
-import importlib
 
 import numpy as np
 import pytest
+import torch
 
 _PROJECT_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "src")
@@ -94,20 +94,6 @@ def test_solve_fem_returns_reference_group_with_suffixed_fields(fake_reference_s
     assert fake_reference_solver.calls[0][0]["boundary_resolution"] == 64
 
 
-def test_solve_fem_accepts_domain_module_solver_patch(monkeypatch):
-    area, domain = _domain_with_pde()
-    domain_module = importlib.import_module("deepflow.domain")
-    solver = type("DomainPatchedSolver", (_FakeReferenceSolver,), {})
-    solver.calls = []
-    solver.solution = _FakeReferenceSolution()
-    monkeypatch.setattr(domain_module, "ReferenceSolver", solver)
-
-    result = domain.solve_fem(area_sampling_res=[2, 2], bound_sampling_res=3)
-
-    assert result.reference_solution is solver.solution
-    assert len(solver.calls) == 1
-
-
 def test_solve_fem_reuses_existing_coordinates_when_resolutions_are_omitted(
     fake_reference_solver,
 ):
@@ -157,6 +143,37 @@ def test_solve_fem_preserves_existing_time_when_processed_coordinates_are_missin
         result.area_evaluators[0].data_dict["t"],
         original_time.numpy(),
     )
+
+
+def test_solve_fem_regenerates_time_when_resampling_is_requested(monkeypatch):
+    solution = _FakeReferenceSolution(transient=True)
+    _FakeReferenceSolver.solution = solution
+    monkeypatch.setattr(reference_module, "ReferenceSolver", _FakeReferenceSolver)
+
+    area = df.rectangle([0, 1], [0, 1])
+    area.define_pde(df.HeatEquation(alpha=0.1))
+    domain = df.domain(area)
+    domain.sampling_uniform(
+        bound_sampling_res=[3, 3, 3, 3],
+        area_sampling_res=[[2, 2]],
+    )
+    for geometry in [*domain.bound_list, area]:
+        geometry.define_time([0.0, 1.0], sampling_scheme="uniform")
+        geometry.process_coordinates()
+        geometry.t = torch.full_like(geometry.X, 0.25)
+        geometry.T = geometry.t
+        geometry.T_ = geometry.t.detach().clone().requires_grad_()
+        geometry.inputs_tensor_dict["t"] = geometry.T_
+
+    result = domain.solve_fem(
+        area_sampling_res=[2, 2],
+        bound_sampling_res=3,
+    )
+
+    regenerated = result.area_evaluators[0].data_dict["t"]
+    assert regenerated.shape == (4,)
+    assert not np.all(regenerated == 0.25)
+    np.testing.assert_allclose(regenerated, np.linspace(0.0, 1.0, 4))
 
 
 def test_solve_fem_accepts_nested_resolutions_for_multiple_areas(
