@@ -70,6 +70,71 @@ _QCPINN_LAYER_TYPES = {
     "hea": _qcpinn_hea_circuit,
 }
 
+class QCPINN(NN):
+    def __init__(
+        self,
+        input_vars: Optional[List[str]] = None,
+        output_vars: Optional[List[str]] = None,
+        nqubits: Optional[int] = 4,
+        q_layer_type: str = "cascade",
+        q_layer_iterations: int = 1,
+        hidden_layer_pre: Optional[List[int]] = None,
+        hidden_layer_post: Optional[List[int]] = None,
+        activation: nn.Module = nn.Tanh(),
+        weight_init: Union[str, Callable, None] = 'kaiming',
+    ):
+        super().__init__(input_vars, output_vars, weight_init=weight_init)
+        self.nqubits = nqubits
+        self.hidden_layer_pre = hidden_layer_pre if hidden_layer_pre is not None else []
+        self.hidden_layer_post = hidden_layer_post if hidden_layer_post is not None else []
+        self.activation = activation
+        if not isinstance(q_layer_type, str) or q_layer_type.lower() not in _QCPINN_LAYER_TYPES:
+            supported = ", ".join(sorted(_QCPINN_LAYER_TYPES))
+            raise ValueError(
+                f"Unsupported q_layer_type={q_layer_type!r}. "
+                f"Expected one of: {supported}."
+            )
+        self.q_layer_type = q_layer_type.lower()
+        self.q_layer_iterations = q_layer_iterations
+        self._build_network()
+        self.to(get_dtype())
+    
+    def _qnn_setup(self):
+        qml_device = qml.device("default.qubit", wires=self.nqubits)
+
+        qnode = qml.QNode(
+            _QCPINN_LAYER_TYPES[self.q_layer_type],
+            qml_device,
+            interface="torch",
+        )
+        qlayer = qml.qnn.TorchLayer(
+            qnode,
+            weight_shapes={"weights": (self.q_layer_iterations, 3, self.nqubits)},
+        )
+        return qlayer
+
+    def _build_network(self):
+        layers = []
+
+        # Pre-processing layers
+        iter_layers = [self.input_num] + self.hidden_layer_pre + [self.nqubits]
+        for i in range(len(iter_layers) - 1):
+            layers.append(nn.Linear(iter_layers[i], iter_layers[i+1]))
+            layers.append(self.activation)
+        
+        q_layer = self._qnn_setup()
+        # Quantum layers
+        layers.append(q_layer)
+        layers.append(self.activation)
+        
+        # Post-processing layers
+        iter_layers = [self.nqubits] + self.hidden_layer_post + [self.output_num]
+        for i in range(len(iter_layers) - 1):
+            layers.append(nn.Linear(iter_layers[i], iter_layers[i+1]))
+            layers.append(self.activation)
+        
+        self.net = nn.Sequential(*layers)
+        self._init_weights()
 
 class QPINN(NN):
     def __init__(
@@ -167,70 +232,3 @@ class QPINN(NN):
         
         self.net = nn.Sequential(*layers)
         self._init_weights()
-
-class QCPINN(NN):
-    def __init__(
-        self,
-        input_vars: Optional[List[str]] = None,
-        output_vars: Optional[List[str]] = None,
-        nqubits: Optional[int] = 4,
-        q_layer_type: str = "cascade",
-        q_layer_iterations: int = 1,
-        hidden_layer_pre: Optional[List[int]] = None,
-        hidden_layer_post: Optional[List[int]] = None,
-        activation: nn.Module = nn.Tanh(),
-        weight_init: Union[str, Callable, None] = 'kaiming',
-    ):
-        super().__init__(input_vars, output_vars, weight_init=weight_init)
-        self.nqubits = nqubits
-        self.hidden_layer_pre = hidden_layer_pre if hidden_layer_pre is not None else []
-        self.hidden_layer_post = hidden_layer_post if hidden_layer_post is not None else []
-        self.activation = activation
-        if not isinstance(q_layer_type, str) or q_layer_type.lower() not in _QCPINN_LAYER_TYPES:
-            supported = ", ".join(sorted(_QCPINN_LAYER_TYPES))
-            raise ValueError(
-                f"Unsupported q_layer_type={q_layer_type!r}. "
-                f"Expected one of: {supported}."
-            )
-        self.q_layer_type = q_layer_type.lower()
-        self.q_layer_iterations = q_layer_iterations
-        self._build_network()
-        self.to(get_dtype())
-    
-    def _qnn_setup(self):
-        qml_device = qml.device("default.qubit", wires=self.nqubits)
-
-        qnode = qml.QNode(
-            _QCPINN_LAYER_TYPES[self.q_layer_type],
-            qml_device,
-            interface="torch",
-        )
-        qlayer = qml.qnn.TorchLayer(
-            qnode,
-            weight_shapes={"weights": (self.q_layer_iterations, 3, self.nqubits)},
-        )
-        return qlayer
-
-    def _build_network(self):
-        layers = []
-
-        # Pre-processing layers
-        iter_layers = [self.input_num] + self.hidden_layer_pre + [self.nqubits]
-        for i in range(len(iter_layers) - 1):
-            layers.append(nn.Linear(iter_layers[i], iter_layers[i+1]))
-            layers.append(self.activation)
-        
-        q_layer = self._qnn_setup()
-        # Quantum layers
-        layers.append(q_layer)
-        layers.append(self.activation)
-        
-        # Post-processing layers
-        iter_layers = [self.nqubits] + self.hidden_layer_post + [self.output_num]
-        for i in range(len(iter_layers) - 1):
-            layers.append(nn.Linear(iter_layers[i], iter_layers[i+1]))
-            layers.append(self.activation)
-        
-        self.net = nn.Sequential(*layers)
-        self._init_weights()
-
