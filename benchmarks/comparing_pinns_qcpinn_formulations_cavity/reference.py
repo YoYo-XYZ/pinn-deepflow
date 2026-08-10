@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator
 
 from benchmark_common import build_domain, df
 from common_config import (
@@ -13,12 +12,9 @@ from common_config import (
     CAVITY_Y,
     CENTERLINE_POINTS,
     FEM_BOUNDARY_RESOLUTION,
-    FEM_COARSE_MESH_SIZE,
     FEM_DEFAULT_GRID,
-    FEM_GRID_CONVERGENCE_FILENAME,
+    FEM_MESH_SIZE,
     FEM_MAX_ITERATIONS,
-    FEM_REFINED_GRID,
-    FEM_REFINED_MESH_SIZE,
     FEM_REFERENCE_FILENAME,
     FEM_TOLERANCE,
     REYNOLDS,
@@ -128,54 +124,15 @@ def solve_reference(grid, mesh_size, output_path=None):
     return payload
 
 
-def save_grid_convergence(coarse, refined, output_path):
-    """Compare coarse and refined FEM payloads and save only the metrics."""
-    points = np.stack(
-        np.meshgrid(coarse["y"], coarse["x"], indexing="ij"), axis=-1
-    ).reshape(-1, 2)
-    metrics = {
-        "coarse_mesh_size": float(coarse["mesh_size"]),
-        "refined_mesh_size": float(refined["mesh_size"]),
-        "coarse_nx": int(coarse["nx"]),
-        "coarse_ny": int(coarse["ny"]),
-        "refined_nx": int(refined["nx"]),
-        "refined_ny": int(refined["ny"]),
-    }
-    for field in ("u", "v", "p"):
-        refined_values = RegularGridInterpolator(
-            (refined["y"], refined["x"]), refined[field],
-            bounds_error=False, fill_value=None,
-        )(points).reshape(coarse[field].shape)
-        metrics[f"l2_relative_{field}"] = np.linalg.norm(
-            coarse[field] - refined_values
-        ) / max(np.linalg.norm(refined_values), 1.0e-14)
-
-    for field, coordinate in (
-        ("vertical_u", "vertical_y"),
-        ("horizontal_v", "horizontal_x"),
-    ):
-        refined_profile = np.interp(
-            coarse[coordinate], refined[coordinate], refined[field]
-        )
-        metrics[f"rmse_{field}"] = np.sqrt(
-            np.mean((coarse[field] - refined_profile) ** 2)
-        )
-
-    output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(output_path, **metrics)
-
-
 def generate_reference():
-    """Generate the FEM reference and convergence metrics."""
-    coarse_path = RESULTS_DIR / FEM_REFERENCE_FILENAME
-    coarse = solve_reference(FEM_DEFAULT_GRID, FEM_COARSE_MESH_SIZE, coarse_path)
-    refined = solve_reference(FEM_REFINED_GRID, FEM_REFINED_MESH_SIZE)
-    if not coarse["converged"] or not refined["converged"]:
-        raise RuntimeError("One or more FEM references did not converge.")
-    save_grid_convergence(
-        coarse, refined, RESULTS_DIR / FEM_GRID_CONVERGENCE_FILENAME
+    """Generate the FEM reference."""
+    reference = solve_reference(
+        FEM_DEFAULT_GRID,
+        FEM_MESH_SIZE,
+        RESULTS_DIR / FEM_REFERENCE_FILENAME,
     )
+    if not reference["converged"]:
+        raise RuntimeError("FEM reference did not converge.")
 
 
 if __name__ == "__main__":

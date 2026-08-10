@@ -35,7 +35,7 @@ def main():
     )
     parser.add_argument(
         "--reference", action="store_true",
-        help="Generate the FEM reference and coarse/refined convergence metrics.",
+        help="Generate the FEM reference.",
     )
     parser.add_argument(
         "--compare", action="store_true",

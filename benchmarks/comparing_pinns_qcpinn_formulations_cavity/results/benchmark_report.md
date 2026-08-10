@@ -57,16 +57,36 @@ At fixed formulation, compare PINN-UVP with QCPINN-UVP and PINN-PSIP with QCPINN
 - **Converged**: True
 - **Pressure gauge**: corner_anchored
 
+## Visual Comparisons
+
+### Solution fields
+
+![Solution fields](compare_solution_fields.png)
+
+### PDE residual fields
+
+![PDE residual fields](compare_residual_fields.png)
+
+### Training losses
+
+![Training loss curves](compare_loss_curves.png)
+
+### Centerline profiles
+
+![Centerline velocity profiles](compare_centerline_profiles.png)
+
+### FEM reference and errors
+
+![FEM reference and model errors](compare_fem_reference_and_errors.png)
+
 ## Generated Artifacts
 
 - `pinn_uvp_results.npz`, `qcpinn_uvp_results.npz`, `pinn_psip_results.npz`, `qcpinn_psip_results.npz` -- setup results
+- `compare_solution_fields.png` -- u, v, velocity magnitude, and pressure fields
+- `compare_residual_fields.png` -- continuity and momentum residual fields
 - `compare_loss_curves.png` -- loss histories for all four setups
-- `compare_u_field.png`, `compare_v_field.png`, `compare_velocity_magnitude.png`, `compare_p_field.png` -- common fields
-- `compare_psi_field.png` -- stream-function fields
-- `compare_continuity_residual.png`, `compare_x_momentum_residual.png`, `compare_y_momentum_residual.png` -- residual fields
 - `compare_centerline_profiles.png` -- centerline velocity profiles
-- `cfd_reference_fields.png` and `compare_*_cfd_errors.png` -- FEM fields and setup errors
-- `cfd_grid_convergence.npz` -- coarse/refined FEM differences
+- `compare_fem_reference_and_errors.png` -- FEM reference fields and setup errors
 
 ## Reproducibility
 

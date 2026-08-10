@@ -58,8 +58,11 @@ Results are written to `results/`:
 
 - Four `*_results.npz` files containing metadata, aggregate metrics, the
   representative fields, residual fields, histories, and centerline profiles.
-- Fresh 101x101 DeepFlow FEM reference plus coarse/refined grid-convergence metrics.
-- Common `u`, `v`, velocity-magnitude, residual, loss, centerline, and FEM-error figures.
+- Fresh 101x101 DeepFlow FEM reference.
+- Five consolidated comparison figures: solution fields, PDE residuals, training
+  losses, centerline profiles, and FEM reference/model errors. The solution
+  figure includes `u`, `v`, velocity magnitude, and `p`; the FEM figure includes
+  the reference fields and all four model-error rows.
 - `benchmark_report.md` with the four-cell summary and factorized comparisons.
 
 Raw UVP and PSIP PDE totals are not directly apples-to-apples because UVP has
@@ -68,7 +71,5 @@ residual, equation-wise residuals, solution fields, and FEM errors for the
 cross-formulation comparison.
 
 The reference stage requires the optional NGSolve/Netgen dependency used by
-DeepFlow's `domain.solve_fem()` backend. The coarse `cfd_reference.npz`
-filename is retained for compatibility with existing comparison artifacts;
-the refined FEM field is generated in memory and only its convergence metrics
-are saved.
+DeepFlow's `domain.solve_fem()` backend. The reference is saved as
+`cfd_reference.npz`.

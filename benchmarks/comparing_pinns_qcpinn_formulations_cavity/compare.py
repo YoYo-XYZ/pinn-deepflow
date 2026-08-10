@@ -14,7 +14,6 @@ from common_config import (
     BOUNDARY_POINTS,
     CAVITY_X,
     CAVITY_Y,
-    FEM_GRID_CONVERGENCE_FILENAME,
     FEM_REFERENCE_FILENAME,
     EPOCHS_ADAM,
     EPOCHS_LBFGS,
@@ -42,6 +41,27 @@ SETUPS = (
     ("QCPINN-UVP", "QCPINN", "UVP", "qcpinn_uvp_results.npz", "C1"),
     ("PINN-PSIP", "PINN", "PSIP", "pinn_psip_results.npz", "C2"),
     ("QCPINN-PSIP", "QCPINN", "PSIP", "qcpinn_psip_results.npz", "C3"),
+)
+
+
+LEGACY_PLOT_FILES = (
+    "compare_u_field.png",
+    "compare_v_field.png",
+    "compare_velocity_magnitude.png",
+    "compare_p_field.png",
+    "compare_psi_field.png",
+    "compare_continuity_residual.png",
+    "compare_x_momentum_residual.png",
+    "compare_y_momentum_residual.png",
+)
+
+
+LEGACY_FEM_PLOT_FILES = (
+    "cfd_reference_fields.png",
+    "compare_pinn_uvp_cfd_errors.png",
+    "compare_qcpinn_uvp_cfd_errors.png",
+    "compare_pinn_psip_cfd_errors.png",
+    "compare_qcpinn_psip_cfd_errors.png",
 )
 
 
@@ -173,7 +193,18 @@ def _grid_field(data, field, values=None):
     return x_values, y_values, grid
 
 
-def _contour_plot(ax, x, y, values, title, cmap="viridis", vrange=None):
+def _contour_plot(
+    ax,
+    x,
+    y,
+    values,
+    title,
+    cmap="viridis",
+    vrange=None,
+    colorbar=True,
+    show_x_label=True,
+    show_y_label=True,
+):
     if vrange is None:
         plot = ax.contourf(x, y, values, levels=50, cmap=cmap)
     else:
@@ -192,51 +223,129 @@ def _contour_plot(ax, x, y, values, title, cmap="viridis", vrange=None):
             extend="both",
         )
     ax.set_title(title)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
+    ax.set_xlabel("x" if show_x_label else "")
+    ax.set_ylabel("y" if show_y_label else "")
     ax.set_aspect("equal")
     ax.set_xlim(CAVITY_X)
     ax.set_ylim(CAVITY_Y)
-    plt.colorbar(plot, ax=ax, shrink=0.8)
+    if colorbar:
+        plt.colorbar(plot, ax=ax, shrink=0.8)
+    return plot
 
 
-def _plot_field(filename, field, title, data_by_setup, absolute=False, cmap="viridis"):
-    plotted = []
-    for _, data, _, _, _ in data_by_setup:
-        values = _field_values(data, field)
-        if values.size:
-            plotted.append(np.abs(values) if absolute else values)
-    value_range = _shared_range(*plotted)
-    if cmap == "RdBu_r":
-        value_range = _symmetric_range(*plotted)
+def _plot_solution_fields(data_by_setup):
+    fields = ("u", "v", "velocity_magnitude", "p")
+    titles = ("u velocity", "v velocity", "Velocity magnitude", "Pressure")
+    ranges = []
+    for field in fields:
+        values = [
+            _field_values(data, field)
+            for _, data, _, _, _ in data_by_setup
+            if _field_values(data, field).size
+        ]
+        ranges.append(_shared_range(*values))
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
-    for ax, (label, data, _, _, _) in zip(axes.flat, data_by_setup):
-        values = _field_values(data, field)
-        if not values.size:
-            ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
-            ax.set_title(f"{title} -- {label}")
+    fig, axes = plt.subplots(
+        len(data_by_setup),
+        len(fields),
+        figsize=(20, 14),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    mappables = [None] * len(fields)
+    for row, (label, data, _, _, _) in enumerate(data_by_setup):
+        for column, (field, title) in enumerate(zip(fields, titles)):
+            ax = axes[row, column]
+            values = _field_values(data, field)
+            if not values.size:
+                ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
+                ax.set_title(f"{title} -- {label}")
+                ax.set_xticks([])
+                ax.set_yticks([])
+                continue
+            x, y, grid = _grid_field(data, field, values=values)
+            mappables[column] = _contour_plot(
+                ax,
+                x,
+                y,
+                grid,
+                f"{title} -- {label}",
+                vrange=ranges[column],
+                colorbar=False,
+                show_x_label=row == len(data_by_setup) - 1,
+                show_y_label=column == 0,
+            )
+
+    for column, mappable in enumerate(mappables):
+        if mappable is None:
             continue
-        if absolute:
-            values = np.abs(values)
-        x, y, grid = _grid_field(data, field, values=values)
-        _contour_plot(ax, x, y, grid, f"{title} -- {label}", cmap, value_range)
-    fig.savefig(RESULTS_DIR / filename, dpi=150)
+        fig.colorbar(mappable, ax=axes[:, column].tolist(), shrink=0.8)
+
+    fig.suptitle("Solution fields across PINN/QCPINN and UVP/PSIP setups")
+    fig.savefig(RESULTS_DIR / "compare_solution_fields.png", dpi=150)
     plt.close(fig)
-    print(f"  -> {filename}")
+    print("  -> compare_solution_fields.png")
 
 
-def _plot_psi_field(data_by_setup):
-    psip = [item for item in data_by_setup if item[2] == "PSIP"]
-    values = [_arr(data, "psi") for _, data, _, _, _ in psip]
-    value_range = _shared_range(*values)
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5), constrained_layout=True)
-    for ax, (label, data, _, _, _) in zip(axes, psip):
-        x, y, grid = _grid_field(data, "psi")
-        _contour_plot(ax, x, y, grid, f"Stream function -- {label}", vrange=value_range)
-    fig.savefig(RESULTS_DIR / "compare_psi_field.png", dpi=150)
+def _plot_residual_fields(data_by_setup):
+    fields = ("continuity_residual", "x_momentum_residual", "y_momentum_residual")
+    titles = ("|continuity residual|", "x-momentum residual", "y-momentum residual")
+    absolute = (True, False, False)
+    ranges = []
+    for field, use_absolute in zip(fields, absolute):
+        values = [
+            np.abs(_arr(data, field)) if use_absolute else _arr(data, field)
+            for _, data, _, _, _ in data_by_setup
+            if _arr(data, field).size
+        ]
+        ranges.append(
+            _shared_range(*values)
+            if use_absolute
+            else _symmetric_range(*values)
+        )
+
+    fig, axes = plt.subplots(
+        len(data_by_setup),
+        len(fields),
+        figsize=(15, 14),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    mappables = [None] * len(fields)
+    for row, (label, data, _, _, _) in enumerate(data_by_setup):
+        for column, (field, title, use_absolute) in enumerate(zip(fields, titles, absolute)):
+            values = _arr(data, field)
+            ax = axes[row, column]
+            if not values.size:
+                ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
+                ax.set_title(f"{title} -- {label}")
+                ax.set_xticks([])
+                ax.set_yticks([])
+                continue
+            if use_absolute:
+                values = np.abs(values)
+            x, y, grid = _grid_field(data, field, values=values)
+            mappables[column] = _contour_plot(
+                ax,
+                x,
+                y,
+                grid,
+                f"{title} -- {label}",
+                cmap="viridis" if use_absolute else "RdBu_r",
+                vrange=ranges[column],
+                colorbar=False,
+                show_x_label=row == len(data_by_setup) - 1,
+                show_y_label=column == 0,
+            )
+
+    for column, mappable in enumerate(mappables):
+        if mappable is not None:
+            fig.colorbar(mappable, ax=axes[:, column].tolist(), shrink=0.8)
+
+    fig.suptitle("PDE residual fields across benchmark setups")
+    fig.savefig(RESULTS_DIR / "compare_residual_fields.png", dpi=150)
     plt.close(fig)
-    print("  -> compare_psi_field.png")
+    print("  -> compare_residual_fields.png")
 
 
 def _plot_loss_curves(data_by_setup):
@@ -263,13 +372,16 @@ def _plot_loss_curves(data_by_setup):
 
 
 def _reference_on_model_grid(cfd_data, model_data, field):
-    model_x, model_y, model_values = _grid_field(model_data, field)
+    model_values = _field_values(model_data, field)
+    model_x, model_y, model_values = _grid_field(
+        model_data, field, values=model_values
+    )
     points = np.stack(
         np.meshgrid(model_y, model_x, indexing="ij"), axis=-1
     ).reshape(-1, 2)
     interpolator = RegularGridInterpolator(
         (_arr(cfd_data, "y"), _arr(cfd_data, "x")),
-        _arr(cfd_data, field),
+        _field_values(cfd_data, field),
         bounds_error=False,
         fill_value=None,
     )
@@ -302,6 +414,7 @@ def _reference_metrics(cfd_data, model_data):
 
     model_speed = np.sqrt(fields["u"][0] ** 2 + fields["v"][0] ** 2)
     reference_speed = np.sqrt(fields["u"][1] ** 2 + fields["v"][1] ** 2)
+    fields["velocity_magnitude"] = (model_speed, reference_speed)
     metrics["l2_relative_speed"] = float(
         np.linalg.norm((model_speed - reference_speed)[interior])
         / max(float(np.linalg.norm(reference_speed[interior])), 1.0e-14)
@@ -334,45 +447,91 @@ def _reference_metrics(cfd_data, model_data):
     return metrics, fields, interior
 
 
-def _plot_fem_reference(cfd_data):
-    fig, axes = plt.subplots(1, 3, figsize=(16, 4), constrained_layout=True)
-    for ax, field, title in zip(
-        axes,
-        ("u", "v", "p"),
-        ("u velocity -- FEM", "v velocity -- FEM", "Pressure -- FEM"),
-    ):
-        values = _arr(cfd_data, field)
-        value_range = np.percentile(values, [2.0, 98.0]) if field == "p" else None
-        _contour_plot(
-            ax,
-            _arr(cfd_data, "x"),
-            _arr(cfd_data, "y"),
-            values,
-            title,
-            vrange=value_range,
+def _plot_fem_reference_and_errors(data_by_setup, cfd_data):
+    fields = ("velocity_magnitude", "v", "p")
+    field_titles = ("Velocity magnitude", "v velocity", "Pressure")
+    error_data = []
+    for label, data, _, _, _ in data_by_setup:
+        _, model_fields, interior = _reference_metrics(cfd_data, data)
+        differences = {}
+        for field in fields:
+            model_values, reference_values = model_fields[field]
+            differences[field] = np.where(
+                interior, model_values - reference_values, np.nan
+            )
+        error_data.append((label, data, differences))
+
+    error_ranges = {
+        field: _symmetric_range(
+            *(differences[field] for _, _, differences in error_data)
         )
-    fig.savefig(RESULTS_DIR / "cfd_reference_fields.png", dpi=150)
-    plt.close(fig)
-    print("  -> cfd_reference_fields.png")
+        for field in fields
+    }
 
+    reference_ranges = []
+    for field in fields:
+        values = _field_values(cfd_data, field)
+        if field == "p":
+            reference_ranges.append(tuple(np.percentile(values, [2.0, 98.0])))
+        else:
+            reference_ranges.append(_shared_range(values))
 
-def _plot_model_fem_errors(label, model_data, cfd_data):
-    _, fields, interior = _reference_metrics(cfd_data, model_data)
-    fig, axes = plt.subplots(1, 3, figsize=(16, 4), constrained_layout=True)
-    x, y, _, _ = _reference_on_model_grid(cfd_data, model_data, "u")
-    for ax, field, title in zip(
-        axes,
-        ("u", "v", "p"),
-        (f"{label} - FEM: u", f"{label} - FEM: v", f"{label} - FEM: p"),
-    ):
-        model_values, reference_values = fields[field]
-        difference = np.where(interior, model_values - reference_values, np.nan)
-        value_range = _symmetric_range(difference)
-        _contour_plot(ax, x, y, difference, title, cmap="RdBu_r", vrange=value_range)
-    filename = f"compare_{label.lower().replace('-', '_')}_cfd_errors.png"
-    fig.savefig(RESULTS_DIR / filename, dpi=150)
+    fig, axes = plt.subplots(
+        len(data_by_setup) + 1,
+        len(fields),
+        figsize=(16, 20),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    reference_mappables = []
+    for column, (field, title) in enumerate(zip(fields, field_titles)):
+        reference_mappables.append(
+            _contour_plot(
+                axes[0, column],
+                _arr(cfd_data, "x"),
+                _arr(cfd_data, "y"),
+                _field_values(cfd_data, field),
+                f"FEM reference -- {title}",
+                vrange=reference_ranges[column],
+                colorbar=False,
+                show_x_label=False,
+                show_y_label=column == 0,
+            )
+        )
+
+    error_mappables = [None] * len(fields)
+    for row, (label, data, differences) in enumerate(error_data, start=1):
+        for column, (field, title) in enumerate(zip(fields, field_titles)):
+            model_x, model_y, _, _ = _reference_on_model_grid(
+                cfd_data, data, field
+            )
+            mappable = _contour_plot(
+                axes[row, column],
+                model_x,
+                model_y,
+                differences[field],
+                f"{label} - FEM: {title}",
+                cmap="RdBu_r",
+                vrange=error_ranges[field],
+                colorbar=False,
+                show_x_label=row == len(data_by_setup),
+                show_y_label=column == 0,
+            )
+            if row == 1:
+                error_mappables[column] = mappable
+
+    for column, mappable in enumerate(reference_mappables):
+        fig.colorbar(mappable, ax=axes[0, column], shrink=0.8)
+        fig.colorbar(
+            error_mappables[column],
+            ax=axes[1:, column].tolist(),
+            shrink=0.8,
+        )
+
+    fig.suptitle("FEM reference fields and model-minus-FEM errors")
+    fig.savefig(RESULTS_DIR / "compare_fem_reference_and_errors.png", dpi=150)
     plt.close(fig)
-    print(f"  -> {filename}")
+    print("  -> compare_fem_reference_and_errors.png")
 
 
 def _plot_centerlines(data_by_setup, cfd_data):
@@ -545,16 +704,47 @@ def _write_report(data_by_setup, cfd_data, reference_metrics):
 
     lines += [
         "",
+        "## Visual Comparisons",
+        "",
+        "### Solution fields",
+        "",
+        "![Solution fields](compare_solution_fields.png)",
+        "",
+        "### PDE residual fields",
+        "",
+        "![PDE residual fields](compare_residual_fields.png)",
+        "",
+        "### Training losses",
+        "",
+        "![Training loss curves](compare_loss_curves.png)",
+        "",
+        "### Centerline profiles",
+        "",
+        "![Centerline velocity profiles](compare_centerline_profiles.png)",
+    ]
+    if cfd_data is not None:
+        lines += [
+            "",
+            "### FEM reference and errors",
+            "",
+            "![FEM reference and model errors](compare_fem_reference_and_errors.png)",
+        ]
+
+    lines += [
+        "",
         "## Generated Artifacts",
         "",
         "- `pinn_uvp_results.npz`, `qcpinn_uvp_results.npz`, `pinn_psip_results.npz`, `qcpinn_psip_results.npz` -- setup results",
+        "- `compare_solution_fields.png` -- u, v, velocity magnitude, and pressure fields",
+        "- `compare_residual_fields.png` -- continuity and momentum residual fields",
         "- `compare_loss_curves.png` -- loss histories for all four setups",
-        "- `compare_u_field.png`, `compare_v_field.png`, `compare_velocity_magnitude.png`, `compare_p_field.png` -- common fields",
-        "- `compare_psi_field.png` -- stream-function fields",
-        "- `compare_continuity_residual.png`, `compare_x_momentum_residual.png`, `compare_y_momentum_residual.png` -- residual fields",
         "- `compare_centerline_profiles.png` -- centerline velocity profiles",
-        "- `cfd_reference_fields.png` and `compare_*_cfd_errors.png` -- FEM fields and setup errors",
-        f"- `{FEM_GRID_CONVERGENCE_FILENAME}` -- coarse/refined FEM differences",
+    ]
+    if cfd_data is not None:
+        lines.append(
+            "- `compare_fem_reference_and_errors.png` -- FEM reference fields and setup errors"
+        )
+    lines += [
         "",
         "## Reproducibility",
         "",
@@ -566,6 +756,17 @@ def _write_report(data_by_setup, cfd_data, reference_metrics):
     ]
     REPORT_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"  -> {REPORT_FILE}")
+
+
+def _remove_legacy_plots(include_fem):
+    filenames = list(LEGACY_PLOT_FILES)
+    if include_fem:
+        filenames.extend(LEGACY_FEM_PLOT_FILES)
+    for filename in filenames:
+        path = RESULTS_DIR / filename
+        if path.is_file():
+            path.unlink()
+            print(f"  removed obsolete plot: {filename}")
 
 
 def main():
@@ -614,43 +815,14 @@ def main():
         print("[WARN] FEM reference is unavailable; FEM metrics will be skipped.")
 
     print("\nGenerating comparison plots ...")
+    _plot_solution_fields(data_by_setup)
+    _plot_residual_fields(data_by_setup)
     _plot_loss_curves(data_by_setup)
-    _plot_field("compare_u_field.png", "u", "u velocity", data_by_setup)
-    _plot_field("compare_v_field.png", "v", "v velocity", data_by_setup)
-    _plot_field(
-        "compare_velocity_magnitude.png",
-        "velocity_magnitude",
-        "Velocity magnitude",
-        data_by_setup,
-    )
-    _plot_field("compare_p_field.png", "p", "Pressure", data_by_setup)
-    _plot_psi_field(data_by_setup)
-    _plot_field(
-        "compare_continuity_residual.png",
-        "continuity_residual",
-        "|continuity residual|",
-        data_by_setup,
-        absolute=True,
-    )
-    _plot_field(
-        "compare_x_momentum_residual.png",
-        "x_momentum_residual",
-        "x-momentum residual",
-        data_by_setup,
-        cmap="RdBu_r",
-    )
-    _plot_field(
-        "compare_y_momentum_residual.png",
-        "y_momentum_residual",
-        "y-momentum residual",
-        data_by_setup,
-        cmap="RdBu_r",
-    )
     _plot_centerlines(data_by_setup, cfd_data)
     if cfd_data is not None:
-        _plot_fem_reference(cfd_data)
-        for label, data, _, _, _ in data_by_setup:
-            _plot_model_fem_errors(label, data, cfd_data)
+        _plot_fem_reference_and_errors(data_by_setup, cfd_data)
+
+    _remove_legacy_plots(include_fem=cfd_data is not None)
 
     print("\nWriting Markdown report ...")
     _write_report(data_by_setup, cfd_data, reference_metrics)

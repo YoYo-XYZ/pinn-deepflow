@@ -42,17 +42,12 @@ CENTERLINE_POINTS: int = 50
 # FEM reference
 # ---------------------------------------------------------------------------
 FEM_DEFAULT_GRID: Tuple[int, int] = (101, 101)
-FEM_REFINED_GRID: Tuple[int, int] = (201, 201)
-FEM_COARSE_MESH_SIZE: float = 0.05
-FEM_REFINED_MESH_SIZE: float = 0.025
+FEM_MESH_SIZE: float = 0.05
 FEM_BOUNDARY_RESOLUTION: int = 128
 FEM_MAX_ITERATIONS: int = 200
 FEM_TOLERANCE: float = 1.0e-5
 
-# Keep the historical filenames so existing comparison commands and artifacts
-# remain compatible after changing the reference backend.
 FEM_REFERENCE_FILENAME: str = "cfd_reference.npz"
-FEM_GRID_CONVERGENCE_FILENAME: str = "cfd_grid_convergence.npz"
 
 # ---------------------------------------------------------------------------
 # Network architectures
