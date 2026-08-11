@@ -1,64 +1,58 @@
-# Benchmark Report: QCPINN vs PINN
+# Benchmark Report: PINN/QCPINN x UVP/PSIP
 
-## 2D Steady Cylinder Flow (Re=50)
+## 2D Steady Cylinder Flow (Re=10)
 
-- **Geometry**: channel [0.0, 1.1] × [0.0, 0.41] with a circular cylinder centered at (0.2, 0.2), radius 0.05.
-- **PDE**: 2D steady incompressible Navier-Stokes; Re = 50.0
-- **Boundary conditions**:
-  - Inlet (left, x=0): parabolic u(y) = 4·U·y·(H−y)/H², v=0 (U=1, H=0.41)
-  - Bottom / top walls (y=0, y=0.41): no-slip (u=v=0)
-  - Outlet (right, x=1.1): pressure release (p=0)
-  - Cylinder surface (upper + lower): no-slip (u=v=0)
-- **Sampling**: LHS initial — 6000 boundary points, 4000 interior points
-- **Resampling**: LHS — full LHS resample every 100 L-BFGS epochs
-- **Training**: Adam(lr=0.004, 2000 epochs, threshold=0.01) → L-BFGS(500 epochs, threshold=0.0001)
-- **Loss**: `df.calc_loss_simple` (unweighted BC + PDE sum)
-- **Seeds**: [69, 70, 71]
-- **QCPINN assumptions**: final `Tanh` is applied to the output layer, so `u`, `v`, and `p` are bounded to [-1, 1]; the quantum layer uses PennyLane `default.qubit` (CPU simulator), with DeepFlow configured for CPU by default.
-- **Runs per model**: PINN = 3, QCPINN = 3  (median-loss run used for representative field plots)
+- **Geometry**: channel [0.0, 1.1] x [0.0, 0.41], cylinder center (0.2, 0.2), radius 0.05.
+- **PDE**: steady incompressible Navier-Stokes; U=1.0, rho=1, mu=0.1, L=1.
+- **UVP BCs**: parabolic inlet, no-slip channel walls/cylinder, and p=0 at the outlet.
+- **PSIP BCs**: psi_y equals the inlet profile, psi_x=0 at the inlet, zero velocity derivatives on solid boundaries, and p=0 at the outlet.
+- **Sampling**: uniform -- 300 boundary points, 2500 interior points.
+- **Training**: L-BFGS(100) with no Adam warm-up; seeds=[69].
+- **PSIP note**: u=psi_y and v=-psi_x, so continuity is satisfied analytically.
 
 ## Network Architectures
 
-| Model | Architecture | Parameters |
-|-------|--------------|------------|
-| **PINN**   | `PINN(width=18, length=3)` — 3×18-neuron hidden layers, Tanh | 795 |
-| **QCPINN** | `QCPINN(pre=[50], post=[50], nqubits=4, q_layer_iterations=1)` — classical pre-layers → PennyLane quantum circuit (AngleEmbedding + cascade ansatz + PauliZ) → classical post-layers | 769 |
+| Setup | Architecture | Parameters | PDE residuals |
+|---|---|---:|---:|
+| PINN-UVP | `PINN(width=48, length=4, outputs=[u,v,p])` | 7347 | 3 |
+| QCPINN-UVP | `QCPINN(pre=[32], post=[32], nqubits=4, q_layer_iterations=10, outputs=[u,v,p])` | 607 | 3 |
+| PINN-PSIP | `PINN(width=48, length=4, outputs=[psi,p])` | 7298 | 2 |
+| QCPINN-PSIP | `QCPINN(pre=[32], post=[32], nqubits=4, q_layer_iterations=10, outputs=[psi,p])` | 574 | 2 |
 
-_Parameter matching: PINN has 795 trainable parameters, QCPINN has 769._
+## Training and Residual Summary
 
-## Summary Table
+| Setup | Total loss | PDE loss | PDE/residual | Max continuity | Total time (s) |
+|---|---:|---:|---:|---:|---:|
+| PINN-UVP | 1.732356e-01 | 1.485524e-02 | 4.951748e-03 | 4.328516e-01 | 9.123845e+01 |
+| QCPINN-UVP | 2.260315e-01 | 2.457026e-02 | 8.190087e-03 | 5.237584e-01 | 4.295873e+03 |
+| PINN-PSIP | 1.837488e-01 | 4.739615e-03 | 2.369807e-03 | 1.084805e-05 | 1.556837e+02 |
+| QCPINN-PSIP | 2.215421e-01 | 6.113469e-03 | 3.056735e-03 | 2.741814e-06 | 8.862370e+03 |
 
-| Metric | PINN | QCPINN | Δ |
-|--------|------|--------|---|
-| Parameters | 795 | 769 | — |
-| Final total loss | 1.612470e-01 ± 2.950248e-03 | 1.774688e-01 ± 5.816681e-03 | +10.1% |
-| Final BC loss | 1.460278e-01 ± 5.231232e-03 | 1.584343e-01 ± 2.433171e-03 | +8.5% |
-| Final PDE loss | 1.521914e-02 ± 2.300805e-03 | 1.903451e-02 ± 3.511820e-03 | +25.1% |
-| Max |continuity| | 1.672323e+00 ± 9.790336e-01 | 7.693678e-01 ± 2.149921e-01 | -54.0% |
-| Max |x-momentum| | 1.928524e+00 ± 2.267545e+00 | 9.207815e-01 ± 6.418435e-01 | -52.3% |
-| Max |y-momentum| | 1.960250e+00 ± 1.139401e+00 | 1.157812e+00 ± 2.142598e-01 | -40.9% |
-| Mean |continuity| | 4.812367e-02 ± 3.525801e-03 | 5.606946e-02 ± 5.954168e-03 | +16.5% |
-| Mean |x-momentum| | 2.910424e-02 ± 3.958944e-03 | 3.527587e-02 ± 6.356463e-03 | +21.2% |
-| Mean |y-momentum| | 2.081518e-02 ± 3.983008e-03 | 2.862409e-02 ± 2.727045e-03 | +37.5% |
-| Adam time (s) | 1.056108e+02 ± 2.298920e+01 | 4.737376e+03 ± 4.087277e+03 | +4385.7% |
-| L-BFGS time (s) | 4.837069e+02 ± 4.504752e+01 | 1.983586e+04 ± 1.610023e+04 | +4000.8% |
-| Total time (s) | 5.893177e+02 ± 4.590103e+01 | 2.457324e+04 ± 1.351687e+04 | +4069.8% |
+## Error Against Fresh FEM Reference
+
+| Setup | Relative L2 u | Relative L2 v | Relative L2 speed | Relative L2 p | Outlet RMSE | Wake RMSE |
+|---|---:|---:|---:|---:|---:|---:|
+| PINN-UVP | 9.876268e-01 | 1.117996e+00 | 8.834846e-01 | 1.063698e+00 | 7.463061e-01 | 9.679407e-01 |
+| QCPINN-UVP | 9.657865e-01 | 1.055681e+00 | 9.046579e-01 | 1.008739e+00 | 7.450826e-01 | 9.420461e-01 |
+| PINN-PSIP | 9.761527e-01 | 1.161890e+00 | 8.910312e-01 | 1.058620e+00 | 7.251473e-01 | 9.544904e-01 |
+| QCPINN-PSIP | 9.564233e-01 | 1.108145e+00 | 9.059806e-01 | 1.019420e+00 | 7.241105e-01 | 9.322757e-01 |
+
+### FEM Reference Diagnostics
+
+- Grid: 101 x 101
+- Mesh size: 0.05
+- Elements: 5640
+- Iterations: 5
+- Final residual: 1.688095e-07
+- Pressure gauge: outlet_zero
 
 ## Generated Figures
 
-All figures saved to `results/` (median-loss run per model):
-
-- `compare_loss_curves.png` — total / BC / PDE loss curves (semilogy)
-- `compare_u_field.png` — u velocity field, side-by-side
-- `compare_v_field.png` — v velocity field, side-by-side
-- `compare_p_field.png` — pressure field, side-by-side
-- `compare_continuity_residual.png` — |continuity residual| field, side-by-side
-- `compare_outlet_velocity.png` — outlet u(y) profile at x=1.1, overlaid
-
-## Reproducibility
-
-- Median run index used for representative fields: PINN = 2, QCPINN = 1
-- Per-run final total losses: PINN = [0.16354109 0.15791893 0.16228093], QCPINN = [0.1738117  0.17441854 0.18417619]
+- `compare_solution_fields.png`
+- `compare_residual_fields.png`
+- `compare_loss_curves.png`
+- `compare_flow_profiles.png`
+- `compare_fem_reference_and_errors.png`
 
 ---
 *Report generated by `compare.py`*

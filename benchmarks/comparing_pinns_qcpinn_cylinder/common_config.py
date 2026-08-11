@@ -1,93 +1,55 @@
-"""
-Shared configuration for the QCPINN vs PINN cylinder flow benchmark.
-
-Problem: 2D steady incompressible flow around a circular cylinder at Re=50,
-following the setup in `examples/cylinder_flow_steady/`.
-"""
+"""Shared configuration for the four-cell cylinder-flow benchmark."""
 
 from pathlib import Path
-from typing import Tuple, List
+from typing import List, Tuple
 
-# ---------------------------------------------------------------------------
-# Problem definition — geometry
-# ---------------------------------------------------------------------------
-# Channel: rectangle [0, CHANNEL_X[1]] x [0, CHANNEL_Y[1]]
+# Geometry and physics copied from examples/cylinder_flow_steady.
 CHANNEL_X: Tuple[float, float] = (0.0, 1.1)
 CHANNEL_Y: Tuple[float, float] = (0.0, 0.41)
-# Cylinder: center (CYLINDER_CX, CYLINDER_CY), radius CYLINDER_R
 CYLINDER_CX: float = 0.2
 CYLINDER_CY: float = 0.2
 CYLINDER_R: float = 0.05
 
-# ---------------------------------------------------------------------------
-# Problem definition — PDE (Navier-Stokes)
-# ---------------------------------------------------------------------------
-# Characteristic velocity, length, dynamic viscosity, density.
-# Re = rho * U * L / mu = 1 * 1 * 1 / 0.02 = 50
 U_INF: float = 1.0
 L_CHAR: float = 1.0
-MU: float = 0.02
+MU: float = 0.1  # Re = rho*U*L/mu = 10
 RHO: float = 1.0
-REYNOLDS: float = RHO * U_INF * L_CHAR / MU  # 50.0
+REYNOLDS: float = RHO * U_INF * L_CHAR / MU
 
-# ---------------------------------------------------------------------------
-# Sampling
-# ---------------------------------------------------------------------------
-# LHS initial sampling — 1000 points per boundary, 4000 interior.
-BOUNDARY_POINTS: List[int] = [1000, 1000, 1000, 1000, 1000, 1000]
-INTERIOR_POINTS: List[int] = [4000]
-
-# ---------------------------------------------------------------------------
-# Resampling (periodic full LHS resampling)
-# ---------------------------------------------------------------------------
-RESAMPLE_EVERY: int = 100  # epochs between resamples
-
-# ---------------------------------------------------------------------------
-# Training
-# ---------------------------------------------------------------------------
+# Match the cavity benchmark workload.
+BOUNDARY_POINTS: List[int] = [50, 50, 50, 50, 50, 50]
+INTERIOR_POINTS: List[List[int]] = [[50, 50]]
 LR_ADAM: float = 0.004
-EPOCHS_ADAM: int = 2000
-THRESHOLD_ADAM: float = 0.01
+EPOCHS_ADAM: int = 0
+EPOCHS_LBFGS: int = 100
+DEFAULT_NUM_RUNS: int = 1
 
-EPOCHS_LBFGS: int = 500
-THRESHOLD_LBFGS: float = 0.0001
+EVAL_GRID: List[int] = [50, 50]
+PROFILE_POINTS: int = 50
 
-# ---------------------------------------------------------------------------
-# Evaluation grid
-# ---------------------------------------------------------------------------
-EVAL_GRID: List[int] = [300, 150]   # uniform grid for area evaluation
-OUTLET_LINE_POINTS: int = 200         # points along the outlet boundary
+# FEM reference settings follow the cavity benchmark format.
+FEM_DEFAULT_GRID: Tuple[int, int] = (101, 101)
+FEM_MESH_SIZE: float = 0.05
+FEM_BOUNDARY_RESOLUTION: int = 128
+FEM_MAX_ITERATIONS: int = 200
+FEM_TOLERANCE: float = 1.0e-5
+FEM_REFERENCE_FILENAME: str = "cfd_reference.npz"
 
-# ---------------------------------------------------------------------------
-# Network architectures
-# ---------------------------------------------------------------------------
-# QCPINN: pre=[50], post=[50], nqubits=4, q_layer_iterations=1
-#   Pre:  Linear(2,50)=150 + Linear(50,4)=204 = 354
-#   Quantum: weights(1,3,4) = 12
-#   Post: Linear(4,50)=250 + Linear(50,3)=153 = 403
-#   Total = 769 parameters
-QC_PRE: List[int] = [50]
-QC_POST: List[int] = [50]
+# Exact network configuration used by the cavity benchmark.
+PINN_WIDTH: int = 48
+PINN_LENGTH: int = 4
+QC_PRE: List[int] = [32]
+QC_POST: List[int] = [32]
 QC_NQUBITS: int = 4
-QC_ITERATIONS: int = 1
+QC_ITERATIONS: int = 10
 
-# Classical PINN: width=18, length=3 (parameter-matched to ~795)
-#   Linear(2,18)=54 + 2*Linear(18,18)=684 + Linear(18,3)=57 = 795
-PINN_WIDTH: int = 18
-PINN_LENGTH: int = 3
-
-# ---------------------------------------------------------------------------
-# Reproducibility
-# ---------------------------------------------------------------------------
 BASE_SEED: int = 69
-SEEDS: List[int] = [BASE_SEED, BASE_SEED + 1, BASE_SEED + 2]  # [69, 70, 71]
+SEEDS: List[int] = [BASE_SEED]
 
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
 SCRIPT_DIR = Path(__file__).resolve().parent
 RESULTS_DIR = SCRIPT_DIR / "results"
-
-PINN_RESULTS_FILE: Path = RESULTS_DIR / "pinn_results.npz"
-QCPINN_RESULTS_FILE: Path = RESULTS_DIR / "qcpinn_results.npz"
-REPORT_FILE: Path = RESULTS_DIR / "benchmark_report.md"
+PINN_UVP_RESULTS_FILE = RESULTS_DIR / "pinn_uvp_results.npz"
+PINN_PSIP_RESULTS_FILE = RESULTS_DIR / "pinn_psip_results.npz"
+QCPINN_UVP_RESULTS_FILE = RESULTS_DIR / "qcpinn_uvp_results.npz"
+QCPINN_PSIP_RESULTS_FILE = RESULTS_DIR / "qcpinn_psip_results.npz"
+REPORT_FILE = RESULTS_DIR / "benchmark_report.md"

@@ -1,444 +1,316 @@
-#!/usr/bin/env python3
-"""
-Compare QCPINN vs classical PINN results for the 2D steady cylinder flow benchmark.
+"""Compare the four cylinder benchmark cells and write figures/report."""
 
-Loads ``results/pinn_results.npz`` and ``results/qcpinn_results.npz``,
-prints a console summary table, generates side-by-side comparison plots,
-and writes a Markdown report to ``results/benchmark_report.md``.
+from pathlib import Path
 
-Usage:
-    python compare.py
-"""
-
-import sys
-
-import numpy as np
 import matplotlib
-matplotlib.use("Agg")  # non-interactive backend
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy.interpolate import RegularGridInterpolator
 
 from common_config import (
-    CHANNEL_X,
-    CHANNEL_Y,
-    CYLINDER_CX,
-    CYLINDER_CY,
-    CYLINDER_R,
-    REYNOLDS,
-    BOUNDARY_POINTS,
-    INTERIOR_POINTS,
-    RESAMPLE_EVERY,
-    LR_ADAM,
-    EPOCHS_ADAM,
-    EPOCHS_LBFGS,
-    THRESHOLD_ADAM,
-    THRESHOLD_LBFGS,
-    PINN_WIDTH,
-    PINN_LENGTH,
-    QC_PRE,
-    QC_POST,
-    QC_NQUBITS,
-    QC_ITERATIONS,
-    SEEDS,
-    RESULTS_DIR,
-    PINN_RESULTS_FILE,
-    QCPINN_RESULTS_FILE,
-    REPORT_FILE,
+    BOUNDARY_POINTS, CHANNEL_X, CHANNEL_Y, CYLINDER_CX, CYLINDER_CY,
+    CYLINDER_R, EPOCHS_ADAM, EPOCHS_LBFGS, FEM_REFERENCE_FILENAME,
+    INTERIOR_POINTS, MU, REYNOLDS, REPORT_FILE, RESULTS_DIR, U_INF,
+)
+
+SETUPS = (
+    ("PINN-UVP", "pinn_uvp_results.npz", "C0"),
+    ("QCPINN-UVP", "qcpinn_uvp_results.npz", "C1"),
+    ("PINN-PSIP", "pinn_psip_results.npz", "C2"),
+    ("QCPINN-PSIP", "qcpinn_psip_results.npz", "C3"),
 )
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _load(path):
-    """Load an NPZ results file; returns None if missing."""
     if not path.is_file():
-        print(f"[WARN] {path} not found.")
-        return None
+        raise FileNotFoundError(f"Missing benchmark result: {path}")
     return np.load(path)
 
 
-def _scalar(d, key, default=float("nan")):
-    """Safely extract a scalar value from an NPZ array."""
-    if d is None or key not in d.files:
-        return default
-    v = d[key]
-    if v is None or v.size == 0:
-        return default
-    return float(v.flat[0])
+def _arr(data, key):
+    return np.asarray(data[key]) if key in data.files else np.array([])
 
 
-def _arr(d, key, default=None):
-    if d is None or key not in d.files:
-        return np.array([]) if default is None else default
-    return d[key]
+def _scalar(data, key, default=float("nan")):
+    values = _arr(data, key)
+    return default if values.size == 0 else float(values.flat[0])
 
 
-def _shared_range(*arrays):
-    """Return a shared (vmin, vmax) covering all supplied arrays, ignoring NaNs."""
-    flat = [np.asarray(a).ravel() for a in arrays
-            if a is not None and len(np.asarray(a))]
-    if not flat:
-        return None
-    vals = np.concatenate(flat)
-    if len(vals) == 0:
-        return None
-    return float(np.nanmin(vals)), float(np.nanmax(vals))
+def _text(data, key, default="N/A"):
+    values = _arr(data, key)
+    return default if values.size == 0 else str(values.item())
 
 
-def _format_mean_std(mean, std):
-    if std is not None and std > 0:
-        return f"{mean:.6e} ± {std:.6e}"
-    return f"{mean:.6e}"
+def _safe_int(value):
+    return "N/A" if np.isnan(value) else str(int(value))
 
 
-def _safe_int(val, default="N/A"):
-    """Convert to int, or return default string if NaN/missing."""
-    if val is None or (isinstance(val, float) and np.isnan(val)):
-        return default
-    try:
-        return str(int(val))
-    except (ValueError, TypeError):
-        return default
+def _format(value, std):
+    return f"{value:.6e} +/- {std:.6e}" if std > 0 else f"{value:.6e}"
 
 
-def _pct_delta(a, b):
-    if a == 0:
-        return float("nan")
-    return (b - a) / a * 100.0
+def _shared_range(*arrays, symmetric=False):
+    values = []
+    for array in arrays:
+        flat = np.asarray(array).reshape(-1)
+        flat = flat[np.isfinite(flat)]
+        if flat.size:
+            values.append(flat)
+    if not values:
+        return (-1.0, 1.0)
+    values = np.concatenate(values)
+    if symmetric:
+        radius = max(float(np.max(np.abs(values))), 1.0e-14)
+        return -radius, radius
+    lower, upper = float(np.min(values)), float(np.max(values))
+    return (lower - 0.5, upper + 0.5) if np.isclose(lower, upper) else (lower, upper)
 
 
-def _required_int(data, key, label):
-    if data is None or key not in data.files or data[key].size != 1:
-        raise ValueError(
-            f"{label} results are missing scalar metadata '{key}'; rerun the benchmark."
-        )
-    return int(data[key].flat[0])
+def _field_values(data, field):
+    if field == "velocity_magnitude":
+        return np.sqrt(_arr(data, "u") ** 2 + _arr(data, "v") ** 2)
+    return _arr(data, field)
 
 
-def _required_seeds(data, label):
-    if data is None or "seeds" not in data.files:
-        raise ValueError(
-            f"{label} results are missing seed metadata; rerun the benchmark."
-        )
-    return np.asarray(data["seeds"]).reshape(-1)
+def _grid_field(data, field, values=None):
+    x = _arr(data, "x").reshape(-1)
+    y = _arr(data, "y").reshape(-1)
+    values = _field_values(data, field) if values is None else np.asarray(values).reshape(-1)
+    x_values, y_values = np.unique(x), np.unique(y)
+    grid = np.full((y_values.size, x_values.size), np.nan, dtype=float)
+    xi = np.searchsorted(x_values, x)
+    yi = np.searchsorted(y_values, y)
+    grid[yi, xi] = values
+    return x_values, y_values, np.ma.masked_invalid(grid)
 
 
-def _validate_matching_runs(pinn, qcpinn):
-    """Reject result files produced with incompatible run configurations."""
-    pinn_runs = _required_int(pinn, "num_runs", "PINN")
-    qcpinn_runs = _required_int(qcpinn, "num_runs", "QCPINN")
-    if pinn_runs != qcpinn_runs:
-        raise ValueError(
-            f"num_runs differs (PINN={pinn_runs}, QCPINN={qcpinn_runs})."
-        )
-
-    pinn_seeds = _required_seeds(pinn, "PINN")
-    qcpinn_seeds = _required_seeds(qcpinn, "QCPINN")
-    if len(pinn_seeds) != pinn_runs or len(qcpinn_seeds) != qcpinn_runs:
-        raise ValueError("seed metadata length does not match num_runs.")
-    if not np.array_equal(pinn_seeds, qcpinn_seeds):
-        raise ValueError(
-            f"seed lists differ (PINN={pinn_seeds.tolist()}, "
-            f"QCPINN={qcpinn_seeds.tolist()})."
-        )
-
-    for key in ("epochs_adam", "epochs_lbfgs"):
-        pinn_epochs = _required_int(pinn, key, "PINN")
-        qcpinn_epochs = _required_int(qcpinn, key, "QCPINN")
-        if pinn_epochs != qcpinn_epochs:
-            raise ValueError(
-                f"{key} differs (PINN={pinn_epochs}, QCPINN={qcpinn_epochs})."
-            )
-
-
-def _scatter(ax, x, y, field, title, cmap="jet", vrange=None):
-    sc = ax.scatter(x, y, c=field, s=2, cmap=cmap, marker="s")
-    if vrange is not None:
-        sc.set_clim(vrange)
+def _contour(ax, x, y, values, title, cmap, vrange, labels=True):
+    plot = ax.contourf(x, y, values, levels=np.linspace(*vrange, 51), cmap=cmap)
     ax.set_title(title)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
     ax.set_aspect("equal")
     ax.set_xlim(CHANNEL_X)
     ax.set_ylim(CHANNEL_Y)
-    plt.colorbar(sc, ax=ax, shrink=0.8)
+    if labels:
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+    return plot
 
 
-# ---------------------------------------------------------------------------
-# 1. Load data
-# ---------------------------------------------------------------------------
+def _validate(results):
+    metadata = None
+    for label, data, _ in results:
+        required = ("num_runs", "epochs_adam", "epochs_lbfgs", "seeds", "n_params")
+        missing = [key for key in required if key not in data.files]
+        if missing:
+            raise ValueError(f"{label} results are missing {missing}")
+        current = (
+            _scalar(data, "num_runs"), _scalar(data, "epochs_adam"),
+            _scalar(data, "epochs_lbfgs"), _arr(data, "seeds").reshape(-1),
+        )
+        if metadata is None:
+            metadata = current
+        elif current[:3] != metadata[:3] or not np.array_equal(current[3], metadata[3]):
+            raise ValueError("All four setups must use matching run metadata and seeds.")
 
-pinn_data = _load(PINN_RESULTS_FILE)
-qc_data = _load(QCPINN_RESULTS_FILE)
 
-if pinn_data is None and qc_data is None:
-    print("Neither PINN nor QCPINN results found. Run the benchmarks first.")
-    sys.exit(1)
+def _plot_solution_fields(results):
+    fields = ("u", "v", "velocity_magnitude", "p")
+    titles = ("u velocity", "v velocity", "Velocity magnitude", "Pressure")
+    ranges = [_shared_range(*[_field_values(d, f) for _, d, _ in results]) for f in fields]
+    fig, axes = plt.subplots(4, 4, figsize=(18, 16), squeeze=False, constrained_layout=True)
+    for row, (label, data, _) in enumerate(results):
+        for col, (field, title) in enumerate(zip(fields, titles)):
+            x, y, grid = _grid_field(data, field)
+            mappable = _contour(axes[row, col], x, y, grid, f"{title} -- {label}", "viridis", ranges[col])
+            if row == 0:
+                fig.colorbar(mappable, ax=axes[:, col].tolist(), shrink=0.8)
+    fig.savefig(RESULTS_DIR / "compare_solution_fields.png", dpi=150)
+    plt.close(fig)
 
-if pinn_data is not None and qc_data is not None:
-    try:
-        _validate_matching_runs(pinn_data, qc_data)
-    except ValueError as exc:
-        print(f"[ERROR] Cannot compare results: {exc}")
-        sys.exit(1)
 
-models = [
-    ("PINN", pinn_data, "C0"),
-    ("QCPINN", qc_data, "C1"),
-]
-loaded = [d for _, d, _ in models if d is not None]
+def _plot_residuals(results):
+    fields = ("continuity_residual", "x_momentum_residual", "y_momentum_residual")
+    titles = ("|continuity|", "x-momentum", "y-momentum")
+    ranges = [_shared_range(*[
+        np.abs(_arr(d, f)) if i == 0 else _arr(d, f)
+        for _, d, _ in results
+    ], symmetric=i != 0) for i, f in enumerate(fields)]
+    fig, axes = plt.subplots(4, 3, figsize=(15, 16), squeeze=False, constrained_layout=True)
+    for row, (label, data, _) in enumerate(results):
+        for col, (field, title) in enumerate(zip(fields, titles)):
+            values = np.abs(_arr(data, field)) if col == 0 else _arr(data, field)
+            x, y, grid = _grid_field(data, field, values)
+            mappable = _contour(axes[row, col], x, y, grid, f"{title} -- {label}", "magma" if col == 0 else "RdBu_r", ranges[col])
+            if row == 0:
+                fig.colorbar(mappable, ax=axes[:, col].tolist(), shrink=0.8)
+    fig.savefig(RESULTS_DIR / "compare_residual_fields.png", dpi=150)
+    plt.close(fig)
 
-# ---------------------------------------------------------------------------
-# 2. Console summary table
-# ---------------------------------------------------------------------------
 
-print("=" * 90)
-print("QCPINN vs PINN Benchmark — 2D Steady Cylinder Flow (Re=50)")
-print("=" * 90)
-header = f"{'Metric':<30} {'PINN':>24} {'QCPINN':>24} {'Delta':>10}"
-print(header)
-print("-" * len(header))
+def _plot_losses(results):
+    fig, axes = plt.subplots(1, 3, figsize=(16, 4), constrained_layout=True)
+    for ax, key, title in zip(axes, ("total_loss_history", "bc_loss_history", "pde_loss_history"), ("Total loss", "BC loss", "PDE loss")):
+        for label, data, color in results:
+            history = _arr(data, key)
+            if history.size:
+                ax.semilogy(np.maximum(history, 1.0e-16), label=label, color=color)
+        ax.set_title(title)
+        ax.set_xlabel("L-BFGS epoch")
+        ax.set_ylabel("Loss")
+        ax.grid(True, which="both", ls="--", alpha=0.5)
+        ax.legend(fontsize=8)
+    fig.savefig(RESULTS_DIR / "compare_loss_curves.png", dpi=150)
+    plt.close(fig)
 
-# Parameter count is a single value, not a mean±std
-pinn_params = _scalar(pinn_data, "n_params")
-qc_params = _scalar(qc_data, "n_params")
-pinn_seeds = _arr(pinn_data, "seeds")
-qc_seeds = _arr(qc_data, "seeds")
-report_seeds = pinn_seeds if len(pinn_seeds) else qc_seeds
-pinn_params_str = str(int(pinn_params)) if not np.isnan(pinn_params) else "N/A"
-qc_params_str = str(int(qc_params)) if not np.isnan(qc_params) else "N/A"
-print(f"{'Parameters':<30} {pinn_params_str:>24} {qc_params_str:>24}")
 
-# Scalar metrics with mean±std
-rows = [
-    ("Final total loss",  "final_total_loss",  "final_total_loss"),
-    ("Final BC loss",     "final_bc_loss",     "final_bc_loss"),
-    ("Final PDE loss",    "final_pde_loss",    "final_pde_loss"),
-    ("Max |continuity|",  "max_continuity",    "max_continuity"),
-    ("Max |x-momentum|",  "max_x_momentum",    "max_x_momentum"),
-    ("Max |y-momentum|",  "max_y_momentum",    "max_y_momentum"),
-    ("Mean |continuity|", "mean_abs_continuity", "mean_abs_continuity"),
-    ("Mean |x-momentum|", "mean_abs_x_momentum", "mean_abs_x_momentum"),
-    ("Mean |y-momentum|", "mean_abs_y_momentum", "mean_abs_y_momentum"),
-    ("Adam time (s)",     "adam_time_s",       "adam_time_s"),
-    ("L-BFGS time (s)",   "lbfgs_time_s",      "lbfgs_time_s"),
-    ("Total time (s)",    "total_time_s",      "total_time_s"),
-]
-for desc, k_p, k_q in rows:
-    pm, ps = (_scalar(pinn_data, f"{k_p}_mean"), _scalar(pinn_data, f"{k_p}_std"))
-    qm, qs = (_scalar(qc_data, f"{k_q}_mean"),   _scalar(qc_data, f"{k_q}_std"))
-    p_str = _format_mean_std(pm, ps)
-    q_str = _format_mean_std(qm, qs)
-    delta = _pct_delta(pm, qm)
-    delta_str = f"{delta:+.1f}%" if not np.isnan(delta) else "N/A"
-    print(f"{desc:<30} {p_str:>24} {q_str:>24} {delta_str:>10}")
+def _plot_profiles(results, reference):
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5), constrained_layout=True)
+    for label, data, color in results:
+        order = np.argsort(_arr(data, "outlet_y"))
+        axes[0].plot(_arr(data, "outlet_u")[order], _arr(data, "outlet_y")[order], label=label, color=color)
+        order = np.argsort(_arr(data, "wake_x"))
+        axes[1].plot(_arr(data, "wake_x")[order], _arr(data, "wake_u")[order], label=label, color=color)
+    if reference is not None:
+        axes[0].plot(_arr(reference, "outlet_u"), _arr(reference, "outlet_y"), "k--", label="FEM")
+        axes[1].plot(_arr(reference, "wake_x"), _arr(reference, "wake_u"), "k--", label="FEM")
+    axes[0].set(xlabel="u", ylabel="y", title="Outlet profile: u(y) at x=1.1")
+    axes[1].set(xlabel="x", ylabel="u", title="Wake centerline: u(x) at y=0.2")
+    for ax in axes:
+        ax.grid(True, alpha=0.3)
+        ax.legend(fontsize=8)
+    fig.savefig(RESULTS_DIR / "compare_flow_profiles.png", dpi=150)
+    plt.close(fig)
 
-print("-" * len(header))
-print("Interpretation: negative Delta for losses/residuals = QCPINN lower/better.")
-print("                positive Delta for time = QCPINN slower.")
-print("=" * 90)
 
-# ---------------------------------------------------------------------------
-# 3. Plots
-# ---------------------------------------------------------------------------
+def _reference_on_model_grid(reference, model, field):
+    cx, cy, cgrid = _grid_field(reference, field)
+    mx, my, mgrid = _grid_field(model, field)
+    interpolator = RegularGridInterpolator(
+        (cy, cx), cgrid.filled(np.nan), bounds_error=False, fill_value=np.nan
+    )
+    yy, xx = np.meshgrid(my, mx, indexing="ij")
+    ref_grid = interpolator(np.stack((yy, xx), axis=-1)).reshape(mgrid.shape)
+    valid = (~np.ma.getmaskarray(mgrid)) & np.isfinite(ref_grid)
+    return mx, my, mgrid.filled(np.nan), ref_grid, valid
 
-print("\nGenerating comparison plots ...")
-RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# (a) Loss curves
-fig, axes = plt.subplots(1, 3, figsize=(16, 4))
-for ax, (key, title) in zip(axes, [
-    ("total_loss_history", "Total loss"),
-    ("bc_loss_history", "BC loss"),
-    ("pde_loss_history", "PDE loss"),
-]):
-    for label, data, color in models:
-        hist = _arr(data, key)
-        if len(hist):
-            ax.semilogy(hist, label=label, color=color)
-    ax.set_title(title)
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Loss")
-    ax.legend()
-    ax.grid(True, which="both", ls="--", alpha=0.5)
-plt.tight_layout()
-fig.savefig(RESULTS_DIR / "compare_loss_curves.png", dpi=150)
-plt.close(fig)
-print("  -> compare_loss_curves.png")
+def _reference_metrics(reference, model):
+    metrics = {}
+    for field in ("u", "v", "p"):
+        _, _, predicted, expected, valid = _reference_on_model_grid(reference, model, field)
+        difference = predicted[valid] - expected[valid]
+        metrics[f"l2_relative_{field}"] = float(
+            np.linalg.norm(difference) / max(np.linalg.norm(expected[valid]), 1.0e-14)
+        )
+    _, _, u, ur, valid_u = _reference_on_model_grid(reference, model, "u")
+    _, _, v, vr, valid_v = _reference_on_model_grid(reference, model, "v")
+    valid = valid_u & valid_v
+    speed, ref_speed = np.sqrt(u**2 + v**2), np.sqrt(ur**2 + vr**2)
+    metrics["l2_relative_speed"] = float(
+        np.linalg.norm((speed - ref_speed)[valid]) / max(np.linalg.norm(ref_speed[valid]), 1.0e-14)
+    )
+    for prefix, xkey, ykey, rxkey, rfield in (
+        ("outlet", "outlet_y", "outlet_u", "outlet_y", "outlet_u"),
+        ("wake", "wake_x", "wake_u", "wake_x", "wake_u"),
+    ):
+        order = np.argsort(_arr(model, xkey))
+        prediction = np.interp(_arr(reference, rxkey), _arr(model, xkey)[order], _arr(model, ykey)[order])
+        metrics[f"rmse_{prefix}_u"] = float(np.sqrt(np.mean((prediction - _arr(reference, rfield)) ** 2)))
+    return metrics
 
-# (b) u velocity field
-fig, axes = plt.subplots(1, 2, figsize=(14, 4))
-u_range = _shared_range(_arr(pinn_data, "u"), _arr(qc_data, "u"))
-for ax, (label, data, color) in zip(axes, models):
-    if data is not None:
-        _scatter(ax, _arr(data, "x"), _arr(data, "y"), _arr(data, "u"),
-                 f"u — {label}", cmap="jet", vrange=u_range)
-    else:
-        ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
-plt.tight_layout()
-fig.savefig(RESULTS_DIR / "compare_u_field.png", dpi=150)
-plt.close(fig)
-print("  -> compare_u_field.png")
 
-# (c) v velocity field
-fig, axes = plt.subplots(1, 2, figsize=(14, 4))
-v_range = _shared_range(_arr(pinn_data, "v"), _arr(qc_data, "v"))
-for ax, (label, data, color) in zip(axes, models):
-    if data is not None:
-        _scatter(ax, _arr(data, "x"), _arr(data, "y"), _arr(data, "v"),
-                 f"v — {label}", cmap="jet", vrange=v_range)
-    else:
-        ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
-plt.tight_layout()
-fig.savefig(RESULTS_DIR / "compare_v_field.png", dpi=150)
-plt.close(fig)
-print("  -> compare_v_field.png")
+def _plot_fem_errors(results, reference):
+    fields = ("velocity_magnitude", "v", "p")
+    titles = ("Velocity magnitude", "v velocity", "Pressure")
+    ref_ranges = [_shared_range(_field_values(reference, field)) for field in fields]
+    errors = []
+    for label, data, _ in results:
+        current = {}
+        for field in fields:
+            _, _, predicted, expected, valid = _reference_on_model_grid(reference, data, field)
+            current[field] = np.ma.masked_where(~valid, predicted - expected)
+        errors.append((label, data, current))
+    error_ranges = [_shared_range(*[e[2][f] for e in errors], symmetric=True) for f in fields]
+    fig, axes = plt.subplots(5, 3, figsize=(16, 20), squeeze=False, constrained_layout=True)
+    for col, (field, title) in enumerate(zip(fields, titles)):
+        x, y, grid = _grid_field(reference, field)
+        mappable = _contour(axes[0, col], x, y, grid, f"FEM -- {title}", "viridis", ref_ranges[col])
+        fig.colorbar(mappable, ax=axes[0, col], shrink=0.8)
+    for row, (label, data, current) in enumerate(errors, start=1):
+        for col, (field, title) in enumerate(zip(fields, titles)):
+            x, y, _ = _grid_field(data, field)
+            mappable = _contour(axes[row, col], x, y, current[field], f"{label} - FEM -- {title}", "RdBu_r", error_ranges[col])
+            if row == 1:
+                fig.colorbar(mappable, ax=axes[1:, col].tolist(), shrink=0.8)
+    fig.savefig(RESULTS_DIR / "compare_fem_reference_and_errors.png", dpi=150)
+    plt.close(fig)
 
-# (d) Pressure field
-fig, axes = plt.subplots(1, 2, figsize=(14, 4))
-p_range = _shared_range(_arr(pinn_data, "p"), _arr(qc_data, "p"))
-for ax, (label, data, color) in zip(axes, models):
-    if data is not None:
-        _scatter(ax, _arr(data, "x"), _arr(data, "y"), _arr(data, "p"),
-                 f"p — {label}", cmap="jet", vrange=p_range)
-    else:
-        ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
-plt.tight_layout()
-fig.savefig(RESULTS_DIR / "compare_p_field.png", dpi=150)
-plt.close(fig)
-print("  -> compare_p_field.png")
 
-# (e) Continuity residual
-fig, axes = plt.subplots(1, 2, figsize=(14, 4))
-cont_range = _shared_range(
-    np.abs(_arr(pinn_data, "continuity_residual")),
-    np.abs(_arr(qc_data, "continuity_residual")),
-)
-for ax, (label, data, color) in zip(axes, models):
-    if data is not None:
-        _scatter(ax, _arr(data, "x"), _arr(data, "y"),
-                 np.abs(_arr(data, "continuity_residual")),
-                 f"|continuity| — {label}", cmap="hot", vrange=cont_range)
-    else:
-        ax.text(0.5, 0.5, "N/A", ha="center", va="center", transform=ax.transAxes)
-plt.tight_layout()
-fig.savefig(RESULTS_DIR / "compare_continuity_residual.png", dpi=150)
-plt.close(fig)
-print("  -> compare_continuity_residual.png")
+def _write_report(results, reference, metrics):
+    first = results[0][1]
+    runs = _arr(first, "seeds").tolist()
+    interior_count = int(np.prod(INTERIOR_POINTS[0]))
+    training = f"L-BFGS({EPOCHS_LBFGS}) with no Adam warm-up" if EPOCHS_ADAM == 0 else f"Adam({EPOCHS_ADAM}) -> L-BFGS({EPOCHS_LBFGS})"
+    lines = [
+        "# Benchmark Report: PINN/QCPINN x UVP/PSIP",
+        "",
+        f"## 2D Steady Cylinder Flow (Re={REYNOLDS:g})",
+        "",
+        f"- **Geometry**: channel [{CHANNEL_X[0]}, {CHANNEL_X[1]}] x [{CHANNEL_Y[0]}, {CHANNEL_Y[1]}], cylinder center ({CYLINDER_CX}, {CYLINDER_CY}), radius {CYLINDER_R}.",
+        f"- **PDE**: steady incompressible Navier-Stokes; U={U_INF}, rho=1, mu={MU}, L=1.",
+        "- **UVP BCs**: parabolic inlet, no-slip channel walls/cylinder, and p=0 at the outlet.",
+        "- **PSIP BCs**: psi_y equals the inlet profile, psi_x=0 at the inlet, zero velocity derivatives on solid boundaries, and p=0 at the outlet.",
+        f"- **Sampling**: uniform -- {sum(BOUNDARY_POINTS)} boundary points, {interior_count} interior points.",
+        f"- **Training**: {training}; seeds={runs}.",
+        "- **PSIP note**: u=psi_y and v=-psi_x, so continuity is satisfied analytically.",
+        "",
+        "## Network Architectures",
+        "",
+        "| Setup | Architecture | Parameters | PDE residuals |",
+        "|---|---|---:|---:|",
+    ]
+    for label, data, _ in results:
+        lines.append(f"| {label} | `{_text(data, 'network_description')}` | {_safe_int(_scalar(data, 'n_params'))} | {_safe_int(_scalar(data, 'pde_residual_count'))} |")
+    lines += ["", "## Training and Residual Summary", "", "| Setup | Total loss | PDE loss | PDE/residual | Max continuity | Total time (s) |", "|---|---:|---:|---:|---:|---:|"]
+    for label, data, _ in results:
+        lines.append(f"| {label} | {_format(_scalar(data, 'final_total_loss_mean'), _scalar(data, 'final_total_loss_std'))} | {_format(_scalar(data, 'final_pde_loss_mean'), _scalar(data, 'final_pde_loss_std'))} | {_format(_scalar(data, 'pde_loss_per_equation_mean'), _scalar(data, 'pde_loss_per_equation_std'))} | {_format(_scalar(data, 'max_continuity_mean'), _scalar(data, 'max_continuity_std'))} | {_format(_scalar(data, 'total_time_s_mean'), _scalar(data, 'total_time_s_std'))} |")
+    if metrics:
+        lines += ["", "## Error Against Fresh FEM Reference", "", "| Setup | Relative L2 u | Relative L2 v | Relative L2 speed | Relative L2 p | Outlet RMSE | Wake RMSE |", "|---|---:|---:|---:|---:|---:|---:|"]
+        for label, _, _ in results:
+            m = metrics[label]
+            lines.append(f"| {label} | {m['l2_relative_u']:.6e} | {m['l2_relative_v']:.6e} | {m['l2_relative_speed']:.6e} | {m['l2_relative_p']:.6e} | {m['rmse_outlet_u']:.6e} | {m['rmse_wake_u']:.6e} |")
+        lines += ["", "### FEM Reference Diagnostics", "", f"- Grid: {_safe_int(_scalar(reference, 'nx'))} x {_safe_int(_scalar(reference, 'ny'))}", f"- Mesh size: {_scalar(reference, 'mesh_size'):.6g}", f"- Elements: {_safe_int(_scalar(reference, 'mesh_elements'))}", f"- Iterations: {_safe_int(_scalar(reference, 'iterations'))}", f"- Final residual: {_scalar(reference, 'final_residual'):.6e}", f"- Pressure gauge: {_text(reference, 'pressure_gauge')}"]
+    lines += ["", "## Generated Figures", "", "- `compare_solution_fields.png`", "- `compare_residual_fields.png`", "- `compare_loss_curves.png`", "- `compare_flow_profiles.png`", "- `compare_fem_reference_and_errors.png`", "", "---", "*Report generated by `compare.py`*"]
+    REPORT_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-# (f) Outlet velocity profile
-fig, ax = plt.subplots(figsize=(7, 5))
-for label, data, color in models:
-    if data is not None:
-        oy = _arr(data, "outlet_y")
-        ou = _arr(data, "outlet_u")
-        if len(oy):
-            sort_i = np.argsort(oy)
-            ax.plot(oy[sort_i], ou[sort_i], label=label, color=color)
-ax.set_xlabel("y")
-ax.set_ylabel("u")
-ax.set_title("Outlet velocity profile (u vs y at x = 1.1)")
-ax.legend()
-ax.grid(True, alpha=0.3)
-plt.tight_layout()
-fig.savefig(RESULTS_DIR / "compare_outlet_velocity.png", dpi=150)
-plt.close(fig)
-print("  -> compare_outlet_velocity.png")
 
-# ---------------------------------------------------------------------------
-# 4. Markdown report
-# ---------------------------------------------------------------------------
+def main():
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    results = [(label, _load(RESULTS_DIR / filename), color) for label, filename, color in SETUPS]
+    _validate(results)
+    reference_path = RESULTS_DIR / FEM_REFERENCE_FILENAME
+    reference = _load(reference_path) if reference_path.is_file() else None
+    print("=" * 100)
+    print(f"PINN/QCPINN x UVP/PSIP -- Re={REYNOLDS:g} Cylinder Benchmark")
+    print("=" * 100)
+    for label, data, _ in results:
+        print(f"{label:<14} params={_safe_int(_scalar(data, 'n_params')):>5} total={_scalar(data, 'final_total_loss_mean'):.6e} pde={_scalar(data, 'final_pde_loss_mean'):.6e}")
+    metrics = {}
+    if reference is not None:
+        print(f"FEM reference converged={bool(_scalar(reference, 'converged'))}")
+        for label, data, _ in results:
+            metrics[label] = _reference_metrics(reference, data)
+            print(f"  {label}: L2 speed={metrics[label]['l2_relative_speed']:.6e}")
+    _plot_solution_fields(results)
+    _plot_residuals(results)
+    _plot_losses(results)
+    _plot_profiles(results, reference)
+    if reference is not None:
+        _plot_fem_errors(results, reference)
+    _write_report(results, reference, metrics)
+    print(f"Artifacts written to {RESULTS_DIR}")
 
-print("\nWriting Markdown report ...")
 
-# Resolve which run indices were used as "median"
-pinn_med_idx = int(_scalar(pinn_data, "median_run_idx", 0))
-qc_med_idx = int(_scalar(qc_data, "median_run_idx", 0))
-
-lines = [
-    "# Benchmark Report: QCPINN vs PINN",
-    "",
-    "## 2D Steady Cylinder Flow (Re=50)",
-    "",
-    f"- **Geometry**: channel [{CHANNEL_X[0]}, {CHANNEL_X[1]}] × [{CHANNEL_Y[0]}, {CHANNEL_Y[1]}]"
-    f" with a circular cylinder centered at ({CYLINDER_CX}, {CYLINDER_CY}),"
-    f" radius {CYLINDER_R}.",
-    f"- **PDE**: 2D steady incompressible Navier-Stokes; Re = {REYNOLDS}",
-    "- **Boundary conditions**:",
-    "  - Inlet (left, x=0): parabolic u(y) = 4·U·y·(H−y)/H², v=0 (U=1, H="
-    f"{CHANNEL_Y[1]})",
-    "  - Bottom / top walls (y=0, y="
-    f"{CHANNEL_Y[1]}): no-slip (u=v=0)",
-    "  - Outlet (right, x="
-    f"{CHANNEL_X[1]}): pressure release (p=0)",
-    "  - Cylinder surface (upper + lower): no-slip (u=v=0)",
-    f"- **Sampling**: LHS initial — {sum(BOUNDARY_POINTS)} boundary points,"
-    f" {sum(INTERIOR_POINTS)} interior points",
-    f"- **Resampling**: LHS — full LHS resample every {RESAMPLE_EVERY} L-BFGS epochs",
-    f"- **Training**: Adam(lr={LR_ADAM}, {EPOCHS_ADAM} epochs, threshold={THRESHOLD_ADAM})"
-    f" → L-BFGS({EPOCHS_LBFGS} epochs, threshold={THRESHOLD_LBFGS})",
-    "- **Loss**: `df.calc_loss_simple` (unweighted BC + PDE sum)",
-    f"- **Seeds**: {report_seeds.tolist() if len(report_seeds) else SEEDS}",
-    "- **QCPINN assumptions**: final `Tanh` is applied to the output layer, so `u`, `v`, and `p` are bounded to [-1, 1]; the quantum layer uses PennyLane `default.qubit` (CPU simulator), with DeepFlow configured for CPU by default.",
-    f"- **Runs per model**: PINN = {_safe_int(_scalar(pinn_data, 'num_runs', 0), '?')},"
-    f" QCPINN = {_safe_int(_scalar(qc_data, 'num_runs', 0), '?')}"
-    f"  (median-loss run used for representative field plots)",
-    "",
-    "## Network Architectures",
-    "",
-    "| Model | Architecture | Parameters |",
-    "|-------|--------------|------------|",
-    f"| **PINN**   | `PINN(width={PINN_WIDTH}, length={PINN_LENGTH})` — {PINN_LENGTH}"
-    f"×{PINN_WIDTH}-neuron hidden layers, Tanh | {_safe_int(pinn_params)} |",
-    f"| **QCPINN** | `QCPINN(pre={QC_PRE}, post={QC_POST}, nqubits={QC_NQUBITS},"
-    f" q_layer_iterations={QC_ITERATIONS})` — classical pre-layers →"
-    f" PennyLane quantum circuit (AngleEmbedding + cascade ansatz + PauliZ)"
-    f" → classical post-layers | {_safe_int(qc_params)} |",
-    "",
-    f"_Parameter matching: PINN has {_safe_int(pinn_params)} trainable parameters,"
-    f" QCPINN has {_safe_int(qc_params)}._",
-    "",
-    "## Summary Table",
-    "",
-    "| Metric | PINN | QCPINN | Δ |",
-    "|--------|------|--------|---|",
-    f"| Parameters | {_safe_int(pinn_params)} | {_safe_int(qc_params)} | — |",
-]
-
-for desc, k_p, k_q in rows:
-    pm, ps = (_scalar(pinn_data, f"{k_p}_mean"), _scalar(pinn_data, f"{k_p}_std"))
-    qm, qs = (_scalar(qc_data, f"{k_q}_mean"),   _scalar(qc_data, f"{k_q}_std"))
-    p_str = _format_mean_std(pm, ps)
-    q_str = _format_mean_std(qm, qs)
-    delta = _pct_delta(pm, qm)
-    delta_str = f"{delta:+.1f}%" if not np.isnan(delta) else "N/A"
-    lines.append(f"| {desc} | {p_str} | {q_str} | {delta_str} |")
-
-lines += [
-    "",
-    "## Generated Figures",
-    "",
-    "All figures saved to `results/` (median-loss run per model):",
-    "",
-    "- `compare_loss_curves.png` — total / BC / PDE loss curves (semilogy)",
-    "- `compare_u_field.png` — u velocity field, side-by-side",
-    "- `compare_v_field.png` — v velocity field, side-by-side",
-    "- `compare_p_field.png` — pressure field, side-by-side",
-    "- `compare_continuity_residual.png` — |continuity residual| field, side-by-side",
-    "- `compare_outlet_velocity.png` — outlet u(y) profile at x=1.1, overlaid",
-    "",
-    "## Reproducibility",
-    "",
-    f"- Median run index used for representative fields: PINN = {pinn_med_idx},"
-    f" QCPINN = {qc_med_idx}",
-    f"- Per-run final total losses: PINN = {_arr(pinn_data, 'final_total_loss_runs')},"
-    f" QCPINN = {_arr(qc_data, 'final_total_loss_runs') if qc_data is not None else np.array([])}",
-    "",
-    "---",
-    "*Report generated by `compare.py`*",
-]
-
-REPORT_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
-print(f"  -> {REPORT_FILE}")
-print("\nDone.")
+if __name__ == "__main__":
+    main()
