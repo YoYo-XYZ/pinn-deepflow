@@ -8,6 +8,11 @@ import torch.nn as nn
 
 from .utility import get_device, get_dtype
 
+
+class _NonFiniteLossError(RuntimeError):
+    """Internal signal used to stop optimizer closures immediately."""
+
+
 class HardConstraint:
     """
     Defines a hard constraint for the PINN.
@@ -242,8 +247,8 @@ class NN(ABC, nn.Module):
                 
                 loss_dict = calc_loss(model)
                 total_loss = loss_dict['total_loss']
-                if torch.isnan(total_loss):
-                    print("Detected NaN in loss. Stop the training.")
+                if not torch.isfinite(total_loss).all():
+                    print("Detected non-finite loss. Stop the training.")
                     break
                 total_loss_num = total_loss.item()
                 
@@ -319,17 +324,18 @@ class NN(ABC, nn.Module):
             for epoch in range(epochs):
                 # Container to extract loss from closure
                 loss_dict_container = {}
-                nan_detected = False
+                epoch_state = {
+                    key: value.detach().clone()
+                    for key, value in model.state_dict().items()
+                }
 
                 def closure():
-                    nonlocal nan_detected
                     optimizer.zero_grad(set_to_none=True)
                     loss_dict = calc_loss(model)
                     total_loss = loss_dict['total_loss']
-                    if torch.isnan(total_loss):
-                        print("Detected NaN in loss. Stop the training.")
-                        nan_detected = True
-                        return 0.0
+                    if not torch.isfinite(total_loss).all():
+                        print("Detected non-finite loss. Stop the training.")
+                        raise _NonFiniteLossError
                     # retain_graph=False (default): each closure call performs
                     # a fresh forward pass that builds a new graph. The LBFGS
                     # line search only consumes the scalar loss and parameter
@@ -346,23 +352,20 @@ class NN(ABC, nn.Module):
                     loss_dict_container.update(loss_dict) # Store loss_dict in the container
                     return total_loss.detach()  # detach to avoid keeping graph alive after step
                 
-                optimizer.step(closure)
-                if nan_detected:
-                    # Reinitialize LBFGS optimizer with fresh state
-                    optimizer = torch.optim.LBFGS(
-                        model.parameters(),
-                        history_size=100,
-                        max_iter=20,
-                        line_search_fn="strong_wolfe")
-                else:   
-                    # Record loss after the step
-                    total_loss_num = loss_dict_container['total_loss'].item()
-                    model._record_loss(loss_dict_container)
+                try:
+                    optimizer.step(closure)
+                except _NonFiniteLossError:
+                    model.load_state_dict(epoch_state)
+                    break
 
-                    # Track best model (just parameters, not entire object graph)
-                    if total_loss_num < best_loss:
-                        best_loss = total_loss_num
-                        best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+                # Record loss after the step
+                total_loss_num = loss_dict_container['total_loss'].item()
+                model._record_loss(loss_dict_container)
+
+                # Track best model (just parameters, not entire object graph)
+                if total_loss_num < best_loss:
+                    best_loss = total_loss_num
+                    best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
 
                 if epoch % print_every == 0:
                     model.print_status()
