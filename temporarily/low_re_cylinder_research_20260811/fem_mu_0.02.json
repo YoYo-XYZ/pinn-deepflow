@@ -1,0 +1,75 @@
+{
+  "mu": 0.02,
+  "runtime_s": 6.718158600007882,
+  "metadata": {
+    "backend": "NGSolve/Netgen",
+    "pde": "NavierStokes",
+    "fields": [
+      "u",
+      "v",
+      "p"
+    ],
+    "mesh_size": 0.025,
+    "mesh": {
+      "dimension": 2,
+      "elements": 9018,
+      "vertices": 5084
+    },
+    "boundary_labels": {
+      "outer_0001": {
+        "hole": false,
+        "bound_id": 2029149292240
+      },
+      "outer_0002": {
+        "hole": false,
+        "bound_id": 2029149293392
+      },
+      "outer_0003": {
+        "hole": false,
+        "bound_id": 2029149294672
+      },
+      "outer_0000": {
+        "hole": false,
+        "bound_id": 2029149291024
+      },
+      "hole_0001": {
+        "hole": true,
+        "bound_id": 2028339708048
+      },
+      "hole_0000": {
+        "hole": true,
+        "bound_id": 2029149209168
+      }
+    },
+    "iterations": 10,
+    "solver_residuals": [
+      0.9965941873930223,
+      0.14550917169915803,
+      0.011550548710288005,
+      0.0012331875370926418,
+      8.075282395435283e-05,
+      7.005116292301125e-06,
+      1.7920525761983451e-06,
+      1.8997172801717716e-07,
+      1.1032029621889502e-08,
+      2.827417421317489e-09
+    ],
+    "converged": true,
+    "pressure_gauge": "configured Dirichlet",
+    "derived_fields": []
+  },
+  "ranges": {
+    "u": [
+      9.703107360071434e-06,
+      1.2987465982309587
+    ],
+    "v": [
+      -0.5183170737148426,
+      0.5545254368157979
+    ],
+    "p": [
+      8.96301808707491e-07,
+      3.6497029352609838
+    ]
+  }
+}

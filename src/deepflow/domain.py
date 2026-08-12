@@ -381,6 +381,13 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 loss_dict[f'{physics_type.lower()}_loss'] += torch.mean(
                     g.residual_field_raw.square().sum(dim=0)
                 )
+                if physics_type == "PDE":
+                    for index, residual_name in enumerate(g.PDE.get_residual_names()):
+                        key = f"pde_loss_{residual_name}"
+                        loss_dict.setdefault(key, 0.0)
+                        loss_dict[key] += torch.mean(
+                            g.residual_field_raw[index].square()
+                        )
                 start = end
 
         return loss_dict
@@ -389,7 +396,9 @@ def calc_loss_simple(domain: ProblemDomain) -> callable:
     """Returns a simple loss calculation for the given domain for PINN training."""
     def calc_loss_function(model):
         loss_dict = domain._batched_loss(model)
-        loss_dict["total_loss"] = sum(value for key, value in loss_dict.items() if key != "total_loss")
+        loss_dict["total_loss"] = sum(
+            loss_dict[key] for key in ("pde_loss", "bc_loss", "ic_loss")
+        )
         return loss_dict
     
     return calc_loss_function
@@ -399,7 +408,10 @@ def calc_loss_weighted(domain: ProblemDomain, bc_weights = 1, ic_weights = 1, pd
     weight = {"pde_loss": pde_weights, "bc_loss": bc_weights, "ic_loss": ic_weights}
     def calc_loss_function(model):
         loss_dict = domain._batched_loss(model)
-        loss_dict["total_loss"] = sum(weight[key] * value for key, value in loss_dict.items() if key != "total_loss")
+        loss_dict["total_loss"] = sum(
+            weight[key] * loss_dict[key]
+            for key in ("pde_loss", "bc_loss", "ic_loss")
+        )
         return loss_dict
     
     return calc_loss_function

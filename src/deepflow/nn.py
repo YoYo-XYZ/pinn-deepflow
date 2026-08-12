@@ -191,15 +191,20 @@ class NN(ABC, nn.Module):
 
     def _record_loss(self, loss_dict: Dict[str, torch.Tensor]):
         """Helper to append current losses to history."""
+        previous_epochs = len(self.loss_history['total_loss'])
         for key, val in loss_dict.items():
             value_to_store = val.detach().item() if isinstance(val, torch.Tensor) else val
-            if key in self.loss_history: self.loss_history[key].append(value_to_store)
+            if key not in self.loss_history:
+                if not key.startswith('pde_loss_'):
+                    continue
+                self.loss_history[key] = [float('nan')] * previous_epochs
+            self.loss_history[key].append(value_to_store)
 
     def print_status(self):
         """Prints the current training status."""
         string_parts = [f"Epoch: {len(self.loss_history['total_loss'])}"]
         for k, v in self.loss_history.items():
-            if v:
+            if v and not k.startswith('pde_loss_'):
                 string_parts.append(f"{k}: {v[-1]:.5f}")
         print(", ".join(string_parts))
     # ------------------------------------------------------------------

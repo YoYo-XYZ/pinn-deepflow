@@ -1,0 +1,66 @@
+{
+  "label": "bench_continuity_mul30_weighted_s69",
+  "mu": 0.2,
+  "deepflow_Re": 5.0,
+  "cylinder_Re_D": 0.5,
+  "relative_l2_u": 0.06145816948487928,
+  "relative_l2_v": 0.11719043295024852,
+  "relative_l2_p": 0.073497543457165,
+  "relative_l2_speed": 0.06115499321854927,
+  "mae_u": 0.03939076773385596,
+  "mae_p": 0.5697901652930489,
+  "pred_ranges": {
+    "u": [
+      -0.03824883699417114,
+      1.2255008220672607
+    ],
+    "v": [
+      -0.4302085340023041,
+      0.4691089391708374
+    ],
+    "p": [
+      8.160315701388754e-06,
+      28.92674446105957
+    ]
+  },
+  "ref_ranges": {
+    "u": [
+      9.667025969310521e-06,
+      1.308687172049198
+    ],
+    "v": [
+      -0.43994746309808586,
+      0.48590559236630787
+    ],
+    "p": [
+      9.02356123631989e-06,
+      31.18627229318653
+    ]
+  },
+  "mean_abs_residuals": {
+    "continuity": 0.9634140729904175,
+    "x_momentum": 0.9101394414901733,
+    "y_momentum": 0.8602097630500793
+  },
+  "losses": {
+    "pde_loss": 18.530651092529297,
+    "bc_loss": 0.0014507308369502425,
+    "ic_loss": 0.0
+  },
+  "pressure_scale": 30.0,
+  "normalize_inputs": true,
+  "hard_pressure_outlet": true,
+  "outlet_gradients": true,
+  "continuity_scale": 30.0,
+  "momentum_scale": 1.0,
+  "adam_bc_weight": 10.0,
+  "adam_pde_weight": 0.00111111111111111,
+  "lbfgs_pde_weight": 0.00111111111111111,
+  "adam_seconds": 18.00170220000018,
+  "lbfgs_seconds": 50.483266600000206,
+  "adam_epochs": 600,
+  "lbfgs_epochs": 50,
+  "n_bound": 300,
+  "n_interior": 3000,
+  "seed": 69
+}
