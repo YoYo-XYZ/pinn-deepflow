@@ -226,7 +226,7 @@ class NN(ABC, nn.Module):
                 and the Triton backend (Linux). The first epoch will be slower
                 due to compilation; subsequent epochs benefit from fused kernels.
         """
-        model = copy.deepcopy(self.to(get_device()))
+        model = copy.deepcopy(self).to(get_device())
         if compile_model:
             model = torch.compile(model)
 
@@ -237,7 +237,11 @@ class NN(ABC, nn.Module):
         scheduler = None
         if use_scheduler:
             # Allow custom scheduler config or default
-            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, epochs//20, gamma=0.9)
+            scheduler = torch.optim.lr_scheduler.StepLR(
+                optimizer,
+                max(1, epochs // 20),
+                gamma=0.9,
+            )
 
         best_loss = float('inf')
         best_state = None
@@ -245,17 +249,25 @@ class NN(ABC, nn.Module):
             for epoch in range(1,epochs+1):
                 optimizer.zero_grad(set_to_none=True)
                 
+                training_loss_dict = calc_loss(model)
+                training_loss = training_loss_dict['total_loss']
+                if not torch.isfinite(training_loss).all():
+                    print("Detected non-finite loss. Stop the training.")
+                    break
+                
+                training_loss.backward()
+                optimizer.step()
+                
+                if scheduler: scheduler.step()
+
+                # Evaluate the updated parameters so the recorded loss and
+                # best-state snapshot always describe the same model.
                 loss_dict = calc_loss(model)
                 total_loss = loss_dict['total_loss']
                 if not torch.isfinite(total_loss).all():
                     print("Detected non-finite loss. Stop the training.")
                     break
                 total_loss_num = total_loss.item()
-                
-                total_loss.backward()
-                optimizer.step()
-                
-                if scheduler: scheduler.step()
                 
                 model._record_loss(loss_dict)
 
@@ -303,7 +315,7 @@ class NN(ABC, nn.Module):
         Returns:
             tuple: (model, best_model) — the final model and the model with the lowest loss.
         """
-        model = copy.deepcopy(self.to(get_device()))
+        model = copy.deepcopy(self).to(get_device())
         if compile_model:
             model = torch.compile(model)
 
@@ -322,8 +334,6 @@ class NN(ABC, nn.Module):
 
         try:
             for epoch in range(epochs):
-                # Container to extract loss from closure
-                loss_dict_container = {}
                 epoch_state = {
                     key: value.detach().clone()
                     for key, value in model.state_dict().items()
@@ -348,8 +358,6 @@ class NN(ABC, nn.Module):
                     # tensors (via .detach().requires_grad_()) so that R3
                     # resampling doesn't leave stale grad_fn references on X_/Y_.
                     total_loss.backward()
-                    
-                    loss_dict_container.update(loss_dict) # Store loss_dict in the container
                     return total_loss.detach()  # detach to avoid keeping graph alive after step
                 
                 try:
@@ -358,9 +366,17 @@ class NN(ABC, nn.Module):
                     model.load_state_dict(epoch_state)
                     break
 
-                # Record loss after the step
-                total_loss_num = loss_dict_container['total_loss'].item()
-                model._record_loss(loss_dict_container)
+                # Re-evaluate the accepted parameters. The last closure call is
+                # not a reliable public contract for the optimizer's final
+                # state, especially when a line search is used.
+                loss_dict = calc_loss(model)
+                total_loss = loss_dict['total_loss']
+                if not torch.isfinite(total_loss).all():
+                    print("Detected non-finite loss. Stop the training.")
+                    model.load_state_dict(epoch_state)
+                    break
+                total_loss_num = total_loss.item()
+                model._record_loss(loss_dict)
 
                 # Track best model (just parameters, not entire object graph)
                 if total_loss_num < best_loss:
