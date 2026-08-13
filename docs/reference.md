@@ -143,6 +143,41 @@ Physics-Informed Neural Network model.
 - `save_as_pickle(path)`: Save model.
 - `load_from_pickle(path)`: Load model.
 
+### `RFFPINN`
+
+```python
+class RFFPINN(
+    input_vars=None,
+    output_vars=None,
+    width=32,
+    length=4,
+    embed_dim=256,
+    alpha=5.0,
+    activation=nn.Tanh(),
+    weight_init="kaiming",
+)
+```
+
+Physics-Informed Neural Network with a fixed Joint Random Fourier Feature
+embedding. For a stacked coordinate vector `x`, the model samples
+`B ~ Normal(0, alpha²)` with shape
+`(len(input_vars), embed_dim // 2)` and replaces the raw coordinates with
+`[cos(x @ B), sin(x @ B)]` before the first dense layer. `embed_dim` must be a
+positive even integer. The frequency matrix is fixed during training and is
+reproducible through `df.manual_seed(...)`.
+
+```python
+df.manual_seed(69)
+model = df.RFFPINN(
+    width=50,
+    length=5,
+    input_vars=["x", "y", "t"],
+    output_vars=["u", "v", "p"],
+    embed_dim=256,
+    alpha=5.0,
+)
+```
+
 ## Evaluation
 
 ### `Evaluator` (Visualizer)

@@ -1,5 +1,7 @@
 import copy
+import math
 import platform
+from numbers import Real
 from typing import List, Dict, Callable, Optional, Tuple, Union
 from abc import ABC, abstractmethod
 
@@ -419,6 +421,42 @@ def load_from_pickle(file_name: str) -> None:
     if file_name[-4:] != '.pkl': file_name += '.pkl'
     with open(file_name, 'rb') as f:
         return pickle.load(f)
+
+
+class _JointRFFEmbedding(nn.Module):
+    """Fixed random Fourier features over the joint input coordinates."""
+
+    def __init__(self, input_dim: int, embed_dim: int, alpha: float):
+        super().__init__()
+
+        if (
+            isinstance(embed_dim, bool)
+            or not isinstance(embed_dim, int)
+            or embed_dim <= 0
+            or embed_dim % 2
+        ):
+            raise ValueError("embed_dim must be a positive even integer")
+        if (
+            isinstance(alpha, bool)
+            or not isinstance(alpha, Real)
+            or not math.isfinite(float(alpha))
+            or alpha <= 0
+        ):
+            raise ValueError("alpha must be a positive finite scalar")
+
+        self.input_dim = input_dim
+        self.embed_dim = embed_dim
+        self.alpha = float(alpha)
+        frequencies = torch.randn(
+            input_dim,
+            embed_dim // 2,
+            dtype=get_dtype(),
+        ) * self.alpha
+        self.register_buffer("B", frequencies)
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        projection = inputs @ self.B
+        return torch.cat((torch.cos(projection), torch.sin(projection)), dim=-1)
     
 class FNN(NN):
     def __init__(
@@ -467,3 +505,41 @@ class PINN(FNN):
             activation,
             weight_init=weight_init,
         )
+
+
+class RFFPINN(FNN):
+    """PINN with a fixed joint random Fourier feature input embedding."""
+
+    def __init__(
+        self,
+        input_vars: Optional[List[str]] = None,
+        output_vars: Optional[List[str]] = None,
+        width: int = 32,
+        length: int = 4,
+        embed_dim: int = 256,
+        alpha: float = 5.0,
+        activation: nn.Module = nn.Tanh(),
+        weight_init: Union[str, Callable, None] = 'kaiming',
+    ):
+        self.embed_dim = embed_dim
+        self.alpha = alpha
+        super().__init__(
+            input_vars, output_vars,
+            [width for _ in range(length)],
+            activation,
+            weight_init=weight_init,
+        )
+
+    def _build_network(self) -> None:
+        """Build the fixed Joint RFF embedding followed by an MLP."""
+        self.layer_list = [self.embed_dim] + self.hidden_layer + [self.output_num]
+
+        layers = [_JointRFFEmbedding(self.input_num, self.embed_dim, self.alpha)]
+        for i in range(len(self.layer_list) - 2):
+            layers.append(nn.Linear(self.layer_list[i], self.layer_list[i+1]))
+            layers.append(self.activation)
+
+        layers.append(nn.Linear(self.layer_list[-2], self.layer_list[-1]))
+
+        self.net = nn.Sequential(*layers)
+        self._init_weights()
