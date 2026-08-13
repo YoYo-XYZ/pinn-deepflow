@@ -8,11 +8,9 @@ class PDE(ABC):
     """
     Base class for Physics-Informed Differential Equations.
     """
-    def __init__(self, residual_names: Optional[Tuple[str, ...]] = None):
+    def __init__(self):
         self.var = {}
-        self.residual_names = (
-            None if residual_names is None else tuple(residual_names)
-        )
+        pass
 
     @abstractmethod
     def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, ...]:
@@ -45,27 +43,9 @@ class PDE(ABC):
         """
         return torch.mean(torch.stack(self.residual_fields, dim=0).pow(2).sum(dim=0))
 
-    def get_residual_names(self) -> Tuple[str, ...]:
-        """Return one stable name for each computed residual field."""
-        residual_count = len(self.residual_fields)
-        names = getattr(self, "residual_names", None)
-        if names is None:
-            return tuple(f"residual_{index}" for index in range(residual_count))
-
-        if len(names) != residual_count:
-            raise ValueError(
-                f"{type(self).__name__} defines {len(names)} residual names "
-                f"for {residual_count} residual fields."
-            )
-        if any(not isinstance(name, str) or not name.strip() for name in names):
-            raise ValueError("Residual names must be non-empty strings.")
-        if len(set(names)) != len(names):
-            raise ValueError("Residual names must be unique within a PDE.")
-        return names
-
 class CustomPDE(PDE):
-    def __init__(self, func, residual_names: Optional[Tuple[str, ...]] = None):
-        super().__init__(residual_names=residual_names)
+    def __init__(self, func):
+        super().__init__()
         self.func = func
 
     def compute_residuals(self, inputs_dict):
@@ -79,7 +59,7 @@ class NavierStokes(PDE):
     Handles both Steady and Unsteady states automatically based on input 't'.
     """
     def __init__(self, mu: float, rho: float, U: float = 1.0, L: float = 1.0):
-        super().__init__(("continuity", "x_momentum", "y_momentum"))
+        super().__init__()
         self.U = U
         self.L = L
         self.mu = mu
@@ -157,7 +137,7 @@ class StreamFunctionNavierStokes(PDE):
     coordinates only.
     """
     def __init__(self, mu: float, rho: float, U: float = 1.0, L: float = 1.0):
-        super().__init__(("x_momentum", "y_momentum"))
+        super().__init__()
         self.U = U
         self.L = L
         self.mu = mu
@@ -225,7 +205,7 @@ class HeatEquation(PDE):
     2D Heat Equation: u_t = alpha * (u_xx + u_yy)
     """
     def __init__(self, alpha: float):
-        super().__init__(("heat",))
+        super().__init__()
         self.alpha = alpha
 
     def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor]:
@@ -252,7 +232,7 @@ class WaveEquation(PDE):
     2D Wave Equation: u_tt = c^2 * (u_xx + u_yy)
     """
     def __init__(self, c: float):
-        super().__init__(("wave",))
+        super().__init__()
         self.c = c
 
     def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor]:
@@ -280,7 +260,7 @@ class BurgersEquation1D(PDE):
     1D Burgers' Equation: u_t + u * u_x = nu * u_xx
     """
     def __init__(self, nu: float):
-        super().__init__(("burgers",))
+        super().__init__()
         self.nu = nu
 
     def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor]:
