@@ -204,6 +204,18 @@ class NN(ABC, nn.Module):
             if v:
                 string_parts.append(f"{k}: {v[-1]:.5f}")
         print(", ".join(string_parts))
+
+    def _maybe_print_status(
+        self,
+        print_every: int,
+        last_printed_epoch: Optional[int],
+    ) -> Optional[int]:
+        """Print on the shared, one-based history epoch schedule."""
+        current_epoch = len(self.loss_history['total_loss'])
+        if current_epoch > 0 and (current_epoch == 1 or current_epoch % print_every == 0):
+            self.print_status()
+            return current_epoch
+        return last_printed_epoch
     # ------------------------------------------------------------------
     # Training Methods
     # ------------------------------------------------------------------
@@ -233,6 +245,8 @@ class NN(ABC, nn.Module):
         """
         if max_grad_norm is not None and max_grad_norm <= 0:
             raise ValueError("max_grad_norm must be positive or None")
+        if print_every <= 0:
+            raise ValueError("print_every must be positive")
 
         model = copy.deepcopy(self).to(get_device())
         if compile_model:
@@ -253,6 +267,8 @@ class NN(ABC, nn.Module):
 
         best_loss = float('inf')
         best_state = None
+        initial_history_len = len(model.loss_history['total_loss'])
+        last_printed_epoch = None
         try:
             for epoch in range(1,epochs+1):
                 optimizer.zero_grad(set_to_none=True)
@@ -284,16 +300,19 @@ class NN(ABC, nn.Module):
                 model._record_loss(loss_dict)
 
                 # Save best state (just parameters, not entire object graph)
+                threshold_reached = False
                 if total_loss_num < best_loss:
                     best_loss = total_loss_num
                     best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
-                    
-                    if threshold_loss and best_loss < threshold_loss:
-                        print(f"Stop: Loss {best_loss:.5f} < Threshold {threshold_loss}")
-                        break
 
-                if epoch % print_every == 0 or epoch == 1:
-                    model.print_status()
+                    if threshold_loss is not None and best_loss < threshold_loss:
+                        threshold_reached = True
+
+                last_printed_epoch = model._maybe_print_status(print_every, last_printed_epoch)
+
+                if threshold_reached:
+                    print(f"Stop: Loss {best_loss:.5f} < Threshold {threshold_loss}")
+                    break
                 
                 if do_between_epochs: do_between_epochs(epoch, model)
 
@@ -304,8 +323,10 @@ class NN(ABC, nn.Module):
         best_model = copy.deepcopy(model)
         if best_state is not None:
             best_model.load_state_dict(best_state)
-            
-        model.print_status()
+
+        current_epoch = len(model.loss_history['total_loss'])
+        if current_epoch > initial_history_len and current_epoch != last_printed_epoch:
+            model.print_status()
         return model, best_model
 
     def train_lbfgs(
@@ -327,6 +348,9 @@ class NN(ABC, nn.Module):
         Returns:
             tuple: (model, best_model) — the final model and the model with the lowest loss.
         """
+        if print_every <= 0:
+            raise ValueError("print_every must be positive")
+
         model = copy.deepcopy(self).to(get_device())
         if compile_model:
             model = torch.compile(model)
@@ -343,9 +367,11 @@ class NN(ABC, nn.Module):
 
         best_loss = float('inf')
         best_state = None
+        initial_history_len = len(model.loss_history['total_loss'])
+        last_printed_epoch = None
 
         try:
-            for epoch in range(epochs):
+            for epoch in range(1, epochs + 1):
                 epoch_state = {
                     key: value.detach().clone()
                     for key, value in model.state_dict().items()
@@ -395,10 +421,9 @@ class NN(ABC, nn.Module):
                     best_loss = total_loss_num
                     best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
 
-                if epoch % print_every == 0:
-                    model.print_status()
+                last_printed_epoch = model._maybe_print_status(print_every, last_printed_epoch)
                 
-                if threshold_loss and total_loss_num < threshold_loss:
+                if threshold_loss is not None and total_loss_num < threshold_loss:
                      print(f"Stop: Loss {total_loss_num:.5f} < Threshold {threshold_loss}")
                      break
                 
@@ -413,8 +438,10 @@ class NN(ABC, nn.Module):
         best_model = copy.deepcopy(model)
         if best_state is not None:
             best_model.load_state_dict(best_state)
-        
-        model.print_status()
+
+        current_epoch = len(model.loss_history['total_loss'])
+        if current_epoch > initial_history_len and current_epoch != last_printed_epoch:
+            model.print_status()
         return model, best_model
     
     def save_as_pickle(self, file_name: str = "model.pkl") -> None:

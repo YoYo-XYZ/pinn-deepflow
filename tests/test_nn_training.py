@@ -14,6 +14,14 @@ def _quadratic_loss(model):
     }
 
 
+def _epoch_lines(output):
+    return [
+        line.split(",", 1)[0]
+        for line in output.splitlines()
+        if line.startswith("Epoch:")
+    ]
+
+
 def test_adam_scheduler_supports_fewer_than_twenty_epochs():
     original_device = deepflow_utility.device
     deepflow_utility.device = "cpu"
@@ -30,6 +38,55 @@ def test_adam_scheduler_supports_fewer_than_twenty_epochs():
         deepflow_utility.device = original_device
 
     assert len(trained_model.loss_history["total_loss"]) == 2
+
+
+def test_adam_does_not_repeat_final_status(capsys):
+    model = df.PINN(width=2, length=1, input_vars=["x"], output_vars=["u"])
+
+    model.train_adam(
+        learning_rate=0.01,
+        epochs=2,
+        calc_loss=_quadratic_loss,
+        print_every=2,
+    )
+
+    assert _epoch_lines(capsys.readouterr().out) == ["Epoch: 1", "Epoch: 2"]
+
+
+def test_lbfgs_uses_same_epoch_schedule_and_no_duplicate_final_status(capsys):
+    model = df.PINN(width=2, length=1, input_vars=["x"], output_vars=["u"])
+
+    model.train_lbfgs(
+        epochs=3,
+        calc_loss=_quadratic_loss,
+        print_every=2,
+    )
+
+    assert _epoch_lines(capsys.readouterr().out) == [
+        "Epoch: 1",
+        "Epoch: 2",
+        "Epoch: 3",
+    ]
+
+
+def test_chained_training_keeps_global_print_schedule(capsys):
+    model = df.PINN(width=2, length=1, input_vars=["x"], output_vars=["u"])
+
+    model, _ = model.train_adam(
+        learning_rate=0.01,
+        epochs=2,
+        calc_loss=_quadratic_loss,
+        print_every=2,
+    )
+    capsys.readouterr()
+
+    model.train_lbfgs(
+        epochs=3,
+        calc_loss=_quadratic_loss,
+        print_every=2,
+    )
+
+    assert _epoch_lines(capsys.readouterr().out) == ["Epoch: 4", "Epoch: 5"]
 
 
 def test_adam_best_model_matches_recorded_best_loss():

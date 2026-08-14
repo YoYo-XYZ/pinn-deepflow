@@ -112,7 +112,6 @@ model1, model1best = model0.train_adam(
     Epoch: 600, total_loss: 0.02541, bc_loss: 0.01232, pde_loss: 0.00730, ic_loss: 0.00580
     Epoch: 800, total_loss: 0.02111, bc_loss: 0.01105, pde_loss: 0.00541, ic_loss: 0.00465
     Epoch: 1000, total_loss: 0.01774, bc_loss: 0.00972, pde_loss: 0.00420, ic_loss: 0.00383
-    Epoch: 1000, total_loss: 0.01774, bc_loss: 0.00972, pde_loss: 0.00420, ic_loss: 0.00383
     
 
 Refine the model using LBFGS for higher precision.
