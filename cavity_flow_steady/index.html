@@ -1030,7 +1030,7 @@ Epoch: 2000, total_loss: 0.02943, bc_loss: 0.02339, pde_loss: 0.00604
 </code></pre></div>
 <p>Refine the model using LBFGS for higher precision.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Train the model</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">model2</span> <span class="o">=</span> <span class="n">model1best</span><span class="o">.</span><span class="n">train_lbfgs</span><span class="p">(</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">_</span><span class="p">,</span> <span class="n">model2</span> <span class="o">=</span> <span class="n">model1best</span><span class="o">.</span><span class="n">train_lbfgs</span><span class="p">(</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">calc_loss</span><span class="o">=</span><span class="n">df</span><span class="o">.</span><span class="n">calc_loss_simple</span><span class="p">(</span><span class="n">domain</span><span class="p">),</span>
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">epochs</span><span class="o">=</span><span class="mi">350</span><span class="p">,</span>
 <a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">threshold_loss</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span>

@@ -1366,8 +1366,8 @@ Steady 2D Burgers equation in the <code>(x, y)</code> domain,
 </code></pre></div>
 Physics-Informed Neural Network model.</p>
 <p><strong>Methods:</strong>
-- <code>train_adam(calc_loss, learning_rate, epochs, ...)</code>: Train using Adam optimizer.
-- <code>train_lbfgs(calc_loss, epochs, ...)</code>: Train using L-BFGS optimizer.
+- <code>train_adam(calc_loss, learning_rate, epochs, ...)</code>: Train using Adam optimizer and return <code>(model, best_model)</code>.
+- <code>train_lbfgs(calc_loss, epochs, ...)</code>: Train using L-BFGS optimizer and return <code>(model, best_model)</code>.
 - <code>save_as_pickle(path)</code>: Save model.
 - <code>load_from_pickle(path)</code>: Load model.</p>
 <h3 id="rffpinn"><code>RFFPINN</code></h3>
