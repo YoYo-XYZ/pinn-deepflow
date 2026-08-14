@@ -36,6 +36,7 @@ from common_config import (  # noqa: E402
 
 MODEL_FIELDS = ("x", "y", "u", "v", "p")
 RESIDUAL_FIELDS = ("continuity", "x_momentum", "y_momentum")
+PDE_RESIDUAL_COUNTS = {"uvp": 3, "psip": 2}
 HISTORY_FIELDS = ("total_loss", "bc_loss", "pde_loss")
 SCALAR_METRICS = (
     "final_total_loss",
@@ -177,7 +178,7 @@ def train_one(
     area_eval.sampling_area(EVAL_GRID)
     data = area_eval.data_dict
     vertical_data, horizontal_data = _evaluate_centerlines(best_model, formulation)
-    residual_count = len(domain.area_list[0].PDE.residual_fields)
+    residual_count = PDE_RESIDUAL_COUNTS[formulation]
 
     metrics = {
         "label": label,

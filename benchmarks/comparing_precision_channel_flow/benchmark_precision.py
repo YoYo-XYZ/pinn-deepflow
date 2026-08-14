@@ -137,10 +137,10 @@ def _apply_coordinates(domain, coordinates, dtype):
         raise ValueError("Baseline and target domains have different geometry layouts.")
 
     for geometry, (x, y) in zip(geometries, coordinates):
-        geometry.X = x.to(dtype=dtype).clone()
-        geometry.Y = y.to(dtype=dtype).clone()
-        if hasattr(geometry, "sampled_area"):
-            geometry.sampled_area = (geometry.X, geometry.Y)
+        geometry.set_coordinates(
+            x.to(dtype=dtype).clone(),
+            y.to(dtype=dtype).clone(),
+        )
     for geometry in geometries:
         geometry.process_coordinates()
 
@@ -245,9 +245,10 @@ def build_evaluation_grid():
 def _set_evaluation_grid(domain, evaluation_grid, dtype):
     """Put the canonical grid on the evaluation area in the requested dtype."""
     area = domain.area_list[0]
-    area.X = evaluation_grid[0].to(dtype=dtype).clone()
-    area.Y = evaluation_grid[1].to(dtype=dtype).clone()
-    area.sampled_area = (area.X, area.Y)
+    area.set_coordinates(
+        evaluation_grid[0].to(dtype=dtype).clone(),
+        evaluation_grid[1].to(dtype=dtype).clone(),
+    )
     area.process_coordinates()
 
 

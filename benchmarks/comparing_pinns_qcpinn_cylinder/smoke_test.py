@@ -74,10 +74,16 @@ def all_setups_smoke():
         model = factory().to(df.device)
         assert count_params(model) == expected_params
         _finite_loss(domain, model)
-        assert len(domain.area_list[0].PDE.residual_fields) == expected_residuals
         area = domain.area_list[0].evaluate(model)
         area.sampling_area([5, 5])
         assert all(area.data_dict[field].size > 0 for field in ("u", "v", "p"))
+        pde_fields = (
+            ("continuity_residual", "x_momentum_residual", "y_momentum_residual")
+            if formulation == "uvp"
+            else ("x_momentum_residual", "y_momentum_residual")
+        )
+        assert len(pde_fields) == expected_residuals
+        assert all(field in area.data_dict for field in pde_fields)
         if formulation == "psip":
             assert np.max(np.abs(area.data_dict["continuity_residual"])) < 1.0e-5
         print(f"  {label}: {expected_params} parameters, {expected_residuals} residuals")

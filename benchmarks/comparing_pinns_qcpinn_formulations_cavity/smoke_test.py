@@ -27,13 +27,19 @@ def check_setup(label, formulation, model_factory, expected_params, expected_res
     assert count_params(model) == expected_params
 
     loss = df.calc_loss_simple(domain)(model)
-    assert len(domain.area_list[0].PDE.residual_fields) == expected_residuals
     assert np.isfinite(loss["total_loss"].detach().cpu().item())
 
     area_eval = domain.area_list[0].evaluate(model)
     area_eval.sampling_area([5, 5])
     for field in ("u", "v", "p"):
         assert area_eval.data_dict[field].size == 25
+    pde_fields = (
+        ("continuity_residual", "x_momentum_residual", "y_momentum_residual")
+        if formulation == "uvp"
+        else ("x_momentum_residual", "y_momentum_residual")
+    )
+    assert len(pde_fields) == expected_residuals
+    assert all(field in area_eval.data_dict for field in pde_fields)
     if formulation == "psip":
         assert area_eval.data_dict["psi"].size == 25
         assert np.max(np.abs(area_eval.data_dict["continuity_residual"])) < 1.0e-5
