@@ -2,6 +2,7 @@
 
 import math
 import numbers
+import warnings
 from typing import Mapping, Optional, Tuple
 
 import numpy as np
@@ -16,7 +17,12 @@ from ..pde import (
     StreamFunctionNavierStokes,
     WaveEquation,
 )
-from .geometry import MeshGeometry, NetgenGeometryAdapter, ReferenceGeometryError
+from .geometry import (
+    MeshGeometry,
+    NetgenGeometryAdapter,
+    ReferenceGeometryError,
+    _sample_bound,
+)
 from .solution import ReferenceSolution
 
 
@@ -114,12 +120,8 @@ def _validate_condition(condition, key: str, *, allow_time_derivative: bool = Fa
 
 
 def _validate_geometry_conditions(domain, pde_area, supported_fields, *, transient=False):
-    boundary_ids = {id(bound) for bound in pde_area.bound_list}
-    boundary_ids.update(id(bound) for bound in (pde_area.negative_bound_list or []))
     for item in _all_geometries(domain):
-        if getattr(item, "physics_type", None) == "BC" and (
-            isinstance(item, Bound) and id(item) in boundary_ids
-        ):
+        if getattr(item, "physics_type", None) == "BC" and isinstance(item, Bound):
             for key, condition in (item.condition_dict or {}).items():
                 _validate_condition(condition, key)
                 if key not in supported_fields:
@@ -139,13 +141,89 @@ def _validate_geometry_conditions(domain, pde_area, supported_fields, *, transie
                 )
 
 
+def _polyline_distance(first: np.ndarray, second: np.ndarray) -> float:
+    distances = np.linalg.norm(first[:, None, :] - second[None, :, :], axis=2)
+    return float(
+        max(
+            np.min(distances, axis=1).max(),
+            np.min(distances, axis=0).max(),
+        )
+    )
+
+
+def _is_point_like(bound: Bound, pde_area: Area) -> bool:
+    scale = max(
+        1.0,
+        abs(float(pde_area.ranges[0][1] - pde_area.ranges[0][0])),
+        abs(float(pde_area.ranges[1][1] - pde_area.ranges[1][0])),
+    )
+    return max(bound.lengths.values()) <= scale * 1.0e-5
+
+
+def _boundary_label(bound: Bound, adapter: MeshGeometry):
+    """Return the mesh label for a boundary object, including aliases.
+
+    A standalone Bound can represent the same curve as an Area boundary while
+    being a different Python object.  Match those aliases by their sampled
+    point sets, but never match a boundary that lies in the area interior.
+    """
+    label = adapter.labels_by_bound.get(id(bound))
+    if label is not None:
+        return label
+
+    matches = []
+    for candidate_label, candidate_points in adapter.points_by_label.items():
+        original_coordinates = (
+            bound.X,
+            bound.Y,
+            dict(getattr(bound, "coords", {})),
+        )
+        try:
+            points = _sample_bound(bound, len(candidate_points))
+        finally:
+            bound.X, bound.Y = original_coordinates[:2]
+            bound.coords = original_coordinates[2]
+        scale = max(
+            1.0,
+            float(np.ptp(candidate_points[:, 0])),
+            float(np.ptp(candidate_points[:, 1])),
+        )
+        if _polyline_distance(points, candidate_points) <= scale * 1.0e-7:
+            matches.append(candidate_label)
+
+    if len(matches) > 1:
+        raise ReferenceConfigurationError(
+            "A standalone boundary matches multiple PDE-area boundaries; "
+            "attach its BC to the Area boundary object explicitly."
+        )
+    return matches[0] if matches else None
+
+
 def _collect_boundary_conditions(domain, pde_area, adapter: MeshGeometry):
     conditions = {label: {} for label in adapter.boundary_info}
-    for bound in list(pde_area.bound_list) + list(pde_area.negative_bound_list or []):
-        label = adapter.labels_by_bound.get(id(bound))
-        if label is None:
+    bounds = list(pde_area.bound_list) + list(pde_area.negative_bound_list or [])
+    bounds += list(getattr(domain, "bound_list", ()))
+    seen = set()
+    for bound in bounds:
+        if id(bound) in seen:
             continue
+        seen.add(id(bound))
         if getattr(bound, "physics_type", None) == "BC":
+            label = _boundary_label(bound, adapter)
+            if label is None:
+                if _is_point_like(bound, pde_area):
+                    warnings.warn(
+                        "Ignoring a point-like FEM boundary condition; "
+                        "point Dirichlet constraints are not represented by "
+                        "the NGSolve boundary labels.",
+                        RuntimeWarning,
+                        stacklevel=2,
+                    )
+                    continue
+                raise ReferenceConfigurationError(
+                    "A boundary condition is attached to a Bound that is not "
+                    "part of the PDE area boundary."
+                )
             conditions[label].update(bound.condition_dict or {})
     return conditions
 

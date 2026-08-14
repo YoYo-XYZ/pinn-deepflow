@@ -304,3 +304,33 @@ def test_solve_fem_burgers_is_steady_2d():
     assert "time_values" not in solution.metadata
     values = solution.evaluate(np.array([0.25, 0.75]), np.array([0.25, 0.75]))
     np.testing.assert_allclose(values["u"], 1.0, atol=1e-8)
+
+
+def test_solve_fem_accepts_external_matching_boundary_conditions():
+    pytest.importorskip("ngsolve")
+
+    area = df.rectangle([-1, 1], [0, 1])
+    line_ic = df.geometry.line_horizontal(y=0, range_x=[-1, 1])
+    line_bc1 = df.geometry.line_vertical(x=-1, range_y=[0, 1])
+    line_bc2 = df.geometry.line_vertical(x=1, range_y=[0, 1])
+    domain = df.domain(area.area_list, line_ic, line_bc1, line_bc2)
+
+    area.define_pde(df.pde.BurgersEquation1D(nu=0.1))
+    domain.bound_list[0].define_bc(
+        {"u": ["x", lambda x: -torch.sin(torch.pi * x)]}
+    )
+    domain.bound_list[1].define_bc({"u": 0.0})
+    domain.bound_list[2].define_bc({"u": 0.0})
+
+    result = domain.solve_fem(
+        mesh_size=0.25,
+        boundary_resolution=16,
+        max_iterations=25,
+        area_sampling_res=[4, 4],
+        bound_sampling_res=8,
+    )
+    solution = result.reference_solution
+    x = np.array([-0.75, 0.0, 0.75])
+    values = solution.evaluate(x, np.zeros_like(x))["u"]
+
+    np.testing.assert_allclose(values, -np.sin(np.pi * x), atol=1e-5)
