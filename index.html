@@ -8,6 +8,8 @@
       
       
       
+        <link rel="canonical" href="https://yoyo-xyz.github.io/pinn-deepflow/">
+      
       
       
         <link rel="next" href="quickstart/">
@@ -154,7 +156,7 @@
     
     
       <div class="md-header__source">
-        <a href="https://github.com/YoYo-XYZ/deepflow" title="Go to repository" class="md-source" data-md-component="source">
+        <a href="https://github.com/YoYo-XYZ/pinn-deepflow" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
@@ -309,7 +311,7 @@
   </label>
   
     <div class="md-nav__source">
-      <a href="https://github.com/YoYo-XYZ/deepflow" title="Go to repository" class="md-source" data-md-component="source">
+      <a href="https://github.com/YoYo-XYZ/pinn-deepflow" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
@@ -1085,7 +1087,7 @@
 <p>DeepFlow is a user-friendly framework for solving PDEs, with a focus on fluid dynamics including the Navier–Stokes equations, using <strong>Physics-Informed Neural Networks (PINNs)</strong>. It provides a CFD-solver-style workflow that makes PINN-based simulations accessible and straightforward.</p>
 <h2 id="table-of-contents">Table of Contents</h2>
 <ul>
-<li><a href="#features"><strong>Key Features</strong></a></li>
+<li><a href="#key-features"><strong>Key Features</strong></a></li>
 <li><a href="#current-implementations">Current Implementations</a></li>
 <li><a href="#installation"><strong>Installation</strong></a></li>
 <li><a href="#requirements">Requirements</a></li>
@@ -1093,7 +1095,7 @@
 <li><a href="#examples">Examples</a></li>
 <li><a href="#contributing">Contributing</a></li>
 <li><a href="#license">License</a></li>
-<li><a href="#future-milestones"><strong>DeepFlow Milestones</strong></a></li>
+<li><a href="#deepflow-milestones"><strong>DeepFlow Milestones</strong></a></li>
 </ul>
 <h2 id="key-features">Key Features</h2>
 <p><img alt="promo" src="static/promo.png" /></p>
@@ -1122,8 +1124,8 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>deepflow
 </code></pre></div>
 <p>For development or to build from source:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/YoYo-XYZ/deepflow.git
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>deepflow
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/YoYo-XYZ/pinn-deepflow.git
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>pinn-deepflow
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </code></pre></div>
 <h2 id="requirements">Requirements</h2>
@@ -1190,16 +1192,16 @@ This example demonstrates how to simulate Steady channel flow <strong>under 20 l
 <img alt="alt text" src="static/quickstart/flow_field.png" />
 <img alt="alt text" src="static/quickstart/loss_curve.png" /></p>
 <h2 id="examples">Examples</h2>
-<p>Explore the <a href="examples">examples</a>
+<p>Explore the <a href="examples/">examples</a>
  directory for real use cases, including</p>
 <p>Steady-state:
-- <a href="examples/cylinder_flow_steady">Steady flow around a cylinder</a>
-- <a href="examples/cavity_flow_steady">Lid-driven cavity flow</a>
-- <a href="examples/BFS_flow_steady">Backward-facing step flow</a>
-- <a href="examples/burgers_eq">Burgers' Equation</a></p>
+- <a href="cylinder_flow_steady/">Steady flow around a cylinder</a>
+- <a href="cavity_flow_steady/">Lid-driven cavity flow</a>
+- <a href="BFS_flow_steady/">Backward-facing step flow</a>
+- <a href="burgers_eq/">Burgers' Equation</a></p>
 <p>Time-dependent:
-- <a href="examples/channel_flow_transient">Transient channel flow</a>
-- <a href="examples/heat_eq">Fourier Heat Equation</a></p>
+- <a href="channel_flow_transient/">Transient channel flow</a>
+- <a href="heat_eq/">Fourier Heat Equation</a></p>
 <h2 id="contributing">Contributing</h2>
 <p>Feel free to submit a Pull Request. For major changes, open an issue first to discuss the proposed changes.</p>
 <h2 id="deepflow-milestones">DeepFlow Milestones</h2>
@@ -1211,7 +1213,7 @@ This example demonstrates how to simulate Steady channel flow <strong>under 20 l
 <li>More neural network architectures (e.g., CNN, RNN)</li>
 </ol>
 <h2 id="license">License</h2>
-<p>This project is licensed under the MIT License - see the <a href="LICENSE">LICENSE</a> file for details.</p>
+<p>This project is licensed under the MIT License - see the <a href="https://github.com/YoYo-XYZ/pinn-deepflow/blob/dev/LICENSE">LICENSE</a> file for details.</p>
 
 
 
