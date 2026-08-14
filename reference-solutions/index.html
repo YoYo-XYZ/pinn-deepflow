@@ -848,12 +848,11 @@ already sampled coordinates otherwise:</p>
 <a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="n">x</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">]</span>
 <a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="n">y</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;y&quot;</span><span class="p">]</span>
 </code></pre></div>
-<p>Heat, wave, transient Navier–Stokes, and 1-D Burgers problems require a time
-interval and initial data.  Set <code>time_step</code> to control the stored snapshots;
-the default stores 100 uniform steps.  Transient <code>evaluate</code> calls linearly
-interpolate between snapshots.  Burgers follows DeepFlow's existing convention
-that <code>x</code> is space and <code>y</code> is time, so <code>reference.evaluate(x, y)</code> is a valid
-transient query for that PDE.  Other transient PDEs use <code>t=...</code>.</p>
+<p>Heat, wave, and transient Navier–Stokes problems require a time interval and
+initial data.  Set <code>time_step</code> to control the stored snapshots; the default
+stores 100 uniform steps.  Transient <code>evaluate</code> calls linearly interpolate
+between snapshots.  <code>BurgersEquation1D</code> is treated as a steady 2D equation in
+the <code>(x, y)</code> domain and does not require a time interval.</p>
 <p>The returned group exposes the advanced point-query and export object as
 <code>reference.reference_solution</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">solution</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span>
@@ -864,7 +863,7 @@ transient query for that PDE.  Other transient PDEs use <code>t=...</code>.</p>
 the low-level <code>ReferenceSolution</code> is preferred.  The reference object retains
 the FEM fields in memory, so repeated queries do not solve the PDE again.
 <code>metadata</code> contains mesh statistics, iteration counts, residual diagnostics,
-time values, and convergence status.</p>
+any time values, and convergence status.</p>
 
 
 
