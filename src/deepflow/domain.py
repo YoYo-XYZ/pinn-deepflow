@@ -134,27 +134,41 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         R3 residual-based resampling with a **fixed total budget** (paper version).
 
         For each geometry, points whose residual exceeds the mean are kept,
-        and the remaining budget is filled with fresh random samples. The total
-        number of points per geometry therefore stays roughly equal to the
-        requested resolution over time.
+        and the remaining budget is filled with fresh random samples. If the
+        threshold set is larger than the budget, the highest-residual points
+        are retained instead. The total number of points per geometry therefore
+        stays equal to the requested resolution over time.
         """
         self.sampling_option = self.sampling_option + ' + R3'
 
+        def resample_geometry(geometry, res, sampler):
+            geometry.get_residual_based_points_threshold()
+            if len(geometry.X_residual_container[0]) > res:
+                _, top_indices = torch.topk(geometry.residual_field, res)
+                top_indices = top_indices.cpu()
+                geometry.X_residual_container = [geometry.X[top_indices]]
+                geometry.Y_residual_container = [geometry.Y[top_indices]]
+
+            remaining = res - len(geometry.X_residual_container[0])
+            if remaining:
+                sampler(remaining, scheme='random')
+            else:
+                geometry.X = geometry.X[:0]
+                geometry.Y = geometry.Y[:0]
+            geometry.apply_residual_based_points()
+            geometry.process_coordinates()
+
         if bound_sampling_res:
             for i, res in enumerate(bound_sampling_res):
-                # Sample new candidates
-                self.bound_list[i].get_residual_based_points_threshold()
-                self.bound_list[i].sampling_line(res-len(self.bound_list[i].X_residual_container[0]), scheme='random')
-                self.bound_list[i].apply_residual_based_points()
-                self.bound_list[i].process_coordinates()
+                resample_geometry(
+                    self.bound_list[i], res, self.bound_list[i].sampling_line
+                )
                 # Add RAR point to saved points
         if area_sampling_res:
             for i, res in enumerate(area_sampling_res):
-                # Sample new candidates
-                self.area_list[i].get_residual_based_points_threshold()
-                self.area_list[i].sampling_area(res-len(self.area_list[i].X_residual_container[0]), scheme='random')
-                self.area_list[i].apply_residual_based_points()
-                self.area_list[i].process_coordinates()
+                resample_geometry(
+                    self.area_list[i], res, self.area_list[i].sampling_area
+                )
                 # Add RAR point to saved points
 
     def sampling_R3_(self, bound_sampling_res:list=None, area_sampling_res:list=None):
