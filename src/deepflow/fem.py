@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 def solve_fem(
     domain: "ProblemDomain",
-    mesh_size=None,
+    mesh_size=0.05,
     boundary_resolution=128,
     time_step=None,
     tolerance=1e-8,
