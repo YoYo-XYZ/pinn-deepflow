@@ -177,11 +177,25 @@ Returned by `domain.area_list[i].evaluate(model)`.
 
 **Methods:**
 - `sampling_area(res_list)`: Sample points for visualization.
+- `expr`: Define persistent lazy expressions between data fields.
 - `plot(key)`: Plot a variable.
 - `plot_color(key)`: Plot a variable as a color map.
 - `plot_streamline(u, v)`: Plot streamlines.
 - `plot_loss_curve()`: Plot loss history.
 - `plot_animate(...)`: Create animation (for transient problems).
+
+Derived fields can be defined with normal arithmetic syntax. Expressions are
+stored and recomputed after resampling, time updates, or `postprocess()`:
+
+```python
+fields = area_prediction.expr
+fields["v_magnitude"] = (fields["u"] ** 2 + fields["v"] ** 2) ** 0.5
+fields["energy"] = 0.5 * fields["v_magnitude"] ** 2
+```
+
+NumPy ufuncs and `np.where()` are also supported. The existing
+`evaluation["u"]` and `evaluation["name"] = values` APIs continue to return
+and store materialized NumPy arrays.
 
 ### `GroupEvaluator`
 

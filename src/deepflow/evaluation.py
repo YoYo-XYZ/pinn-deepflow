@@ -1,4 +1,5 @@
-from typing import List, Union, Dict, Any, Optional
+import operator
+from typing import Callable, List, Union, Dict, Any, Optional
 
 import torch
 import numpy as np
@@ -83,6 +84,253 @@ def _normalize_resolutions(
     return values
 
 
+class _DerivedExpressionCycleError(ValueError):
+    """Internal marker used to preserve cycle diagnostics."""
+
+
+class _LazyFieldExpression:
+    """Lazy expression tree used by :attr:`Evaluator.expr`."""
+
+    __array_priority__ = 1000
+
+    def __init__(
+        self,
+        evaluator,
+        kind: str,
+        value=None,
+        args=(),
+        kwargs=None,
+        text: Optional[str] = None,
+    ) -> None:
+        self._evaluator = evaluator
+        self._kind = kind
+        self._value = value
+        self._args = tuple(args)
+        self._kwargs = dict(kwargs or {})
+        self._text = text
+
+    @classmethod
+    def field(cls, evaluator, name: str):
+        return cls(evaluator, "field", value=name, text=name)
+
+    @classmethod
+    def literal(cls, evaluator, value):
+        return cls(evaluator, "literal", value=value, text=repr(value))
+
+    @classmethod
+    def call(cls, evaluator, function, args, kwargs, text: str):
+        normalized_args = tuple(
+            cls._coerce(evaluator, value) for value in args
+        )
+        normalized_kwargs = {
+            key: cls._coerce(evaluator, value)
+            for key, value in kwargs.items()
+        }
+        return cls(
+            evaluator,
+            "call",
+            value=function,
+            args=normalized_args,
+            kwargs=normalized_kwargs,
+            text=text,
+        )
+
+    @classmethod
+    def _coerce(cls, evaluator, value):
+        if isinstance(value, cls):
+            if value._evaluator is not evaluator:
+                raise ValueError(
+                    "Cannot combine expressions belonging to different "
+                    "Evaluator instances."
+                )
+            return value
+        return cls.literal(evaluator, value)
+
+    def _binary(self, other, function: Callable, symbol: str, reverse=False):
+        other = self._coerce(self._evaluator, other)
+        left, right = (other, self) if reverse else (self, other)
+        return self.call(
+            self._evaluator,
+            function,
+            (left, right),
+            {},
+            f"({left!r} {symbol} {right!r})",
+        )
+
+    def _unary(self, function: Callable, symbol: str):
+        return self.call(
+            self._evaluator,
+            function,
+            (self,),
+            {},
+            f"({symbol}{self!r})",
+        )
+
+    def __add__(self, other):
+        return self._binary(other, operator.add, "+")
+
+    def __radd__(self, other):
+        return self._binary(other, operator.add, "+", reverse=True)
+
+    def __sub__(self, other):
+        return self._binary(other, operator.sub, "-")
+
+    def __rsub__(self, other):
+        return self._binary(other, operator.sub, "-", reverse=True)
+
+    def __mul__(self, other):
+        return self._binary(other, operator.mul, "*")
+
+    def __rmul__(self, other):
+        return self._binary(other, operator.mul, "*", reverse=True)
+
+    def __truediv__(self, other):
+        return self._binary(other, operator.truediv, "/")
+
+    def __rtruediv__(self, other):
+        return self._binary(other, operator.truediv, "/", reverse=True)
+
+    def __floordiv__(self, other):
+        return self._binary(other, operator.floordiv, "//")
+
+    def __rfloordiv__(self, other):
+        return self._binary(other, operator.floordiv, "//", reverse=True)
+
+    def __mod__(self, other):
+        return self._binary(other, operator.mod, "%")
+
+    def __rmod__(self, other):
+        return self._binary(other, operator.mod, "%", reverse=True)
+
+    def __pow__(self, other):
+        return self._binary(other, operator.pow, "**")
+
+    def __rpow__(self, other):
+        return self._binary(other, operator.pow, "**", reverse=True)
+
+    def __neg__(self):
+        return self._unary(operator.neg, "-")
+
+    def __pos__(self):
+        return self._unary(operator.pos, "+")
+
+    def __abs__(self):
+        return self.call(
+            self._evaluator,
+            operator.abs,
+            (self,),
+            {},
+            f"abs({self!r})",
+        )
+
+    def __lt__(self, other):
+        return self._binary(other, operator.lt, "<")
+
+    def __le__(self, other):
+        return self._binary(other, operator.le, "<=")
+
+    def __gt__(self, other):
+        return self._binary(other, operator.gt, ">")
+
+    def __ge__(self, other):
+        return self._binary(other, operator.ge, ">=")
+
+    def __eq__(self, other):
+        return self._binary(other, operator.eq, "==")
+
+    def __ne__(self, other):
+        return self._binary(other, operator.ne, "!=")
+
+    def __bool__(self):
+        raise TypeError(
+            "A lazy field expression cannot be used as a Python boolean. "
+            "Use np.where() for element-wise conditions."
+        )
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        if method != "__call__":
+            raise TypeError(
+                f"NumPy ufunc method {method!r} is not supported for lazy "
+                "field expressions."
+            )
+        if kwargs.get("out") is not None:
+            raise TypeError("Lazy field expressions do not support NumPy 'out'.")
+
+        text = f"{ufunc.__name__}({', '.join(repr(value) for value in inputs)})"
+        return self.call(
+            self._evaluator,
+            ufunc,
+            inputs,
+            kwargs,
+            text,
+        )
+
+    def __array_function__(self, function, types, args, kwargs):
+        if function is not np.where:
+            raise TypeError(
+                f"NumPy function {function.__name__!r} is not supported for "
+                "lazy field expressions."
+            )
+
+        text = f"where({', '.join(repr(value) for value in args)})"
+        return self.call(
+            self._evaluator,
+            np.where,
+            args,
+            kwargs,
+            text,
+        )
+
+    def _evaluate(self, resolve: Callable[[str], Any]):
+        if self._kind == "field":
+            return resolve(self._value)
+        if self._kind == "literal":
+            return self._value
+
+        args = tuple(value._evaluate(resolve) for value in self._args)
+        kwargs = {
+            key: value._evaluate(resolve)
+            for key, value in self._kwargs.items()
+        }
+        return self._value(*args, **kwargs)
+
+    def __repr__(self) -> str:
+        return self._text or "<lazy field expression>"
+
+
+class _ExpressionNamespace:
+    """Mapping-like namespace for defining persistent field expressions."""
+
+    def __init__(self, evaluator) -> None:
+        self._evaluator = evaluator
+
+    def __getitem__(self, key: str) -> _LazyFieldExpression:
+        if not isinstance(key, str):
+            raise TypeError("Expression field names must be strings.")
+        return _LazyFieldExpression.field(self._evaluator, key)
+
+    def __setitem__(self, key: str, expression: _LazyFieldExpression) -> None:
+        if not isinstance(key, str):
+            raise TypeError("Expression field names must be strings.")
+        if not isinstance(expression, _LazyFieldExpression):
+            raise TypeError(
+                "Evaluator.expr values must be lazy field expressions."
+            )
+        if expression._evaluator is not self._evaluator:
+            raise ValueError(
+                "Cannot assign an expression belonging to a different "
+                "Evaluator instance."
+            )
+        self._evaluator._set_derived_expression(key, expression)
+
+    def __delitem__(self, key: str) -> None:
+        self._evaluator._remove_derived_expression(key)
+
+    def __repr__(self) -> str:
+        names = tuple(self._evaluator._derived_expressions)
+        return f"ExpressionNamespace(derived_fields={names})"
+
+
 class Evaluator(Visualizer):
     """
     Evaluates a PINN model against a given geometry and prepares data for visualization.
@@ -100,6 +348,8 @@ class Evaluator(Visualizer):
 
         # Initialize internal state
         self.data_dict: Dict[str, Any] = {}
+        self._derived_expressions: Dict[str, _LazyFieldExpression] = {}
+        self._expression_namespace = _ExpressionNamespace(self)
         self.is_postprocessed = False
         
         if isinstance(geometry, CustomData):
@@ -143,6 +393,7 @@ class Evaluator(Visualizer):
         self.geometry.process_coordinates()
 
         self._create_data_dict()
+        self._refresh_derived_fields()
         self.is_postprocessed = True
         
         # Initialize the parent Visualizer with the processed data
@@ -196,12 +447,113 @@ class Evaluator(Visualizer):
                 print(f"Warning: Could not convert key '{key}' to numpy. Error: {e}")
                 clean_dict[key] = value
         return clean_dict
+
+    @property
+    def expr(self) -> _ExpressionNamespace:
+        """Namespace for defining persistent lazy data-field expressions."""
+        return self._expression_namespace
+
+    def _evaluate_derived_fields(self) -> Dict[str, np.ndarray]:
+        """Evaluate all registered expressions against the current data."""
+        values = {}
+        memo = {}
+        visiting = []
+
+        def resolve(key: str):
+            if key in memo:
+                return memo[key]
+            if key in self._derived_expressions:
+                if key in visiting:
+                    cycle = " -> ".join(visiting + [key])
+                    raise _DerivedExpressionCycleError(
+                        f"Cyclic derived-field dependency detected: {cycle}."
+                    )
+
+                visiting.append(key)
+                try:
+                    value = self._derived_expressions[key]._evaluate(resolve)
+                except KeyError as exc:
+                    missing = exc.args[0] if exc.args else "unknown"
+                    raise KeyError(
+                        f"Cannot evaluate derived field {key!r}: missing "
+                        f"data key {missing!r}."
+                    ) from exc
+                except _DerivedExpressionCycleError:
+                    raise
+                except Exception as exc:
+                    raise ValueError(
+                        f"Failed to evaluate derived field {key!r} "
+                        f"({self._derived_expressions[key]!r})."
+                    ) from exc
+                finally:
+                    visiting.pop()
+
+                memo[key] = np.asarray(value)
+                return memo[key]
+
+            if key not in self.data_dict:
+                raise KeyError(key)
+            return self.data_dict[key]
+
+        for key in self._derived_expressions:
+            values[key] = resolve(key)
+        return values
+
+    def _refresh_derived_fields(self) -> None:
+        """Recompute registered expressions and update ``data_dict`` atomically."""
+        values = self._evaluate_derived_fields()
+        self.data_dict.update(values)
+
+    def _set_derived_expression(
+        self,
+        key: str,
+        expression: _LazyFieldExpression,
+    ) -> None:
+        if key in self.data_dict and key not in self._derived_expressions:
+            raise ValueError(
+                f"Cannot define derived field {key!r}: it is already a "
+                "base data key."
+            )
+
+        sentinel = object()
+        previous = self._derived_expressions.get(key, sentinel)
+        self._derived_expressions[key] = expression
+        if not self.is_postprocessed:
+            return
+
+        try:
+            self._refresh_derived_fields()
+        except Exception:
+            if previous is sentinel:
+                del self._derived_expressions[key]
+            else:
+                self._derived_expressions[key] = previous
+            raise
+
+    def _remove_derived_expression(self, key: str) -> None:
+        if key not in self._derived_expressions:
+            raise KeyError(key)
+
+        previous = self._derived_expressions.pop(key)
+        previous_names = set(self._derived_expressions) | {key}
+        try:
+            values = self._evaluate_derived_fields()
+        except Exception:
+            self._derived_expressions[key] = previous
+            raise
+
+        for name in previous_names:
+            self.data_dict.pop(name, None)
+        self.data_dict.update(values)
     
     def __getitem__(self, key: str) -> Any:
         return self.data_dict[key]
     
     def __setitem__(self, key: str, value: Any) -> None:
+        self._derived_expressions.pop(key, None)
         self.data_dict[key] = value
+        if self.is_postprocessed and self._derived_expressions:
+            self._refresh_derived_fields()
 
     def __str__(self):
         return f"Available data keys: {tuple(self.data_dict.keys())}"
@@ -265,6 +617,8 @@ class ReferenceEvaluator(Evaluator):
         self.reference_solution = reference_solution
         self.geometry = geometry
         self.data_dict: Dict[str, Any] = {}
+        self._derived_expressions: Dict[str, _LazyFieldExpression] = {}
+        self._expression_namespace = _ExpressionNamespace(self)
         self.is_postprocessed = False
         self.metadata = reference_solution.metadata
 
@@ -432,6 +786,7 @@ class ReferenceEvaluator(Evaluator):
 
     def postprocess(self) -> None:
         self._create_data_dict()
+        self._refresh_derived_fields()
         self.is_postprocessed = True
         Visualizer.__init__(self, self.data_dict)
 

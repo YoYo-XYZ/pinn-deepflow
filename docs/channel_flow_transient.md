@@ -186,7 +186,8 @@ print(area_eval)
 
 
 ```python
-area_eval['v_mag'] = (area_eval['u']**2 + area_eval['v']**2)**0.5
+fields = area_eval.expr
+fields['v_mag'] = (fields['u']**2 + fields['v']**2)**0.5
 ```
 
 
