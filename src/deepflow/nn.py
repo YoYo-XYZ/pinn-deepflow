@@ -218,6 +218,7 @@ class NN(ABC, nn.Module):
         threshold_loss: Optional[float] = None,
         do_between_epochs: Optional[Callable] = None,
         compile_model: bool = False,
+        max_grad_norm: Optional[float] = 1.0,
     )-> tuple['NN', 'NN']:
         """
         Trains the model using the Adam optimizer.
@@ -227,7 +228,12 @@ class NN(ABC, nn.Module):
                 for kernel fusion and reduced overhead. Requires PyTorch 2.0+
                 and the Triton backend (Linux). The first epoch will be slower
                 due to compilation; subsequent epochs benefit from fused kernels.
+            max_grad_norm: Maximum global gradient norm used for clipping. Set
+                to ``None`` to disable gradient clipping.
         """
+        if max_grad_norm is not None and max_grad_norm <= 0:
+            raise ValueError("max_grad_norm must be positive or None")
+
         model = copy.deepcopy(self).to(get_device())
         if compile_model:
             model = torch.compile(model)
@@ -258,6 +264,10 @@ class NN(ABC, nn.Module):
                     break
                 
                 training_loss.backward()
+                if max_grad_norm is not None:
+                    torch.nn.utils.clip_grad_norm_(
+                        model.parameters(), max_norm=max_grad_norm
+                    )
                 optimizer.step()
                 
                 if scheduler: scheduler.step()
