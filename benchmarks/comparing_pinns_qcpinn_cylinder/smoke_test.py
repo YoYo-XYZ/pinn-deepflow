@@ -49,11 +49,9 @@ def pinn_reference_smoke():
         boundary_resolution=24,
         tolerance=1.0e-4,
         max_iterations=40,
-        area_sampling_res=[11, 5],
-        bound_sampling_res=12,
     )
     assert reference.metadata["converged"]
-    fields = reference.reference_solution.evaluate(
+    fields = reference.evaluate(
         area.data_dict["x"], area.data_dict["y"], fields=("u", "v", "p")
     )
     assert all(np.all(np.isfinite(np.asarray(fields[name]))) for name in ("u", "v", "p"))

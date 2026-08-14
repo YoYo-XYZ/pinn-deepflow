@@ -11,7 +11,7 @@ from .nn import HardConstraint
 from .geometry import CustomData
 
 if TYPE_CHECKING:
-    from .evaluation import GroupEvaluator
+    from .reference import ReferenceSolution
 
 
 def domain(*geometries):
@@ -60,9 +60,7 @@ class ProblemDomain():
         time_step=None,
         tolerance=1e-8,
         max_iterations=200,
-        area_sampling_res=None,
-        bound_sampling_res=None,
-    ) -> "GroupEvaluator":
+    ) -> "ReferenceSolution":
         """Solve the domain with the optional NGSolve FEM backend."""
         from .fem import solve_fem as _solve_fem
 
@@ -73,8 +71,6 @@ class ProblemDomain():
             time_step=time_step,
             tolerance=tolerance,
             max_iterations=max_iterations,
-            area_sampling_res=area_sampling_res,
-            bound_sampling_res=bound_sampling_res,
         )
 
     def __str__(self):

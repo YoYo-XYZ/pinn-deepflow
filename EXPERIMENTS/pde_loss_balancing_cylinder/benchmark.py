@@ -86,13 +86,22 @@ def fem_reference(args) -> dict[str, object]:
         boundary_resolution=args.fem_boundary_resolution,
         tolerance=1e-8,
         max_iterations=200,
-        area_sampling_res=list(args.fem_grid),
-        bound_sampling_res=args.fem_boundary_resolution,
     )
     metadata = reference.metadata
     if not metadata.get("converged", False):
         raise RuntimeError("FEM reference did not converge")
-    data = reference.area_evaluators[0].data_dict
+    area = domain.area_list[0]
+    area.sampling_area(list(args.fem_grid))
+    x = area.X.detach().cpu().numpy()
+    y = area.Y.detach().cpu().numpy()
+    fields = reference.evaluate(x, y, fields=("u", "v", "p"))
+    data = {
+        "x": x,
+        "y": y,
+        "u_ref": np.asarray(fields["u"]),
+        "v_ref": np.asarray(fields["v"]),
+        "p_ref": np.asarray(fields["p"]),
+    }
     residuals = np.asarray(metadata.get("solver_residuals", []), dtype=float)
     mesh = metadata.get("mesh", {})
     payload = {

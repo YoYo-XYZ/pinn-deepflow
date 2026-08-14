@@ -18,18 +18,19 @@ def _build_reference_domain():
     return build_domain("uvp")
 
 
-def _sample_solution(reference):
-    data = reference.area_evaluators[0].data_dict
-    x = np.asarray(data["x"]).reshape(-1)
-    y = np.asarray(data["y"]).reshape(-1)
-    solution = reference.reference_solution
-    fields = solution.evaluate(x, y, fields=("u", "v", "p"))
+def _sample_solution(reference, grid):
+    x_axis = np.linspace(*CHANNEL_X, grid[0])
+    y_axis = np.linspace(*CHANNEL_Y, grid[1])
+    query_x, query_y = np.meshgrid(x_axis, y_axis, indexing="ij")
+    fields = reference.evaluate(query_x, query_y, fields=("u", "v", "p"))
+    x = query_x.reshape(-1)
+    y = query_y.reshape(-1)
 
     epsilon = 1.0e-6
     outlet_y = np.linspace(
         CHANNEL_Y[0] + epsilon, CHANNEL_Y[1] - epsilon, PROFILE_POINTS
     )
-    outlet = solution.evaluate(
+    outlet = reference.evaluate(
         np.full_like(outlet_y, CHANNEL_X[1] - epsilon),
         outlet_y,
         fields=("u", "v"),
@@ -39,7 +40,7 @@ def _sample_solution(reference):
         CHANNEL_X[1] - epsilon,
         PROFILE_POINTS,
     )
-    wake = solution.evaluate(
+    wake = reference.evaluate(
         wake_x, np.full_like(wake_x, CYLINDER_CY), fields=("u", "v")
     )
     return x, y, fields, outlet_y, outlet, wake_x, wake
@@ -54,10 +55,8 @@ def solve_reference(grid=FEM_DEFAULT_GRID, mesh_size=FEM_MESH_SIZE, output_path=
         boundary_resolution=FEM_BOUNDARY_RESOLUTION,
         tolerance=FEM_TOLERANCE,
         max_iterations=FEM_MAX_ITERATIONS,
-        area_sampling_res=list(grid),
-        bound_sampling_res=FEM_BOUNDARY_RESOLUTION,
     )
-    x, y, fields, outlet_y, outlet, wake_x, wake = _sample_solution(reference)
+    x, y, fields, outlet_y, outlet, wake_x, wake = _sample_solution(reference, grid)
     metadata = reference.metadata
     residuals = np.asarray(metadata.get("solver_residuals", []), dtype=float)
     mesh = metadata.get("mesh", {})

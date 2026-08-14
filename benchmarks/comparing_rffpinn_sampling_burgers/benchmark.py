@@ -54,10 +54,18 @@ def solve_reference():
     domain.area_list[0].define_time((0.0, 1.0), sampling_scheme="uniform", expo_scaling=False)
     result = domain.solve_fem(
         mesh_size=0.02, time_step=0.01, tolerance=1e-8, max_iterations=50,
-        area_sampling_res=EVALUATION_RESOLUTION,
-        bound_sampling_res=EVALUATION_RESOLUTION[0],
     )
-    return result.area_evaluators[0].data_dict, result.metadata
+    area = domain.area_list[0]
+    x_axis = np.linspace(area.ranges[0][0], area.ranges[0][1], EVALUATION_RESOLUTION[0])
+    y_axis = np.linspace(area.ranges[1][0], area.ranges[1][1], EVALUATION_RESOLUTION[1])
+    x, y = np.meshgrid(x_axis, y_axis, indexing="ij")
+    values = result.evaluate(x, y, fields=("u",))
+    data = {
+        "x": x.reshape(-1),
+        "y": y.reshape(-1),
+        "u_ref": np.asarray(values["u"]).reshape(-1),
+    }
+    return data, result.metadata
 
 
 def predict(model, data):

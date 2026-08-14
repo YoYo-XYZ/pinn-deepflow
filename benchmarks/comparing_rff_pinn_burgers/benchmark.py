@@ -82,11 +82,18 @@ def _solve_reference() -> tuple[dict, dict]:
         time_step=FEM_TIME_STEP,
         tolerance=1e-8,
         max_iterations=50,
-        area_sampling_res=EVALUATION_RESOLUTION,
-        bound_sampling_res=EVALUATION_RESOLUTION[0],
     )
     elapsed = time.perf_counter() - start
-    data = reference.area_evaluators[0].data_dict
+    area = domain.area_list[0]
+    x_axis = np.linspace(area.ranges[0][0], area.ranges[0][1], EVALUATION_RESOLUTION[0])
+    y_axis = np.linspace(area.ranges[1][0], area.ranges[1][1], EVALUATION_RESOLUTION[1])
+    x, y = np.meshgrid(x_axis, y_axis, indexing="ij")
+    values = reference.evaluate(x, y, fields=("u",))
+    data = {
+        "x": x.reshape(-1),
+        "y": y.reshape(-1),
+        "u_ref": np.asarray(values["u"]).reshape(-1),
+    }
     metadata = reference.metadata
     summary = {
         "solve_time_s": elapsed,

@@ -13,7 +13,6 @@ if _PROJECT_ROOT not in sys.path:
 
 import deepflow as df
 import deepflow.reference as reference_module
-from deepflow.visualization import Visualizer
 
 
 class _FakeReferenceSolution:
@@ -66,157 +65,59 @@ def _domain_with_pde():
     return area, df.domain(area)
 
 
-def test_solve_fem_returns_reference_group_with_suffixed_fields(fake_reference_solver):
-    area, domain = _domain_with_pde()
+def test_solve_fem_returns_reference_solution_without_sampling(fake_reference_solver):
+    _, domain = _domain_with_pde()
 
     result = domain.solve_fem(
-        area_sampling_res=[3, 4],
-        bound_sampling_res=5,
         mesh_size=0.05,
         boundary_resolution=64,
         max_iterations=7,
     )
 
-    assert isinstance(result, df.GroupEvaluator)
-    assert result.reference_solution is fake_reference_solver.solution
+    assert result is fake_reference_solver.solution
     assert result.metadata["backend"] == "fake"
-    assert len(result.area_evaluators) == 1
-    assert len(result.bound_evaluators) == 4
-
-    area_data = result.area_evaluators[0].data_dict
-    assert {"u_ref", "v_ref", "p_ref", "x", "y"} <= set(area_data)
-    assert not any(
-        key.endswith("_residual") or "loss" in key for key in area_data
-    )
-    assert area_data["u_ref"].shape == area_data["x"].shape
+    values = result.evaluate(np.array([0.25]), np.array([0.5]))
+    np.testing.assert_allclose(values["u"], [0.25])
     assert len(fake_reference_solver.calls) == 1
-    assert fake_reference_solver.calls[0][0]["mesh_size"] == 0.05
-    assert fake_reference_solver.calls[0][0]["boundary_resolution"] == 64
+    assert fake_reference_solver.calls[0][0] == {
+        "mesh_size": 0.05,
+        "boundary_resolution": 64,
+        "time_step": None,
+        "tolerance": 1e-8,
+        "max_iterations": 7,
+    }
 
 
-def test_solve_fem_reuses_existing_coordinates_when_resolutions_are_omitted(
-    fake_reference_solver,
-):
+def test_solve_fem_does_not_require_sampled_coordinates(monkeypatch):
     area, domain = _domain_with_pde()
-    domain.sampling_uniform(
-        bound_sampling_res=[4, 5, 6, 7],
-        area_sampling_res=[[3, 3]],
-    )
-    original_area_x = area.X.clone()
-    original_area_y = area.Y.clone()
-    original_bound_x = [bound.X.clone() for bound in domain.bound_list]
-
-    domain.solve_fem()
-
-    assert np.array_equal(area.X.numpy(), original_area_x.numpy())
-    assert np.array_equal(area.Y.numpy(), original_area_y.numpy())
-    assert all(
-        np.array_equal(bound.X.numpy(), original.numpy())
-        for bound, original in zip(domain.bound_list, original_bound_x)
-    )
-
-
-def test_solve_fem_preserves_existing_time_when_processed_coordinates_are_missing(
-    monkeypatch,
-):
-    solution = _FakeReferenceSolution(transient=True)
-    _FakeReferenceSolver.solution = solution
-    monkeypatch.setattr(reference_module, "ReferenceSolver", _FakeReferenceSolver)
-
-    area = df.rectangle([0, 1], [0, 1])
-    area.define_pde(df.HeatEquation(alpha=0.1))
-    domain = df.domain(area)
-    domain.sampling_uniform(
-        bound_sampling_res=[3, 3, 3, 3],
-        area_sampling_res=[[2, 2]],
-    )
-    for geometry in [*domain.bound_list, area]:
-        geometry.define_time([0.0, 1.0], sampling_scheme="uniform")
-        geometry.process_coordinates()
-    original_time = area.T.clone()
-    area.X_ = None
-    area.Y_ = None
-
-    result = domain.solve_fem()
-
-    assert np.array_equal(
-        result.area_evaluators[0].data_dict["t"],
-        original_time.numpy(),
-    )
-
-
-def test_solve_fem_regenerates_time_when_resampling_is_requested(monkeypatch):
-    solution = _FakeReferenceSolution(transient=True)
-    _FakeReferenceSolver.solution = solution
-    monkeypatch.setattr(reference_module, "ReferenceSolver", _FakeReferenceSolver)
-
-    area = df.rectangle([0, 1], [0, 1])
-    area.define_pde(df.HeatEquation(alpha=0.1))
-    domain = df.domain(area)
-    domain.sampling_uniform(
-        bound_sampling_res=[3, 3, 3, 3],
-        area_sampling_res=[[2, 2]],
-    )
-    for geometry in [*domain.bound_list, area]:
-        geometry.define_time([0.0, 1.0], sampling_scheme="uniform")
-        geometry.process_coordinates()
-        geometry.t = torch.full_like(geometry.X, 0.25)
-        geometry.T = geometry.t
-        geometry.T_ = geometry.t.detach().clone().requires_grad_()
-        geometry.inputs_tensor_dict["t"] = geometry.T_
-
-    result = domain.solve_fem(
-        area_sampling_res=[2, 2],
-        bound_sampling_res=3,
-    )
-
-    regenerated = result.area_evaluators[0].data_dict["t"]
-    assert regenerated.shape == (4,)
-    assert not np.all(regenerated == 0.25)
-    np.testing.assert_allclose(regenerated, np.linspace(0.0, 1.0, 4))
-
-
-def test_solve_fem_accepts_nested_resolutions_for_multiple_areas(
-    fake_reference_solver,
-):
-    area_a = df.rectangle([0, 1], [0, 1])
-    area_b = df.rectangle([2, 3], [0, 1])
-    area_a.define_pde(df.NavierStokes(mu=1.0, rho=1.0))
-    domain = df.domain(area_a, area_b)
-
-    result = domain.solve_fem(
-        area_sampling_res=[[2, 3], [3, 2]],
-        bound_sampling_res=4,
-    )
-
-    assert [evaluator.data_dict["x"].shape[0] for evaluator in result.area_evaluators] == [
-        6,
-        6,
-    ]
-
-
-def test_solve_fem_rejects_unsampled_geometry_before_backend(monkeypatch):
-    area = df.rectangle([0, 1], [0, 1])
-    area.define_pde(df.NavierStokes(mu=1.0, rho=1.0))
-    domain = df.domain(area)
     calls = []
 
-    class ShouldNotRun:
+    class ShouldRun:
         def __init__(self, **kwargs):
             calls.append(("init", kwargs))
 
-        def solve(self, domain):
-            calls.append(("solve", domain))
-            raise AssertionError("backend should not run")
+        def solve(self, solved_domain):
+            calls.append(("solve", solved_domain))
+            return "solution"
 
-    monkeypatch.setattr(reference_module, "ReferenceSolver", ShouldNotRun)
+    monkeypatch.setattr(reference_module, "ReferenceSolver", ShouldRun)
 
-    with pytest.raises(ValueError, match="unsampled domain geometries"):
-        domain.solve_fem()
-    assert calls == []
+    assert domain.solve_fem() == "solution"
+    assert calls[0] == (
+        "init",
+        {
+            "mesh_size": None,
+            "boundary_resolution": 128,
+            "time_step": None,
+            "tolerance": 1e-8,
+            "max_iterations": 200,
+        },
+    )
+    assert calls[1] == ("solve", domain)
+    assert area.X is None
 
 
-def test_reference_refresh_and_time_updates_requery_solution(monkeypatch):
+def test_solve_fem_returns_transient_reference_solution_without_sampling(monkeypatch):
     solution = _FakeReferenceSolution(transient=True)
     _FakeReferenceSolver.solution = solution
     monkeypatch.setattr(reference_module, "ReferenceSolver", _FakeReferenceSolver)
@@ -224,41 +125,15 @@ def test_reference_refresh_and_time_updates_requery_solution(monkeypatch):
     area = df.rectangle([0, 1], [0, 1])
     area.define_pde(df.HeatEquation(alpha=0.1))
     domain = df.domain(area)
-    for geometry in [*domain.bound_list, area]:
-        geometry.define_time([0.0, 1.0], sampling_scheme="uniform")
 
-    result = domain.solve_fem(area_sampling_res=[2, 2], bound_sampling_res=3)
-    evaluator = result.area_evaluators[0]
-    initial_values = evaluator.data_dict["u_ref"].copy()
+    result = domain.solve_fem()
 
-    evaluator.define_time(0.5)
-    assert np.all(evaluator.data_dict["t"] == 0.5)
-    assert not np.array_equal(evaluator.data_dict["u_ref"], initial_values)
-
-    area.sampling_area([3, 2])
-    result.refresh()
-    assert result.area_evaluators[0].data_dict["u_ref"].shape == (6,)
-
-
-def test_reference_group_aggregate_plot_uses_suffixed_field(
-    monkeypatch,
-    fake_reference_solver,
-):
-    area, domain = _domain_with_pde()
-    result = domain.solve_fem(area_sampling_res=[2, 2], bound_sampling_res=3)
-    captured = {}
-
-    def fake_plot_color(self, **kwargs):
-        captured.update(kwargs)
-        return self.data_dict
-
-    monkeypatch.setattr(Visualizer, "plot_color", fake_plot_color)
-    data = result.plot_color("u_ref")
-
-    assert data["u_ref"].shape[0] == sum(
-        evaluator.data_dict["u_ref"].shape[0] for evaluator in result
+    values = result.evaluate(
+        np.array([0.25, 0.75]),
+        np.array([0.5, 0.5]),
+        t=np.array([0.0, 1.0]),
     )
-    assert captured["color_axis"] == "u_ref"
+    np.testing.assert_allclose(values["u"], [0.25, 1.75])
 
 
 def test_solve_fem_ngsolve_steady_smoke():
@@ -273,12 +148,12 @@ def test_solve_fem_ngsolve_steady_smoke():
         mesh_size=0.75,
         boundary_resolution=8,
         max_iterations=3,
-        area_sampling_res=[3, 3],
-        bound_sampling_res=4,
     )
 
-    assert isinstance(result, df.GroupEvaluator)
-    assert result.area_evaluators[0].data_dict["u_ref"].shape == (9,)
+    assert isinstance(result, df.ReferenceSolution)
+    assert result.metadata["mesh"]["dimension"] == 2
+    values = result.evaluate(np.array([0.5]), np.array([0.5]))
+    assert values["u"].shape == (1,)
 
 
 def test_solve_fem_burgers_is_steady_2d():
@@ -293,16 +168,15 @@ def test_solve_fem_burgers_is_steady_2d():
         mesh_size=0.5,
         boundary_resolution=8,
         max_iterations=5,
-        area_sampling_res=[3, 3],
-        bound_sampling_res=4,
     )
-    solution = result.reference_solution
 
-    assert not solution.is_transient
-    assert not solution.time_from_y
-    assert solution.metadata["mesh"]["dimension"] == 2
-    assert "time_values" not in solution.metadata
-    values = solution.evaluate(np.array([0.25, 0.75]), np.array([0.25, 0.75]))
+    assert not result.is_transient
+    assert not result.time_from_y
+    assert result.metadata["mesh"]["dimension"] == 2
+    assert "time_values" not in result.metadata
+    values = result.evaluate(
+        np.array([0.25, 0.75]), np.array([0.25, 0.75])
+    )
     np.testing.assert_allclose(values["u"], 1.0, atol=1e-8)
 
 
@@ -326,11 +200,8 @@ def test_solve_fem_accepts_external_matching_boundary_conditions():
         mesh_size=0.25,
         boundary_resolution=16,
         max_iterations=25,
-        area_sampling_res=[4, 4],
-        bound_sampling_res=8,
     )
-    solution = result.reference_solution
     x = np.array([-0.75, 0.0, 0.75])
-    values = solution.evaluate(x, np.zeros_like(x))["u"]
+    values = result.evaluate(x, np.zeros_like(x))["u"]
 
     np.testing.assert_allclose(values, -np.sin(np.pi * x), atol=1e-5)

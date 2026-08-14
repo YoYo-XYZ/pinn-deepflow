@@ -27,26 +27,24 @@ def _build_reference_domain():
     return df.domain(build_domain("uvp").area_list[0])
 
 
-def _sample_solution(reference):
-    """Sample the documented FEM solution object on the requested grid."""
-    data = reference.area_evaluators[0].data_dict
-    x = np.unique(np.asarray(data["x"]).reshape(-1))
-    y = np.unique(np.asarray(data["y"]).reshape(-1))
+def _sample_solution(reference, grid):
+    """Query the FEM solution on the requested grid."""
+    x = np.linspace(*CAVITY_X, grid[0])
+    y = np.linspace(*CAVITY_Y, grid[1])
     query_x, query_y = np.meshgrid(x, y, indexing="xy")
-    solution = reference.reference_solution
-    fields = solution.evaluate(query_x, query_y, fields=("u", "v", "p"))
+    fields = reference.evaluate(query_x, query_y, fields=("u", "v", "p"))
 
     pressure_offset = float(
-        solution.evaluate([CAVITY_X[0]], [CAVITY_Y[0]], fields=["p"])["p"][0]
+        reference.evaluate([CAVITY_X[0]], [CAVITY_Y[0]], fields=["p"])["p"][0]
     )
     fields["p"] = np.asarray(fields["p"]) - pressure_offset
 
     vertical_y = np.linspace(*CAVITY_Y, CENTERLINE_POINTS)
-    vertical_u = solution.evaluate(
+    vertical_u = reference.evaluate(
         np.full_like(vertical_y, 0.5), vertical_y, fields=["u"]
     )["u"]
     horizontal_x = np.linspace(*CAVITY_X, CENTERLINE_POINTS)
-    horizontal_v = solution.evaluate(
+    horizontal_v = reference.evaluate(
         horizontal_x, np.full_like(horizontal_x, 0.5), fields=["v"]
     )["v"]
     return (
@@ -61,7 +59,7 @@ def _sample_solution(reference):
     )
 
 
-def _payload(reference, mesh_size, runtime_s):
+def _payload(reference, grid, mesh_size, runtime_s):
     (
         x,
         y,
@@ -71,7 +69,7 @@ def _payload(reference, mesh_size, runtime_s):
         horizontal_x,
         horizontal_v,
         pressure_offset,
-    ) = _sample_solution(reference)
+    ) = _sample_solution(reference, grid)
     metadata = reference.metadata
     residuals = np.asarray(metadata.get("solver_residuals", []), dtype=float)
     mesh = metadata.get("mesh", {})
@@ -111,10 +109,8 @@ def solve_reference(grid, mesh_size, output_path=None):
         boundary_resolution=FEM_BOUNDARY_RESOLUTION,
         tolerance=FEM_TOLERANCE,
         max_iterations=FEM_MAX_ITERATIONS,
-        area_sampling_res=list(grid),
-        bound_sampling_res=FEM_BOUNDARY_RESOLUTION,
     )
-    payload = _payload(reference, mesh_size, time.perf_counter() - start)
+    payload = _payload(reference, grid, mesh_size, time.perf_counter() - start)
     if not payload["converged"]:
         raise RuntimeError("DeepFlow FEM reference did not converge.")
     if output_path is not None:

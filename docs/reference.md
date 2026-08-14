@@ -31,7 +31,7 @@ The main class managing the physics problem.
 - `sampling_R3(bound_sampling_res, area_sampling_res)`: Samples points using R3 refinement.
 - `evaluate(model)`: Returns a structured `GroupEvaluator` for all unique sampled geometries.
 - `solve_fem(...)`: Solves the attached PDE with the optional NGSolve backend
-  and returns a FEM-backed `GroupEvaluator`.
+  and returns a `ReferenceSolution` for direct point queries.
 - `show_setup()`: Plots the domain geometry and boundary conditions.
 - `show_coordinates(display_physics=False)`: Plots the sampled collocation points.
 
@@ -42,23 +42,13 @@ reference = domain.solve_fem(
     mesh_size=0.05,
     boundary_resolution=64,
     max_iterations=200,
-    area_sampling_res=[300, 150],
-    bound_sampling_res=200,
 )
+values = reference.evaluate([0.25, 0.5], [0.5, 0.5])
 ```
 
-`area_sampling_res` and `bound_sampling_res` use uniform sampling. A scalar
-applies to every compatible child; with one `Area`, `[nx, ny]` is accepted;
-with multiple Areas, use one scalar per Area or nested `[nx, ny]` pairs.
-Omitted resolutions reuse existing coordinates. Every unique geometry must
-have coordinates before the FEM backend is started.
-
-The result is a normal bound-first, area-second `GroupEvaluator`. FEM fields
-are stored on each child with a `_ref` suffix (`u_ref`, `v_ref`, `p_ref`,
-`psi_ref`), while coordinates remain `x`, `y`, and `t` when applicable. FEM
-children contain no PINN residual or training-history fields. Solver metadata
-is available as `reference.metadata`, and the underlying advanced
-`ReferenceSolution` is exposed as `reference.reference_solution`.
+The FEM solve does not require DeepFlow point samples. The returned
+`ReferenceSolution` evaluates the FEM fields at any requested coordinates and
+exposes solver metadata through `reference.metadata`.
 
 ### `calc_loss_simple`
 
@@ -224,19 +214,11 @@ Aggregate color plots skip child evaluators that do not contain the requested
 field or coordinate keys. The temporary concatenated data is used only for the
 plot and is not stored on `GroupEvaluator`.
 
-For FEM results, use the suffixed fields on the child evaluators:
+`ReferenceSolver` and `ReferenceSolution` are available for direct point
+queries and `export_npz()`:
 
 ```python
-reference.area_evaluators[0].plot_color("u_ref")
-reference.plot_color("u_ref")
-```
-
-`ReferenceSolver` and `ReferenceSolution` remain available as advanced APIs
-for direct point queries and `export_npz()`:
-
-```python
-solution = reference.reference_solution
-values = solution.evaluate(x, y, t=t)
-solution.export_npz("reference.npz", x=x, y=y, t=t)
+values = reference.evaluate(x, y, t=t)
+reference.export_npz("reference.npz", x=x, y=y, t=t)
 ```
 

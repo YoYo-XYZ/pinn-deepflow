@@ -31,9 +31,8 @@ is recorded in `reference.metadata["pressure_gauge"]`.
 
 ## Usage
 
-The primary FEM workflow returns a geometry-aware `GroupEvaluator`.  It
-uses the existing domain samplers when resolutions are supplied and reuses
-already sampled coordinates otherwise:
+The primary FEM workflow returns a `ReferenceSolution`. It does not require
+DeepFlow point sampling; query the solved fields at any coordinates you need:
 
 ```python
 import numpy as np
@@ -48,16 +47,13 @@ area.define_pde(df.NavierStokes(mu=1.0, rho=1.0))
 reference = domain.solve_fem(
     mesh_size=0.05,
     boundary_resolution=128,
-    area_sampling_res=[300, 150],
-    bound_sampling_res=200,
 )
-reference.area_evaluators[0].plot_color("u_ref")
 print(reference.metadata)
 
-# FEM data is kept per geometry and uses the ``*_ref`` suffix.
-u = reference.area_evaluators[0].data_dict["u_ref"]
-x = reference.area_evaluators[0].data_dict["x"]
-y = reference.area_evaluators[0].data_dict["y"]
+# FEM data is returned by point query.
+x = np.linspace(0.0, 1.0, 300)
+y = np.linspace(0.0, 1.0, 150)
+u = reference.evaluate(x, y, fields=("u",))["u"]
 ```
 
 Heat, wave, and transient Navier–Stokes problems require a time interval and
@@ -66,17 +62,15 @@ stores 100 uniform steps.  Transient `evaluate` calls linearly interpolate
 between snapshots.  `BurgersEquation1D` is treated as a steady 2D equation in
 the `(x, y)` domain and does not require a time interval.
 
-The returned group exposes the advanced point-query and export object as
-`reference.reference_solution`:
+The returned `ReferenceSolution` supports point queries and export directly:
 
 ```python
-solution = reference.reference_solution
-values = solution.evaluate(np.array([0.25, 0.5]), np.array([0.5, 0.5]))
-solution.export_npz("reference.npz", x=[0.25, 0.5], y=[0.5, 0.5])
+values = reference.evaluate(np.array([0.25, 0.5]), np.array([0.5, 0.5]))
+reference.export_npz("reference.npz", x=[0.25, 0.5], y=[0.5, 0.5])
 ```
 
-`ReferenceSolver(...).solve(domain)` remains available when direct access to
-the low-level `ReferenceSolution` is preferred.  The reference object retains
-the FEM fields in memory, so repeated queries do not solve the PDE again.
+`ReferenceSolver(...).solve(domain)` remains available as a lower-level
+alternative. The reference object retains the FEM fields in memory, so
+repeated queries do not solve the PDE again.
 `metadata` contains mesh statistics, iteration counts, residual diagnostics,
 any time values, and convergence status.

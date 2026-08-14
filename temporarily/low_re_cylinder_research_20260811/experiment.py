@@ -113,11 +113,20 @@ def make_reference(mu, eval_grid=(121, 61)):
         boundary_resolution=192,
         tolerance=1e-8,
         max_iterations=300,
-        area_sampling_res=list(eval_grid),
-        bound_sampling_res=241,
     )
     runtime = time.perf_counter() - start
-    data = reference.area_evaluators[0].data_dict
+    area = domain.area_list[0]
+    area.sampling_area(list(eval_grid))
+    x = area.X.detach().cpu().numpy()
+    y = area.Y.detach().cpu().numpy()
+    fields = reference.evaluate(x, y, fields=("u", "v", "p"))
+    data = {
+        "x": x,
+        "y": y,
+        "u_ref": np.asarray(fields["u"]),
+        "v_ref": np.asarray(fields["v"]),
+        "p_ref": np.asarray(fields["p"]),
+    }
     metadata = dict(reference.metadata)
     path = OUT / f"fem_mu_{mu:g}.npz"
     np.savez(
