@@ -1,7 +1,8 @@
 site_name: DeepFlow   # Change to your project name
-repo_url: https://github.com/YoYo-XYZ/deepflow
+site_url: https://yoyo-xyz.github.io/pinn-deepflow/
+repo_url: https://github.com/YoYo-XYZ/pinn-deepflow
 repo_name: GitHub
-edit_uri: edit/main/docs/    # Lets people click "Edit on GitHub"
+edit_uri: edit/dev/docs/    # Lets people click "Edit on GitHub"
 
 theme:
   name: material             # The beautiful theme

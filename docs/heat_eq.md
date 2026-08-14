@@ -197,6 +197,6 @@ prediction.plot_animate('u', range_t = [0.02, 1.02], dt = 0.02, frame_interval=1
 
 
     
-![animation](img/examples/heat_equation.mp4)
+![animation](img/examples/heat_eq_files/heat_equation.mp4)
     
 

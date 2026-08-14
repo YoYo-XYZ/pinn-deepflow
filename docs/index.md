@@ -11,7 +11,7 @@ DeepFlow is a user-friendly framework for solving PDEs, with a focus on fluid dy
 
 ## Table of Contents
 
-- [**Key Features**](#features)
+- [**Key Features**](#key-features)
 - [Current Implementations](#current-implementations)
 - [**Installation**](#installation)
 - [Requirements](#requirements)
@@ -19,7 +19,7 @@ DeepFlow is a user-friendly framework for solving PDEs, with a focus on fluid dy
 - [Examples](#examples)
 - [Contributing](#contributing)
 - [License](#license)
-- [**DeepFlow Milestones**](#future-milestones)
+- [**DeepFlow Milestones**](#deepflow-milestones)
 
 ## Key Features
 
@@ -52,8 +52,8 @@ pip install deepflow
 For development or to build from source:
 
 ```bash
-git clone https://github.com/YoYo-XYZ/deepflow.git
-cd deepflow
+git clone https://github.com/YoYo-XYZ/pinn-deepflow.git
+cd pinn-deepflow
 pip install -e .
 ```
 
@@ -135,18 +135,18 @@ _ =prediction.plot_loss_curve()
 
 ## Examples
 
-Explore the [examples](examples)
+Explore the [examples](examples.md)
  directory for real use cases, including
 
 Steady-state:
-- [Steady flow around a cylinder](examples/cylinder_flow_steady)
-- [Lid-driven cavity flow](examples/cavity_flow_steady)
-- [Backward-facing step flow](examples/BFS_flow_steady)
-- [Burgers' Equation](examples/burgers_eq)
+- [Steady flow around a cylinder](cylinder_flow_steady.md)
+- [Lid-driven cavity flow](cavity_flow_steady.md)
+- [Backward-facing step flow](BFS_flow_steady.md)
+- [Burgers' Equation](burgers_eq.md)
 
 Time-dependent:
-- [Transient channel flow](examples/channel_flow_transient)
-- [Fourier Heat Equation](examples/heat_eq)
+- [Transient channel flow](channel_flow_transient.md)
+- [Fourier Heat Equation](heat_eq.md)
 
 ## Contributing
 
@@ -162,4 +162,4 @@ Feel free to submit a Pull Request. For major changes, open an issue first to di
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/YoYo-XYZ/pinn-deepflow/blob/dev/LICENSE) file for details.
