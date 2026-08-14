@@ -60,7 +60,7 @@ for i in range(10):
             print_every=200)
 
     import numpy as np
-    with open('../../EXPERIMENTS/burger_sol/burgers_solution.txt', 'r') as f:
+    with open('../../EXPERIMENTS/burgers_reference_solution/burgers_solution.txt', 'r') as f:
         data = np.loadtxt(f)
     x, y, u = data[:, 0], data[:, 1], data[:, 2]
 
