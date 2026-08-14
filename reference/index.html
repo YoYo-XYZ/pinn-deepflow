@@ -1301,7 +1301,7 @@ The main class managing the physics problem.</p>
 - <code>sampling_R3(bound_sampling_res, area_sampling_res)</code>: Samples points using R3 refinement.
 - <code>evaluate(model)</code>: Returns a structured <code>GroupEvaluator</code> for all unique sampled geometries.
 - <code>solve_fem(...)</code>: Solves the attached PDE with the optional NGSolve backend
-  and returns a FEM-backed <code>GroupEvaluator</code>.
+  and returns a <code>ReferenceSolution</code> for direct point queries.
 - <code>show_setup()</code>: Plots the domain geometry and boundary conditions.
 - <code>show_coordinates(display_physics=False)</code>: Plots the sampled collocation points.</p>
 <p>The primary FEM workflow is:</p>
@@ -1309,21 +1309,12 @@ The main class managing the physics problem.</p>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">mesh_size</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">boundary_resolution</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">max_iterations</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">area_sampling_res</span><span class="o">=</span><span class="p">[</span><span class="mi">300</span><span class="p">,</span> <span class="mi">150</span><span class="p">],</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">bound_sampling_res</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">)</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">evaluate</span><span class="p">([</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
 </code></pre></div>
-<p><code>area_sampling_res</code> and <code>bound_sampling_res</code> use uniform sampling. A scalar
-applies to every compatible child; with one <code>Area</code>, <code>[nx, ny]</code> is accepted;
-with multiple Areas, use one scalar per Area or nested <code>[nx, ny]</code> pairs.
-Omitted resolutions reuse existing coordinates. Every unique geometry must
-have coordinates before the FEM backend is started.</p>
-<p>The result is a normal bound-first, area-second <code>GroupEvaluator</code>. FEM fields
-are stored on each child with a <code>_ref</code> suffix (<code>u_ref</code>, <code>v_ref</code>, <code>p_ref</code>,
-<code>psi_ref</code>), while coordinates remain <code>x</code>, <code>y</code>, and <code>t</code> when applicable. FEM
-children contain no PINN residual or training-history fields. Solver metadata
-is available as <code>reference.metadata</code>, and the underlying advanced
-<code>ReferenceSolution</code> is exposed as <code>reference.reference_solution</code>.</p>
+<p>The FEM solve does not require DeepFlow point samples. The returned
+<code>ReferenceSolution</code> evaluates the FEM fields at any requested coordinates and
+exposes solver metadata through <code>reference.metadata</code>.</p>
 <h3 id="calc_loss_simple"><code>calc_loss_simple</code></h3>
 <p><div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">calc_loss_simple</span><span class="p">(</span><span class="n">domain</span><span class="p">:</span> <span class="n">ProblemDomain</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">callable</span>
 </code></pre></div>
@@ -1441,15 +1432,10 @@ fields from different physics types into one data dictionary.</p>
 <p>Aggregate color plots skip child evaluators that do not contain the requested
 field or coordinate keys. The temporary concatenated data is used only for the
 plot and is not stored on <code>GroupEvaluator</code>.</p>
-<p>For FEM results, use the suffixed fields on the child evaluators:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">reference</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s2">&quot;u_ref&quot;</span><span class="p">)</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">reference</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s2">&quot;u_ref&quot;</span><span class="p">)</span>
-</code></pre></div>
-<p><code>ReferenceSolver</code> and <code>ReferenceSolution</code> remain available as advanced APIs
-for direct point queries and <code>export_npz()</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">solution</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">values</span> <span class="o">=</span> <span class="n">solution</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">solution</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+<p><code>ReferenceSolver</code> and <code>ReferenceSolution</code> are available for direct point
+queries and <code>export_npz()</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">reference</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
 </code></pre></div>
 
 
