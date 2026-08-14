@@ -8,6 +8,7 @@ theme:
   name: material             # The beautiful theme
   features:
     - content.code.copy      # Copy button on code blocks
+    - content.action.edit    # Edit this page on GitHub
     - navigation.tabs        # Top tabs if you want
     - navigation.sections
     - search.suggest
