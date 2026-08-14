@@ -1,0 +1,26 @@
+{
+  "skill_name": "deepflow-api",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Build a complete, runnable steady 2D channel-flow example with DeepFlow. Use rectangle geometry, explicit inlet/wall/outlet boundary conditions, Navier-Stokes physics, reproducible sampling, a PINN trained with Adam followed by L-BFGS, and velocity-field visualization. Keep the training configuration small enough for a smoke test and explain how to scale it up.",
+      "expected_output": "A self-contained Python script or notebook-ready code using only DeepFlow's public API, with correctly aligned geometry, boundary-condition, PDE, model, sampling, training, best-model, and evaluation steps.",
+      "files": [],
+      "expectations": []
+    },
+    {
+      "id": 2,
+      "prompt": "Build a complete transient 2D heat-equation example with DeepFlow. Use one area for the PDE and a separate area for the initial condition, configure time coordinates, use LHS or random sampling, include an R3 resampling callback, train a PINN with x/y/t input and u output, and evaluate the temperature at a selected time.",
+      "expected_output": "A runnable transient DeepFlow workflow that configures time on all relevant geometries, uses the correct HeatEquation and model variable contract, performs initial sampling before R3, trains with Adam and optionally L-BFGS, and evaluates a time-specific field.",
+      "files": [],
+      "expectations": []
+    },
+    {
+      "id": 3,
+      "prompt": "Build a DeepFlow Burgers-equation example using a functional boundary condition, explicit x/y-to-u model mappings, a reproducible seed, LHS sampling, best-model persistence, and residual visualization. Include an optional FEM reference comparison only if it is supported by the current public API and clearly separate the optional dependency.",
+      "expected_output": "A complete BurgersEquation1D example using the public DeepFlow API, including the callable boundary-condition syntax, correct geometry/model/PDE contracts, best-model saving/loading, residual plotting, and an accurate optional ReferenceSolution workflow.",
+      "files": [],
+      "expectations": []
+    }
+  ]
+}
