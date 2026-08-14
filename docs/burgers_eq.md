@@ -132,7 +132,7 @@ model1, model1_best = model0.train_adam(
 
 
 ```python
-model2 = model1_best.train_lbfgs(calc_loss = df.calc_loss_simple(domain), epochs=500, do_between_epochs=do_in_lbfgs)
+_, model2 = model1_best.train_lbfgs(calc_loss = df.calc_loss_simple(domain), epochs=500, do_between_epochs=do_in_lbfgs)
 ```
 
     Epoch: 3945, total_loss: 0.00049, bc_loss: 0.00009, pde_loss: 0.00041

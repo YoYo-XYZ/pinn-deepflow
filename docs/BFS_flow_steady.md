@@ -13,11 +13,13 @@ df.manual_seed(69) # for reproducibility
     
 
 ## 1. Define Geometry Domain
-Set up the computational domain: a rectangle with a circular obstacle (cylinder). This defines the area for simulation.
+Set up the six-boundary backward-facing-step channel. This defines the area for simulation.
 
 
 ```python
-rectangle = df.geometry.rectangle(0, 5)
+rectangle = df.geometry.polygon(
+    [0, 0.4], [0, 1], [5, 1], [5, 0], [1, 0], [1, 0.4]
+)
 ```
 
 
@@ -117,7 +119,7 @@ Refine the model using LBFGS for higher precision.
 
 ```python
 # Train the model
-model2 = model1best.train_lbfgs(
+_, model2 = model1best.train_lbfgs(
     calc_loss=df.calc_loss_simple(domain),
     epochs=350,
     threshold_loss=0.0001,

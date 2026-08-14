@@ -119,7 +119,7 @@ Refine the model using LBFGS for higher precision.
 
 ```python
 # Train the model
-model2 = model1best.train_lbfgs(
+_, model2 = model1best.train_lbfgs(
     calc_loss=df.calc_loss_simple(domain),
     epochs=350,
     threshold_loss=0.0001,

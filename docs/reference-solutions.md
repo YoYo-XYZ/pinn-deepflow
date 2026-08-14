@@ -51,8 +51,11 @@ reference = domain.solve_fem(
 print(reference.metadata)
 
 # FEM data is returned by point query.
-x = np.linspace(0.0, 1.0, 300)
-y = np.linspace(0.0, 1.0, 150)
+x, y = np.meshgrid(
+    np.linspace(0.0, 1.0, 300),
+    np.linspace(0.0, 1.0, 150),
+    indexing="ij",
+)
 u = reference.evaluate(x, y, fields=("u",))["u"]
 ```
 

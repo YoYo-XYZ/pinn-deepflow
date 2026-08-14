@@ -118,7 +118,7 @@ Refine the model using LBFGS for higher precision.
 
 ```python
 # Train the model
-model2 = model1best.train_lbfgs(
+_, model2 = model1best.train_lbfgs(
     calc_loss=df.calc_loss_simple(domain),
     epochs=450,
     threshold_loss=0.0001,
@@ -281,4 +281,31 @@ u_data = bound_visual.data_dict['u']
 import numpy as np
 array = np.column_stack((x_data, y_data, u_data))
 np.savetxt('outlet_velocity.txt', array)
+```
+
+## 5. FEM reference comparison
+
+The optional NGSolve backend returns a direct `ReferenceSolution`. Sample the
+same area coordinates used for the PINN visualization, query the FEM field,
+and compare the velocity fields:
+
+```python
+import numpy as np
+
+fem_reference = domain.solve_fem(
+    mesh_size=0.05,
+    boundary_resolution=64,
+    max_iterations=200,
+)
+area_x, area_y = area.sampling_area([300, 150])
+fem_x = area_x.detach().cpu().numpy()
+fem_y = area_y.detach().cpu().numpy()
+fem_values = fem_reference.evaluate(fem_x, fem_y, fields=['u'])
+fem_area = df.Visualizer({'x': fem_x, 'y': fem_y, 'u_ref': fem_values['u']})
+print(fem_reference.metadata)
+_ = fem_area.plot_color('u_ref', s=2, cmap='rainbow')
+
+pinn_area = domain.area_list[0].evaluate(model2)
+u_error = np.mean(np.abs(pinn_area.data_dict['u'] - fem_area.data_dict['u_ref']))
+print('mean absolute u error:', u_error)
 ```

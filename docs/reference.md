@@ -129,8 +129,8 @@ class PINN(width, length, input_vars, output_vars, activation=nn.Tanh())
 Physics-Informed Neural Network model.
 
 **Methods:**
-- `train_adam(calc_loss, learning_rate, epochs, ...)`: Train using Adam optimizer.
-- `train_lbfgs(calc_loss, epochs, ...)`: Train using L-BFGS optimizer.
+- `train_adam(calc_loss, learning_rate, epochs, ...)`: Train using Adam optimizer and return `(model, best_model)`.
+- `train_lbfgs(calc_loss, epochs, ...)`: Train using L-BFGS optimizer and return `(model, best_model)`.
 - `save_as_pickle(path)`: Save model.
 - `load_from_pickle(path)`: Load model.
 
