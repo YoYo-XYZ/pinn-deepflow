@@ -1,11 +1,10 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
-try:
-    import ultraplot as plt
-except ImportError:
-    import matplotlib.pyplot as plt
 import numpy as np
+import ultraplot as plt
 from scipy import interpolate
+from scipy.spatial import QhullError
+
 
 class Visualizer:
     """
@@ -26,7 +25,7 @@ class Visualizer:
         fig, ax = plt.subplot(refwidth = (self.refwidth_default if ref_width is None else ref_width), refheight = ref_height)
         return fig, ax
 
-    def plot_color(self, color_axis:str, x_axis:str = 'x', y_axis:str = 'y', cmap = 'viridis', s: Union[int, float] = 2, orientation: str = 'vertical', return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
+    def plot_color(self, color_axis: str, x_axis: str = 'x', y_axis: str = 'y', cmap='viridis', s: Union[int, float] = 2, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
         Creates scatter plots (heatmap style) for the specified keys.
         """
@@ -51,9 +50,9 @@ class Visualizer:
     def plot(self, z_axis: str = None, x_axis:str = 'x', y_axis:str = 'y', return_ax: bool = False, color = None) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
         General plotting method.
-        If axis='xy': 3D surface plot.
-        If axis='x' or 'y': 1D line plot against that axis.
-        """    
+        With ``z_axis`` set, creates a 3-D scatter plot; otherwise creates a
+        1-D line plot using ``x_axis`` and ``y_axis``.
+        """
         if z_axis is None:
             fig, ax = self._create_subplot()
             # Line Plot
@@ -67,7 +66,7 @@ class Visualizer:
             scatter = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], self.data_dict[z_axis], c=self.data_dict[z_axis], cmap=self.cmap_default if color is None else color, s=3)
             ax.set(xlabel=x_axis, ylabel=y_axis)
             ax.set_title(f'3D Scatter Plot of {z_axis}')
-            colorbar = fig.colorbar(scatter, ax=ax)
+            fig.colorbar(scatter, ax=ax)
 
         if return_ax:
             return fig, ax
@@ -87,7 +86,7 @@ class Visualizer:
 
     def plot_loss_curve(self, log_scale: bool = True, 
                         start: int = 0, end: Optional[int] = None, 
-                        keys: List[str] = ['total_loss', 'bc_loss', 'pde_loss'], return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
+                        keys: Tuple[str, ...] = ('total_loss', 'bc_loss', 'pde_loss'), return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
         Plots loss per iteration.
         """
@@ -96,10 +95,13 @@ class Visualizer:
         # Plot
         for key in keys:
             if key in self.data_dict:
-                ax.plot(self.data_dict[key][start:end], label=key)
+                values = np.asarray(self.data_dict[key]).reshape(-1)
+                iterations = np.arange(values.size)[start:end]
+                ax.plot(iterations, values[start:end], label=key)
 
         # Styling
-        if log_scale: ax.set_yscale("log")
+        if log_scale:
+            ax.set_yscale("log")
         ax.format(title = "Loss per Iteration", xlabel = "Iteration", ylabel = "Loss")
         ax.legend()  
         
@@ -107,14 +109,12 @@ class Visualizer:
             return fig, ax
         return fig
     
-### Need interpolation ####
-
     def plot_contour(self, color_axis:str, x_axis:str = 'x', y_axis:str = 'y', cmap = 'jet', levels = 50, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
-        Creates scatter plots (heatmap style) for the specified keys.
+        Creates a filled contour plot for the specified field.
         """
         fig, ax = self._create_subplot()
-        (C), (X, Y) = self._interpolate(color_axis , x_key = x_axis, y_key = y_axis)
+        (C,), (X, Y) = self._interpolate(color_axis, x_key=x_axis, y_key=y_axis)
 
         # Plot
         scatter = ax.contourf(X, Y, C, cmap=cmap, levels = levels)
@@ -131,11 +131,11 @@ class Visualizer:
     
     def plot_streamline(self, u:str, v:str, x_axis:str = 'x', y_axis:str = 'y', cmap = 'viridis', levels = 100, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
-        Creates scatter plots (heatmap style) for the specified keys.
+        Creates a streamline plot for two interpolated vector components.
         """
         fig, ax = self._create_subplot()
 
-        (U, V), (X, Y) = self._interpolate(u, v , x_key = x_axis, y_key = y_axis, points=2000)
+        (U, V), (X, Y) = self._interpolate(u, v, x_key=x_axis, y_key=y_axis, points=2000)
 
         # Plot
         stream = ax.streamplot(X, Y, U, V, color = (U**2 + V**2)**0.5, cmap = cmap, levels = levels, broken_streamlines = False)
@@ -150,20 +150,56 @@ class Visualizer:
             return fig, ax
         return fig
 
-    def _interpolate(self, *keys, x_key = 'x', y_key='y', points = None):
+    def _interpolate(self, *keys, x_key='x', y_key='y', points=None):
         """
-        Interpolates scattered data onto a grid for surface plotting.
+        Interpolate scattered fields onto a rectangular grid.
         """
-        x = self.data_dict[x_key]
-        y = self.data_dict[y_key]
-        ratio = (np.max(y) - np.min(y)) / (np.max(x) - np.min(x))
-        
-        if points is None: points = len(x)
-        n_x = int(np.sqrt(points / ratio))
-        n_y = int(ratio * n_x)
+        x = np.asarray(self.data_dict[x_key]).reshape(-1)
+        y = np.asarray(self.data_dict[y_key]).reshape(-1)
 
-        xi = np.linspace(np.min(x), np.max(x), n_x)
-        yi = np.linspace(np.min(y), np.max(y), n_y)
+        if x.size == 0 or y.size == 0:
+            raise ValueError("Interpolation requires non-empty x and y coordinates.")
+        if x.size != y.size:
+            raise ValueError("Interpolation requires x and y coordinates with equal lengths.")
+        if x.size < 3:
+            raise ValueError("Interpolation requires at least three 2-D samples.")
+        if not np.isfinite(x).all() or not np.isfinite(y).all():
+            raise ValueError("Interpolation requires finite x and y coordinates.")
+
+        x_range = np.ptp(x)
+        y_range = np.ptp(y)
+        if x_range <= 0 or y_range <= 0:
+            raise ValueError("Interpolation requires varying x and y coordinates.")
+
+        points = x.size if points is None else int(points)
+        if points < 4:
+            raise ValueError("Interpolation requires enough points for a 2x2 grid.")
+
+        fields = []
+        for key in keys:
+            field = np.asarray(self.data_dict[key]).reshape(-1)
+            if field.size != x.size:
+                raise ValueError(
+                    f"Interpolation field {key!r} must match the coordinate length."
+                )
+            fields.append(field)
+
+        ratio = y_range / x_range
+        n_x = max(2, int(np.sqrt(points / ratio)))
+        n_y = max(2, int(ratio * n_x))
+
+        xi = np.linspace(x.min(), x.max(), n_x)
+        yi = np.linspace(y.min(), y.max(), n_y)
         X, Y = np.meshgrid(xi, yi)
 
-        return [interpolate.griddata((x, y), self.data_dict[key], (X, Y), method='cubic') for key in keys], (X, Y)
+        try:
+            values = [
+                interpolate.griddata((x, y), field, (X, Y), method='cubic')
+                for field in fields
+            ]
+        except QhullError as exc:
+            raise ValueError(
+                "Cubic interpolation requires non-collinear 2-D samples."
+            ) from exc
+
+        return values, (X, Y)

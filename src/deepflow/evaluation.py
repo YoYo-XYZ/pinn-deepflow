@@ -2,10 +2,7 @@ from typing import List, Union, Dict, Any, Optional
 
 import torch
 import numpy as np
-try:
-    import ultraplot as plt
-except ImportError:
-    import matplotlib.pyplot as plt
+import ultraplot as plt
 
 # Explicit imports are better for open source
 from .nn import PINN 
@@ -648,7 +645,6 @@ class GroupEvaluator:
             "y_axis",
             "cmap",
             "s",
-            "orientation",
             "return_ax",
         )
         values = {
@@ -657,7 +653,6 @@ class GroupEvaluator:
             "y_axis": "y",
             "cmap": "viridis",
             "s": 2,
-            "orientation": "vertical",
             "return_ax": False,
         }
 

@@ -10,9 +10,9 @@ _PROJECT_ROOT = os.path.abspath(
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-import deepflow as df
-import deepflow.utility as _df_util
-from deepflow.visualization import Visualizer
+import deepflow as df  # noqa: E402
+import deepflow.utility as _df_util  # noqa: E402
+from deepflow.visualization import Visualizer  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -222,7 +222,6 @@ def test_group_plot_color_aggregates_all_compatible_children(monkeypatch):
         "y_axis": "y",
         "cmap": "viridis",
         "s": 3,
-        "orientation": "vertical",
         "return_ax": True,
     }
     assert not hasattr(group, "data_dict")
