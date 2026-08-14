@@ -217,9 +217,9 @@ class PhysicsAttach:
     # Model Execution & Loss Calculation
     # --------------------------------------------------------------------------
 
-    def calc_output(self, model: nn.Module = None) -> Dict[str, torch.Tensor]:
+    def calc_output(self) -> Dict[str, torch.Tensor]:
         """
-        Post-process the model's output to match target conditions.
+        Post-process cached model outputs to match target conditions.
         Handles derivative constraints (e.g., if key is 'u_x').
 
         Uses ``self.model_inputs`` (not ``self.inputs_tensor_dict``) for
@@ -243,9 +243,9 @@ class PhysicsAttach:
                 
         return pred_dict
     
-    def calc_loss(self, model: nn.Module, loss_fn: Callable = nn.MSELoss()) -> torch.Tensor:
+    def calc_loss(self, model: nn.Module) -> torch.Tensor:
         """
-        Calculate the total loss for the current physics type.
+        Calculate the mean per-point sum of squared residual components.
         """
         self.calc_residual_field(model)
         self.loss = torch.mean(self.residual_field_raw.square().sum(dim=0))
