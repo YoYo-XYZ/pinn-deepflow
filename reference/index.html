@@ -1404,19 +1404,29 @@ reproducible through <code>df.manual_seed(...)</code>.</p>
 <p>Returned by <code>domain.area_list[i].evaluate(model)</code>.</p>
 <p><strong>Methods:</strong>
 - <code>sampling_area(res_list)</code>: Sample points for visualization.
+- <code>expr</code>: Define persistent lazy expressions between data fields.
 - <code>plot(key)</code>: Plot a variable.
 - <code>plot_color(key)</code>: Plot a variable as a color map.
 - <code>plot_streamline(u, v)</code>: Plot streamlines.
 - <code>plot_loss_curve()</code>: Plot loss history.
 - <code>plot_animate(...)</code>: Create animation (for transient problems).</p>
+<p>Derived fields can be defined with normal arithmetic syntax. Expressions are
+stored and recomputed after resampling, time updates, or <code>postprocess()</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">fields</span> <span class="o">=</span> <span class="n">area_prediction</span><span class="o">.</span><span class="n">expr</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">fields</span><span class="p">[</span><span class="s2">&quot;v_magnitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="s2">&quot;u&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">fields</span><span class="p">[</span><span class="s2">&quot;v&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">fields</span><span class="p">[</span><span class="s2">&quot;energy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">fields</span><span class="p">[</span><span class="s2">&quot;v_magnitude&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span>
+</code></pre></div>
+<p>NumPy ufuncs and <code>np.where()</code> are also supported. The existing
+<code>evaluation["u"]</code> and <code>evaluation["name"] = values</code> APIs continue to return
+and store materialized NumPy arrays.</p>
 <h3 id="groupevaluator"><code>GroupEvaluator</code></h3>
 <p>Returned by <code>domain.evaluate(model)</code>.</p>
 <p><code>GroupEvaluator</code> keeps one <code>Evaluator</code> per unique geometry instead of merging
 fields from different physics types into one data dictionary.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">results</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">area_prediction</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="n">bound_prediction</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">get_evaluator</span><span class="p">(</span><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">results</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">area_prediction</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">bound_prediction</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">get_evaluator</span><span class="p">(</span><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 </code></pre></div>
 <p><strong>Attributes and methods:</strong>
 - <code>area_evaluators</code>: Evaluators aligned with the unique entries in <code>domain.area_list</code>.
@@ -1434,8 +1444,8 @@ field or coordinate keys. The temporary concatenated data is used only for the
 plot and is not stored on <code>GroupEvaluator</code>.</p>
 <p><code>ReferenceSolver</code> and <code>ReferenceSolution</code> are available for direct point
 queries and <code>export_npz()</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">reference</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">reference</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
 </code></pre></div>
 
 
