@@ -257,7 +257,8 @@ class WaveEquation(PDE):
 
 class BurgersEquation1D(PDE):
     """
-    1D Burgers' Equation: u_t + u * u_x = nu * u_xx
+    Steady 2D Burgers equation in the x-y domain:
+    u_y + u * u_x = nu * u_xx.
     """
     def __init__(self, nu: float):
         super().__init__()

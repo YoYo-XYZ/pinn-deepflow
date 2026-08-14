@@ -120,7 +120,8 @@ evaluation for plotting streamlines.
 ```python
 class BurgersEquation1D(nu)
 ```
-1D Burgers' equation.
+Steady 2D Burgers equation in the `(x, y)` domain,
+`u_y + u * u_x = nu * u_xx`.
 
 ### `HeatEquation`
 ```python

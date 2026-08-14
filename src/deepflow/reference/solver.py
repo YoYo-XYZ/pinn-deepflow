@@ -214,19 +214,6 @@ def _condition_to_cf(ngs, condition, x_symbol, y_symbol, coordinate_ranges=None)
         )
 
 
-def _condition_to_cf_1d(ngs, condition, x_symbol, x_range=None):
-    if _is_number(condition):
-        return ngs.CoefficientFunction(float(condition))
-    variable, function = condition
-    if variable == "x":
-        try:
-            return ngs.CoefficientFunction(function(x_symbol))
-        except Exception:
-            ranges = {0: x_range or (-1.0, 1.0), 1: (0.0, 0.0)}
-            return _polynomial_condition_cf(ngs, function, x_symbol, "x", ranges)
-    return ngs.CoefficientFunction(_numeric_function_value(function, 0.0))
-
-
 def _set_boundary_values(
     ngs,
     mesh,
@@ -281,22 +268,14 @@ def _set_initial_field(
     grid_function,
     condition,
     *,
-    one_dimensional=False,
     mesh=None,
     coordinate_ranges=None,
 ):
     if mesh is None:
         raise ValueError("An NGSolve mesh is required for initial field projection.")
-    if one_dimensional:
-        coefficient = _condition_to_cf_1d(
-            ngs, condition, ngs.x,
-            None if coordinate_ranges is None else coordinate_ranges[0],
-        )
-        grid_function.Set(coefficient)
-    else:
-        _assign_gridfunction_condition(
-            ngs, grid_function, condition, coordinate_ranges
-        )
+    _assign_gridfunction_condition(
+        ngs, grid_function, condition, coordinate_ranges
+    )
 
 
 def _copy_grid_function(ngs, grid_function, fes):
@@ -361,38 +340,11 @@ def _initial_conditions(domain):
     return initial
 
 
-def _burgers_initial_from_boundary(domain, start_time):
-    candidates = []
-    for item in _all_geometries(domain):
-        if not isinstance(item, Bound) or getattr(item, "physics_type", None) not in ("BC", "IC"):
-            continue
-        y_range = item.ranges.get(1)
-        x_range = item.ranges.get(0)
-        if y_range is None or x_range is None:
-            continue
-        if abs(float(y_range[0]) - start_time) <= 1.0e-7 * max(1.0, abs(start_time)) and abs(
-            float(y_range[1]) - start_time
-        ) <= 1.0e-7 * max(1.0, abs(start_time)):
-            if float(x_range[1]) - float(x_range[0]) > 0 and "u" in (item.condition_dict or {}):
-                candidates.append(item.condition_dict["u"])
-    return candidates[0] if candidates else None
-
-
 def _make_solution_evaluator(mesh):
     def evaluate(field, x, y):
         values = np.empty(x.size, dtype=float)
         for index, (x_value, y_value) in enumerate(zip(x.flat, y.flat)):
             values[index] = float(np.real(field(mesh(float(x_value), float(y_value)))))
-        return values
-
-    return evaluate
-
-
-def _make_one_dimensional_evaluator(mesh):
-    def evaluate(field, x, y):
-        values = np.empty(x.size, dtype=float)
-        for index, x_value in enumerate(x.flat):
-            values[index] = float(np.real(field(mesh(float(x_value)))))
         return values
 
     return evaluate
@@ -452,22 +404,32 @@ class ReferenceSolver:
             domain,
             pde_area,
             supported,
-            transient=isinstance(pde, (NavierStokes, HeatEquation, WaveEquation, BurgersEquation1D)),
+            transient=isinstance(pde, (NavierStokes, HeatEquation, WaveEquation)),
         )
 
-        interval = _time_interval(domain, pde_area)
+        interval = (
+            None
+            if isinstance(pde, BurgersEquation1D)
+            else _time_interval(domain, pde_area)
+        )
         if isinstance(pde, StreamFunctionNavierStokes) and interval is not None:
             raise ReferenceConfigurationError(
                 "StreamFunctionNavierStokes supports steady reference problems only."
             )
-        if isinstance(pde, (HeatEquation, WaveEquation, BurgersEquation1D)) and interval is None:
+        if isinstance(pde, (HeatEquation, WaveEquation)) and interval is None:
             raise ReferenceConfigurationError(
                 f"{pde.__class__.__name__} reference problems require a time interval."
             )
 
         ngs = _load_ngsolve()
         if isinstance(pde, BurgersEquation1D):
-            solution = self._solve_burgers(domain, pde_area, pde, interval, ngs)
+            mesh_size = self.mesh_size or _default_mesh_size(pde_area)
+            adapter = NetgenGeometryAdapter(self.boundary_resolution)
+            geometry = adapter.build(pde_area, ngs, mesh_size)
+            boundary_conditions = _collect_boundary_conditions(domain, pde_area, geometry)
+            solution = self._solve_burgers(
+                pde_area, pde, geometry, boundary_conditions, ngs
+            )
         else:
             mesh_size = self.mesh_size or _default_mesh_size(pde_area)
             adapter = NetgenGeometryAdapter(self.boundary_resolution)
@@ -514,12 +476,11 @@ class ReferenceSolver:
         return metadata
 
     def _solve_scalar_initial(
-        self, ngs, fes, condition, *, one_dimensional=False, mesh=None,
-        coordinate_ranges=None
+        self, ngs, fes, condition, *, mesh=None, coordinate_ranges=None
     ):
         field = ngs.GridFunction(fes)
         _set_initial_field(
-            ngs, field, condition, one_dimensional=one_dimensional, mesh=mesh,
+            ngs, field, condition, mesh=mesh,
             coordinate_ranges=coordinate_ranges,
         )
         return field
@@ -925,146 +886,72 @@ class ReferenceSolver:
             field_evaluator=_make_solution_evaluator(geometry.mesh),
         )
 
-    def _make_burgers_mesh(self, ngs, x_range, mesh_size):
-        from netgen.meshing import Element0D, Element1D, FaceDescriptor, Mesh as NetgenMesh, MeshPoint, Pnt
-
-        count = max(2, int(math.ceil((x_range[1] - x_range[0]) / mesh_size)))
-        netgen_mesh = NetgenMesh(dim=1)
-        descriptor = FaceDescriptor(surfnr=1, domin=1, domout=0, bc=0)
-        descriptor.bcname = "default"
-        netgen_mesh.Add(descriptor)
-        points = [
-            netgen_mesh.Add(MeshPoint(Pnt(float(value), 0.0, 0.0)))
-            for value in np.linspace(x_range[0], x_range[1], count + 1)
-        ]
-        for first, second in zip(points[:-1], points[1:]):
-            netgen_mesh.Add(Element1D([first, second], index=1))
-        netgen_mesh.Add(Element0D(points[0], index=1))
-        netgen_mesh.Add(Element0D(points[-1], index=1))
-        netgen_mesh.AddRegion("spatial", 1)
-        return ngs.Mesh(netgen_mesh)
-
-    def _solve_burgers(self, domain, pde_area, pde, interval, ngs):
-        x_range = tuple(float(value) for value in pde_area.ranges[0])
-        mesh_size = self.mesh_size or (x_range[1] - x_range[0]) / 40.0
-        mesh = self._make_burgers_mesh(ngs, x_range, mesh_size)
-        initial = _initial_conditions(domain)
-        if "u" not in initial:
-            initial["u"] = _burgers_initial_from_boundary(domain, interval[0])
-        if initial.get("u") is None:
-            raise ReferenceConfigurationError(
-                "BurgersEquation1D reference solutions require an initial u value "
-                "on an IC geometry or the lower y boundary."
-            )
-
-        # The existing DeepFlow convention has x as space and y as time.  A
-        # one-dimensional mesh is therefore sufficient for every time slice.
-        boundary_values = {"left": None, "right": None}
-        midpoint = 0.5 * (x_range[0] + x_range[1])
-        for item in _all_geometries(domain):
-            if not isinstance(item, Bound) or getattr(item, "physics_type", None) != "BC":
-                continue
-            x_bounds, y_bounds = item.ranges.get(0), item.ranges.get(1)
-            if x_bounds is None or y_bounds is None or y_bounds[1] - y_bounds[0] <= 1.0e-8:
-                continue
-            if abs(x_bounds[0] - x_range[0]) <= 1.0e-7 and "u" in (item.condition_dict or {}):
-                boundary_values["left"] = item.condition_dict["u"]
-            if abs(x_bounds[1] - x_range[1]) <= 1.0e-7 and "u" in (item.condition_dict or {}):
-                boundary_values["right"] = item.condition_dict["u"]
-
-        labels = ["default"] if any(value is not None for value in boundary_values.values()) else []
-        fes = _make_scalar_fes(ngs, mesh, labels)
-        old = self._solve_scalar_initial(
-            ngs, fes, initial["u"], one_dimensional=True, mesh=mesh,
-            coordinate_ranges=(x_range, pde_area.ranges[1]),
+    def _solve_burgers(
+        self, pde_area, pde, geometry, boundary_conditions, ngs
+    ):
+        labels = _field_labels(boundary_conditions, ["u"])
+        fes = _make_scalar_fes(ngs, geometry.mesh, labels["u"])
+        current = ngs.GridFunction(fes)
+        _set_boundary_values(
+            ngs,
+            geometry.mesh,
+            current,
+            boundary_conditions,
+            "u",
+            points_by_label=geometry.points_by_label,
+            coordinate_ranges=pde_area.ranges,
         )
 
-        def set_endpoint_values(grid_function):
-            if not labels:
-                return
-            vector = grid_function.vec.FV().NumPy()
-            for element in mesh.Elements(ngs.BND):
-                dofs = fes.GetDofNrs(element)
-                for dof, vertex in zip(dofs, element.vertices):
-                    point = mesh.ngmesh.Points()[vertex.nr + 1]
-                    x_value = float(point[0])
-                    condition = (
-                        boundary_values["left"]
-                        if x_value <= midpoint
-                        else boundary_values["right"]
-                    )
-                    vector[dof] = 0.0 if condition is None else _numeric_condition_at(condition, x_value)
-
-        times = _time_values(interval, self.time_step)
-        snapshots = [{"u": old}]
-        iteration_counts, residuals = [], []
-        converged = True
-        for previous_time, current_time in zip(times[:-1], times[1:]):
-            dt = float(current_time - previous_time)
-            current = ngs.GridFunction(fes)
-            current.vec.data = old.vec
-            set_endpoint_values(current)
-            step_residuals = []
-            step_converged = False
-            for iteration in range(1, self.max_iterations + 1):
-                previous = _copy_grid_function(ngs, current, fes)
-                trial = fes.TrialFunction()
-                test = fes.TestFunction()
-                bilinear = ngs.BilinearForm(fes)
-                bilinear += (
-                    trial * test / dt
-                    + pde.nu * ngs.grad(trial) * ngs.grad(test)
-                    + previous * ngs.grad(trial)[0] * test
-                ) * ngs.dx
-                linear = ngs.LinearForm(fes)
-                linear += old * test / dt * ngs.dx
-                bilinear.Assemble()
-                linear.Assemble()
-                _linear_solve(ngs, bilinear, linear, current, fes)
-                set_endpoint_values(current)
-                change = _relative_change(current, previous)
-                step_residuals.append(change)
-                if change <= self.tolerance:
-                    step_converged = True
-                    break
-            snapshots.append({"u": current})
-            old = current
-            iteration_counts.append(iteration)
-            residuals.append(step_residuals[-1] if step_residuals else math.inf)
-            converged = converged and step_converged
+        residuals = []
+        converged = False
+        for iteration in range(1, self.max_iterations + 1):
+            previous = _copy_grid_function(ngs, current, fes)
+            trial = fes.TrialFunction()
+            test = fes.TestFunction()
+            bilinear = ngs.BilinearForm(fes, symmetric=False)
+            bilinear += (
+                ngs.grad(trial)[1] * test
+                + previous * ngs.grad(trial)[0] * test
+                + pde.nu * ngs.grad(trial)[0] * ngs.grad(test)[0]
+            ) * ngs.dx
+            linear = ngs.LinearForm(fes)
+            bilinear.Assemble()
+            linear.Assemble()
+            _linear_solve(ngs, bilinear, linear, current, fes)
+            _set_boundary_values(
+                ngs,
+                geometry.mesh,
+                current,
+                boundary_conditions,
+                "u",
+                points_by_label=geometry.points_by_label,
+                coordinate_ranges=pde_area.ranges,
+            )
+            change = _relative_change(current, previous)
+            residuals.append(change)
+            if change <= self.tolerance:
+                converged = True
+                break
 
         metadata = {
-            "backend": "NGSolve/Netgen",
-            "pde": pde.__class__.__name__,
-            "fields": ["u"],
-            "mesh_size": float(mesh_size),
-            "mesh": {"dimension": 1, "elements": int(mesh.ne), "vertices": int(mesh.nv)},
-            "spatial_coordinate": "x",
-            "temporal_coordinate": "y",
-            "time_values": times.tolist(),
-            "time_step": float(np.min(np.diff(times))),
-            "iterations": iteration_counts,
+            **self._metadata(
+                pde,
+                geometry,
+                self.mesh_size or _default_mesh_size(pde_area),
+                ["u"],
+            ),
+            "spatial_coordinates": ["x", "y"],
+            "iterations": iteration,
             "solver_residuals": residuals,
             "converged": converged,
         }
         return ReferenceSolution(
             area=pde_area,
-            mesh=mesh,
-            snapshots=snapshots,
-            times=times,
+            mesh=geometry.mesh,
+            fields={"u": current},
             metadata=metadata,
-            field_evaluator=_make_one_dimensional_evaluator(mesh),
-            time_from_y=True,
+            field_evaluator=_make_solution_evaluator(geometry.mesh),
         )
-
-
-def _numeric_condition_at(condition, x, y=None):
-    if _is_number(condition):
-        return float(condition)
-    variable, function = condition
-    return _numeric_function_value(function, x if variable == "x" else (0.0 if y is None else y))
-
-
 __all__ = [
     "ReferenceConfigurationError",
     "ReferenceGeometryError",

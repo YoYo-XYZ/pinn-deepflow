@@ -60,12 +60,11 @@ x = reference.area_evaluators[0].data_dict["x"]
 y = reference.area_evaluators[0].data_dict["y"]
 ```
 
-Heat, wave, transient Navier–Stokes, and 1-D Burgers problems require a time
-interval and initial data.  Set `time_step` to control the stored snapshots;
-the default stores 100 uniform steps.  Transient `evaluate` calls linearly
-interpolate between snapshots.  Burgers follows DeepFlow's existing convention
-that `x` is space and `y` is time, so `reference.evaluate(x, y)` is a valid
-transient query for that PDE.  Other transient PDEs use `t=...`.
+Heat, wave, and transient Navier–Stokes problems require a time interval and
+initial data.  Set `time_step` to control the stored snapshots; the default
+stores 100 uniform steps.  Transient `evaluate` calls linearly interpolate
+between snapshots.  `BurgersEquation1D` is treated as a steady 2D equation in
+the `(x, y)` domain and does not require a time interval.
 
 The returned group exposes the advanced point-query and export object as
 `reference.reference_solution`:
@@ -80,4 +79,4 @@ solution.export_npz("reference.npz", x=[0.25, 0.5], y=[0.5, 0.5])
 the low-level `ReferenceSolution` is preferred.  The reference object retains
 the FEM fields in memory, so repeated queries do not solve the PDE again.
 `metadata` contains mesh statistics, iteration counts, residual diagnostics,
-time values, and convergence status.
+any time values, and convergence status.

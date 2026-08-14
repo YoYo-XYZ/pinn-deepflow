@@ -279,3 +279,28 @@ def test_solve_fem_ngsolve_steady_smoke():
 
     assert isinstance(result, df.GroupEvaluator)
     assert result.area_evaluators[0].data_dict["u_ref"].shape == (9,)
+
+
+def test_solve_fem_burgers_is_steady_2d():
+    pytest.importorskip("ngsolve")
+
+    area = df.rectangle([0, 1], [0, 1])
+    area.define_pde(df.pde.BurgersEquation1D(nu=0.1))
+    for bound in area.bound_list:
+        bound.define_bc({"u": 1.0})
+
+    result = df.domain(area).solve_fem(
+        mesh_size=0.5,
+        boundary_resolution=8,
+        max_iterations=5,
+        area_sampling_res=[3, 3],
+        bound_sampling_res=4,
+    )
+    solution = result.reference_solution
+
+    assert not solution.is_transient
+    assert not solution.time_from_y
+    assert solution.metadata["mesh"]["dimension"] == 2
+    assert "time_values" not in solution.metadata
+    values = solution.evaluate(np.array([0.25, 0.75]), np.array([0.25, 0.75]))
+    np.testing.assert_allclose(values["u"], 1.0, atol=1e-8)

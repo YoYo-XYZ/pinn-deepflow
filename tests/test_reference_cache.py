@@ -47,3 +47,47 @@ def test_reference_solver_recomputes_after_pde_mutation(monkeypatch):
 
     # Keep the historical method callable for users that previously cleared it.
     solver.clear_cache()
+
+
+def test_burgers_reference_is_steady_2d_without_time_interval(monkeypatch):
+    import deepflow as df
+    import deepflow.reference.solver as solver_module
+    from deepflow.pde import BurgersEquation1D
+
+    pde_area = SimpleNamespace(
+        physics_type="PDE",
+        PDE=BurgersEquation1D(nu=0.1),
+        bound_list=[],
+        negative_bound_list=[],
+        ranges={0: (0.0, 1.0), 1: (0.0, 1.0)},
+    )
+    domain = SimpleNamespace(area_list=[pde_area], bound_list=[])
+    fake_geometry = SimpleNamespace(
+        mesh=object(),
+        boundary_info={},
+        labels_by_bound={},
+        points_by_label={},
+    )
+    calls = []
+
+    class FakeAdapter:
+        def __init__(self, boundary_resolution):
+            pass
+
+        def build(self, area, ngsolve_module, mesh_size):
+            return fake_geometry
+
+    def fake_solve_burgers(self, *args):
+        calls.append(args)
+        return object()
+
+    monkeypatch.setattr(solver_module, "_load_ngsolve", lambda: object())
+    monkeypatch.setattr(solver_module, "NetgenGeometryAdapter", FakeAdapter)
+    monkeypatch.setattr(solver_module.ReferenceSolver, "_solve_burgers", fake_solve_burgers)
+
+    solution = df.ReferenceSolver().solve(domain)
+
+    assert solution is not None
+    assert len(calls) == 1
+    assert calls[0][0] is pde_area
+    assert calls[0][2] is fake_geometry
