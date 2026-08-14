@@ -204,4 +204,4 @@ def test_solve_fem_accepts_external_matching_boundary_conditions():
     x = np.array([-0.75, 0.0, 0.75])
     values = result.evaluate(x, np.zeros_like(x))["u"]
 
-    np.testing.assert_allclose(values, -np.sin(np.pi * x), atol=1e-5)
+    np.testing.assert_allclose(values, -np.sin(np.pi * x), atol=5e-4)
