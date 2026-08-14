@@ -1,0 +1,65 @@
+{
+  "timestamp_utc": "2026-08-13T11:17:54.776390+00:00",
+  "commit_hash": "df92c3e17db369669be21a1b1e7681383649fd13",
+  "device": "cuda",
+  "dtype": "torch.float32",
+  "config": {
+    "seed": 69,
+    "nu": 0.003183098861837907,
+    "width": 16,
+    "depth": 4,
+    "adam_epochs": 500,
+    "lbfgs_epochs": 100,
+    "learning_rate": 0.004,
+    "sampling_scheme": "R3",
+    "r3_interval": 100,
+    "boundary_points": [
+      512,
+      256,
+      256
+    ],
+    "interior_points": [
+      1024
+    ],
+    "embed_dim": 256,
+    "alpha": 5.0,
+    "evaluation_resolution": [
+      161,
+      81
+    ],
+    "fem_mesh_size": 0.02,
+    "fem_time_step": 0.01
+  },
+  "fem": {
+    "solve_time_s": 1.1834086999988358,
+    "backend": "NGSolve/Netgen",
+    "mesh_elements": 100,
+    "time_steps": 100,
+    "converged": true,
+    "max_solver_residual": 9.785662548738445e-09
+  },
+  "models": {
+    "PINN": {
+      "train_time_s": 68.9565662999994,
+      "trainable_parameters": 881,
+      "final_training_loss": 0.0018719123909249902,
+      "relative_l2": 0.43581129668236174,
+      "rmse": 0.26648252773599823,
+      "mae": 0.058582121790455216,
+      "max_abs_error": 1.9678976073550731,
+      "final_time_relative_l2": 0.5910152937385337,
+      "checkpoint": "pinn_checkpoint.pt"
+    },
+    "RFFPINN": {
+      "train_time_s": 66.83943349999754,
+      "trainable_parameters": 4945,
+      "final_training_loss": 1.7528494709040388e-06,
+      "relative_l2": 0.16194827955388094,
+      "rmse": 0.09902539752077266,
+      "mae": 0.012267854999152127,
+      "max_abs_error": 1.5974514897480105,
+      "final_time_relative_l2": 0.50475770089045,
+      "checkpoint": "rffpinn_checkpoint.pt"
+    }
+  }
+}
