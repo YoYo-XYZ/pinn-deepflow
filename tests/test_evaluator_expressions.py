@@ -164,38 +164,6 @@ def test_lazy_expression_works_with_real_evaluator_after_resampling():
     )
 
 
-class _FakeReferenceSolution:
-    fields = ("u", "v")
-    is_transient = False
-    time_from_y = False
-    metadata = {"fields": ["u", "v"]}
-
-    def evaluate(self, x, y, t=None, fields=None):
-        values = {}
-        for index, name in enumerate(fields or self.fields):
-            values[name] = np.asarray(x, dtype=float) + index
-        return values
-
-
-def test_lazy_expression_works_with_reference_evaluator():
-    custom = df.custom_data(
-        {
-            "x": torch.linspace(0.0, 1.0, 4),
-            "y": torch.linspace(0.0, 1.0, 4),
-        }
-    )
-    evaluator = df.ReferenceEvaluator(_FakeReferenceSolution(), custom)
-    fields = evaluator.expr
-    fields["magnitude"] = np.hypot(fields["u_ref"], fields["v_ref"])
-
-    evaluator.postprocess()
-
-    np.testing.assert_allclose(
-        evaluator["magnitude"],
-        np.hypot(evaluator["u_ref"], evaluator["v_ref"]),
-    )
-
-
 def test_deleting_lazy_expression_removes_materialized_field():
     evaluator = _manual_evaluator({"u": np.array([1.0])})
     fields = evaluator.expr

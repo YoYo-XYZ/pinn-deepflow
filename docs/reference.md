@@ -31,7 +31,7 @@ The main class managing the physics problem.
 - `sampling_R3(bound_sampling_res, area_sampling_res)`: Samples points using R3 refinement.
 - `evaluate(model)`: Returns a structured `GroupEvaluator` for all unique sampled geometries.
 - `solve_fem(...)`: Solves the attached PDE with the optional NGSolve backend
-  and returns a `ReferenceSolution` for direct point queries.
+  and returns a `ReferenceGroupEvaluator` for direct point queries.
 - `show_setup()`: Plots the domain geometry and boundary conditions.
 - `show_coordinates(display_physics=False)`: Plots the sampled collocation points.
 
@@ -47,8 +47,11 @@ values = reference.evaluate([0.25, 0.5], [0.5, 0.5])
 ```
 
 The FEM solve does not require DeepFlow point samples. The returned
-`ReferenceSolution` evaluates the FEM fields at any requested coordinates and
-exposes solver metadata through `reference.metadata`.
+`ReferenceGroupEvaluator` evaluates the FEM fields at any requested
+coordinates and exposes solver metadata through `reference.metadata`. The
+underlying `ReferenceSolution` remains available at
+`reference.reference_solution` for advanced use (`export_npz`, `times`,
+`is_transient`, etc.).
 
 ### `calc_loss_simple`
 
@@ -228,11 +231,12 @@ Aggregate color plots skip child evaluators that do not contain the requested
 field or coordinate keys. The temporary concatenated data is used only for the
 plot and is not stored on `GroupEvaluator`.
 
-`ReferenceSolver` and `ReferenceSolution` are available for direct point
-queries and `export_npz()`:
+`ReferenceGroupEvaluator` (returned by `solve_fem`) supports direct point
+queries through `evaluate(...)`. The underlying `ReferenceSolution` is exposed
+as `.reference_solution` and supports `export_npz()`:
 
 ```python
 values = reference.evaluate(x, y, t=t)
-reference.export_npz("reference.npz", x=x, y=y, t=t)
+reference.reference_solution.export_npz("reference.npz", x=x, y=y, t=t)
 ```
 

@@ -11,7 +11,7 @@ from .nn import HardConstraint
 from .geometry import CustomData
 
 if TYPE_CHECKING:
-    from .reference import ReferenceSolution
+    from .evaluation import ReferenceGroupEvaluator
 
 
 def domain(*geometries):
@@ -60,8 +60,13 @@ class ProblemDomain():
         time_step=None,
         tolerance=1e-8,
         max_iterations=200,
-    ) -> "ReferenceSolution":
-        """Solve the domain with the optional NGSolve FEM backend."""
+    ) -> "ReferenceGroupEvaluator":
+        """Solve the domain with the optional NGSolve FEM backend.
+
+        Returns a :class:`ReferenceGroupEvaluator` for point lookups via
+        ``evaluate(...)``; the underlying :class:`ReferenceSolution` is
+        available as ``.reference_solution``.
+        """
         from .fem import solve_fem as _solve_fem
 
         return _solve_fem(

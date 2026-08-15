@@ -74,7 +74,8 @@ def test_solve_fem_returns_reference_solution_without_sampling(fake_reference_so
         max_iterations=7,
     )
 
-    assert result is fake_reference_solver.solution
+    assert isinstance(result, df.ReferenceGroupEvaluator)
+    assert result.reference_solution is fake_reference_solver.solution
     assert result.metadata["backend"] == "fake"
     values = result.evaluate(np.array([0.25]), np.array([0.5]))
     np.testing.assert_allclose(values["u"], [0.25])
@@ -91,6 +92,7 @@ def test_solve_fem_returns_reference_solution_without_sampling(fake_reference_so
 def test_solve_fem_does_not_require_sampled_coordinates(monkeypatch):
     area, domain = _domain_with_pde()
     calls = []
+    solution = _FakeReferenceSolution()
 
     class ShouldRun:
         def __init__(self, **kwargs):
@@ -98,11 +100,13 @@ def test_solve_fem_does_not_require_sampled_coordinates(monkeypatch):
 
         def solve(self, solved_domain):
             calls.append(("solve", solved_domain))
-            return "solution"
+            return solution
 
     monkeypatch.setattr(reference_module, "ReferenceSolver", ShouldRun)
 
-    assert domain.solve_fem() == "solution"
+    result = domain.solve_fem()
+    assert isinstance(result, df.ReferenceGroupEvaluator)
+    assert result.reference_solution is solution
     assert calls[0] == (
         "init",
         {
@@ -150,7 +154,7 @@ def test_solve_fem_ngsolve_steady_smoke():
         max_iterations=3,
     )
 
-    assert isinstance(result, df.ReferenceSolution)
+    assert isinstance(result, df.ReferenceGroupEvaluator)
     assert result.metadata["mesh"]["dimension"] == 2
     values = result.evaluate(np.array([0.5]), np.array([0.5]))
     assert values["u"].shape == (1,)
@@ -170,8 +174,8 @@ def test_solve_fem_burgers_is_steady_2d():
         max_iterations=5,
     )
 
-    assert not result.is_transient
-    assert not result.time_from_y
+    assert not result.reference_solution.is_transient
+    assert not result.reference_solution.time_from_y
     assert result.metadata["mesh"]["dimension"] == 2
     assert "time_values" not in result.metadata
     values = result.evaluate(

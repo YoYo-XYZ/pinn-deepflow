@@ -31,8 +31,9 @@ is recorded in `reference.metadata["pressure_gauge"]`.
 
 ## Usage
 
-The primary FEM workflow returns a `ReferenceSolution`. It does not require
-DeepFlow point sampling; query the solved fields at any coordinates you need:
+The primary FEM workflow returns a `ReferenceGroupEvaluator`. It does not
+require DeepFlow point sampling; query the solved fields at any coordinates
+you need:
 
 ```python
 import numpy as np
@@ -65,11 +66,12 @@ stores 100 uniform steps.  Transient `evaluate` calls linearly interpolate
 between snapshots.  `BurgersEquation1D` is treated as a steady 2D equation in
 the `(x, y)` domain and does not require a time interval.
 
-The returned `ReferenceSolution` supports point queries and export directly:
+The returned `ReferenceGroupEvaluator` supports point queries directly, and
+the underlying `ReferenceSolution` (`.reference_solution`) supports export:
 
 ```python
 values = reference.evaluate(np.array([0.25, 0.5]), np.array([0.5, 0.5]))
-reference.export_npz("reference.npz", x=[0.25, 0.5], y=[0.5, 0.5])
+reference.reference_solution.export_npz("reference.npz", x=[0.25, 0.5], y=[0.5, 0.5])
 ```
 
 `ReferenceSolver(...).solve(domain)` remains available as a lower-level
