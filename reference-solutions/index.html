@@ -829,8 +829,9 @@ condition.  A pressure field without a pressure Dirichlet condition is
 normalized to zero mean after each Navier–Stokes solve; the normalization mode
 is recorded in <code>reference.metadata["pressure_gauge"]</code>.</p>
 <h2 id="usage">Usage</h2>
-<p>The primary FEM workflow returns a <code>ReferenceSolution</code>. It does not require
-DeepFlow point sampling; query the solved fields at any coordinates you need:</p>
+<p>The primary FEM workflow returns a <code>ReferenceGroupEvaluator</code>. It does not
+require DeepFlow point sampling; query the solved fields at any coordinates
+you need:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">deepflow</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">df</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
@@ -859,9 +860,10 @@ initial data.  Set <code>time_step</code> to control the stored snapshots; the d
 stores 100 uniform steps.  Transient <code>evaluate</code> calls linearly interpolate
 between snapshots.  <code>BurgersEquation1D</code> is treated as a steady 2D equation in
 the <code>(x, y)</code> domain and does not require a time interval.</p>
-<p>The returned <code>ReferenceSolution</code> supports point queries and export directly:</p>
+<p>The returned <code>ReferenceGroupEvaluator</code> supports point queries directly, and
+the underlying <code>ReferenceSolution</code> (<code>.reference_solution</code>) supports export:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]))</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">reference</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
 </code></pre></div>
 <p><code>ReferenceSolver(...).solve(domain)</code> remains available as a lower-level
 alternative. The reference object retains the FEM fields in memory, so
