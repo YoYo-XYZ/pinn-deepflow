@@ -22,4 +22,5 @@ dist/
 *.log
 
 site/
+.site-plan-check/
 .github/
