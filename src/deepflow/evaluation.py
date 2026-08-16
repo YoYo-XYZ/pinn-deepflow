@@ -1,3 +1,5 @@
+"""Model evaluation, derived fields, and structured plotting results."""
+
 import operator
 from typing import Callable, List, Union, Dict, Any, Optional
 
@@ -332,16 +334,30 @@ class _ExpressionNamespace:
 
 
 class Evaluator(Visualizer):
-    """
-    Evaluates a PINN model against a given geometry and prepares data for visualization.
+    """Evaluate a PINN on one geometry and prepare plotting data.
+
+    Args:
+        pinns_model: PINN model used to calculate predictions and residuals.
+        geometry: Sampled ``Area``, ``Bound``, or ``CustomData``
+            object.
+
+    Attributes:
+        data_dict: Materialized NumPy fields, coordinates, residuals, and loss
+            history.
+        expr: Mapping-like namespace for persistent derived fields.
+
+    Notes:
+        Sampling and time changes refresh ``data_dict`` automatically. Fields
+        assigned through ``expr`` are recomputed after each refresh.
     """
 
     def __init__(self, pinns_model: PINN, geometry: Area|Bound|CustomData) -> None:
         """
+        Initialize an evaluator for a model and geometry.
+
         Args:
             pinns_model: The physics-informed neural network model.
-            geometry: The geometric domain (Area or Bound) to evaluate on.
-            custom_data: Optional custom data to include in the evaluation.
+            geometry: The geometric domain or custom data to evaluate.
         """
         self.model = pinns_model 
         self.geometry = geometry
@@ -363,12 +379,22 @@ class Evaluator(Visualizer):
         # super().__init__({}) 
 
     def sampling_line(self, n_points: int, scheme: str = 'uniform') -> None:
-        """Samples points along a line within the geometry."""
+        """Sample a boundary and refresh evaluated fields.
+
+        Args:
+            n_points: Number of boundary points.
+            scheme: ``"uniform"``, ``"random"``, or ``"lhs"``.
+        """
         self.geometry.sampling_line(n_points, scheme)
         self.postprocess()
 
     def sampling_area(self, res_list: List[int], scheme: str = 'uniform') -> None:
-        """Samples points within the area of the geometry."""
+        """Sample an area and refresh evaluated fields.
+
+        Args:
+            res_list: Area resolution as a scalar or ``[nx, ny]`` pair.
+            scheme: ``"uniform"``, ``"random"``, or ``"lhs"``.
+        """
         self.geometry.sampling_area(res_list, scheme)
         self.postprocess()
 
@@ -378,7 +404,13 @@ class Evaluator(Visualizer):
         sampling_scheme: str = "uniform",
         expo_scaling: Optional[bool] = None,
     ) -> None:
-        """Defines time coordinates for transient problems."""
+        """Define time coordinates and refresh evaluated fields.
+
+        Args:
+            range_t: Time interval or fixed time value.
+            sampling_scheme: Time sampling scheme.
+            expo_scaling: Whether to apply exponential time scaling.
+        """
         self.geometry.define_time(
             range_t,
             sampling_scheme=sampling_scheme,
@@ -387,8 +419,10 @@ class Evaluator(Visualizer):
         self.postprocess()
     def postprocess(self) -> None:
         """
-        Aggregates model predictions, residuals, and coordinates, 
-        then converts them to NumPy for visualization.
+        Recompute predictions, residuals, coordinates, and derived fields.
+
+        Returns:
+            None. ``data_dict`` is replaced with NumPy-compatible values.
         """
         self.geometry.process_coordinates()
 
@@ -450,7 +484,12 @@ class Evaluator(Visualizer):
 
     @property
     def expr(self) -> _ExpressionNamespace:
-        """Namespace for defining persistent lazy data-field expressions."""
+        """Namespace for persistent lazy data-field expressions.
+
+        Returns:
+            Mapping-like object supporting expressions such as
+            ``evaluator.expr["speed"] = (evaluator.expr["u"] ** 2) ** 0.5``.
+        """
         return self._expression_namespace
 
     def _evaluate_derived_fields(self) -> Dict[str, np.ndarray]:
@@ -560,7 +599,22 @@ class Evaluator(Visualizer):
     
     def plot_animate(self, color_axis:str, x_axis: str = 'x', y_axis: str = 'y', cmap = 'viridis', range_t=None, dt=None, frame_interval = 10, plot_type: str = 'scatter', s = 6, color_range:list=None) -> Any:
         """
-        Creates an animation over time for the specified key(s).
+        Create and display an animation over time for a field.
+
+        Args:
+            color_axis: Field to animate.
+            x_axis: x-coordinate field.
+            y_axis: y-coordinate field.
+            cmap: Matplotlib colormap name.
+            range_t: Two-element animation time interval.
+            dt: Time increment between frames.
+            frame_interval: Delay between frames in milliseconds.
+            plot_type: ``"scatter"``, ``"tripcolor"``, or ``"contourf"``.
+            s: Scatter marker size.
+            color_range: Optional ``[min, max]`` color limits.
+
+        Returns:
+            The created Matplotlib animation object.
         """
         import matplotlib.animation as animation
 
@@ -605,14 +659,20 @@ class Evaluator(Visualizer):
 
 
 class ReferenceEvaluator(Evaluator):
-    """Evaluate a solved :class:`ReferenceSolution` on one geometry.
+    """Evaluate a solved ``ReferenceSolution`` on one geometry.
 
     Reference evaluators deliberately do not calculate PINN residuals or copy
     model training history.  They retain the FEM solution and re-query it
     whenever the geometry is sampled again or its time coordinates change.
+
+    Args:
+        reference_solution: Solved ``ReferenceSolution`` queried by this
+            evaluator.
+        geometry: Geometry whose coordinates are used for FEM queries.
     """
 
     def __init__(self, reference_solution, geometry: Area | Bound | CustomData) -> None:
+        """Initialize an evaluator backed by a reference solution."""
         self.model = None
         self.reference_solution = reference_solution
         self.geometry = geometry
@@ -724,7 +784,13 @@ class ReferenceEvaluator(Evaluator):
         sampling_scheme: str = "uniform",
         expo_scaling: Optional[bool] = None,
     ) -> None:
-        """Update time coordinates and immediately re-query the FEM fields."""
+        """Update time coordinates and re-query the FEM fields.
+
+        Args:
+            range_t: Time interval or fixed time value.
+            sampling_scheme: Time sampling scheme.
+            expo_scaling: Whether to apply exponential time scaling.
+        """
         self.geometry.define_time(
             range_t,
             sampling_scheme=sampling_scheme,
@@ -782,6 +848,7 @@ class ReferenceEvaluator(Evaluator):
         return self.data_dict
 
     def postprocess(self) -> None:
+        """Re-query the reference fields and refresh derived fields."""
         self._create_data_dict()
         self._refresh_derived_fields()
         self.is_postprocessed = True
@@ -790,14 +857,23 @@ class ReferenceEvaluator(Evaluator):
 
 class GroupEvaluator:
     """
-    Coordinates geometry-specific :class:`Evaluator` instances for a domain.
+    Coordinates geometry-specific ``Evaluator`` instances for a domain.
 
     Results remain structured per geometry.  The group does not merge data
     dictionaries because different geometries can represent different physics
     types and therefore expose different residual fields.
+
+    Args:
+        pinns_model: PINN model shared by child evaluators.
+        domain: Domain containing the sampled geometries.
+
+    Attributes:
+        bound_list: Evaluators aligned with unique domain boundaries.
+        area_list: Evaluators aligned with unique domain areas.
     """
 
     def __init__(self, pinns_model: PINN, domain) -> None:
+        """Build one evaluator for each unique domain geometry."""
         self.model = pinns_model
         self.domain = domain
         self._init_entries(domain)
@@ -855,11 +931,16 @@ class GroupEvaluator:
             evaluator.postprocess()
 
     def refresh(self) -> None:
-        """Alias for :meth:`postprocess`."""
+        """Alias for ``postprocess``."""
         self.postprocess()
 
     def sampling_line(self, n_points, scheme: str = "uniform") -> None:
-        """Sample and refresh every Bound child."""
+        """Sample and refresh every boundary child.
+
+        Args:
+            n_points: Scalar count or one count per boundary child.
+            scheme: Boundary sampling scheme.
+        """
         resolutions = _normalize_resolutions(
             n_points,
             len(self.bound_list),
@@ -874,6 +955,11 @@ class GroupEvaluator:
 
         ``CustomData`` entries are intentionally left unchanged because they
         represent fixed user-provided coordinates rather than a sampler.
+
+        Args:
+            res_list: Scalar, one resolution per area, or ``[nx, ny]`` for a
+                single area.
+            scheme: Area sampling scheme.
         """
         sampleable_areas = [
             evaluator
@@ -895,7 +981,13 @@ class GroupEvaluator:
         sampling_scheme: str = "uniform",
         expo_scaling: Optional[bool] = None,
     ) -> None:
-        """Define and refresh time coordinates for every child geometry."""
+        """Define and refresh time coordinates for every child geometry.
+
+        Args:
+            range_t: Time interval or fixed time value.
+            sampling_scheme: Time sampling scheme.
+            expo_scaling: Whether to apply exponential time scaling.
+        """
         for evaluator in self._ordered_evaluators:
             evaluator.define_time(
                 range_t,
@@ -1003,9 +1095,31 @@ class GroupEvaluator:
         return values
 
     def plot(self, *args, geometry, **kwargs):
+        """Delegate a general plot to a geometry-specific evaluator.
+
+        Args:
+            *args: Positional plotting arguments.
+            geometry: Geometry whose child evaluator should plot.
+            **kwargs: Keyword plotting arguments.
+
+        Returns:
+            The figure returned by the child evaluator.
+        """
         return self._evaluator_for_geometry(geometry).plot(*args, **kwargs)
 
     def plot_color(self, *args, geometry=None, **kwargs):
+        """Plot one geometry or aggregate compatible geometries.
+
+        Args:
+            *args: Positional arguments accepted by
+                ``Visualizer.plot_color``.
+            geometry: Optional geometry for a child-specific plot. If omitted,
+                compatible child data is concatenated temporarily.
+            **kwargs: Keyword arguments accepted by the color plot.
+
+        Returns:
+            The generated figure or ``(figure, axes)`` result.
+        """
         if geometry is not None:
             return self._evaluator_for_geometry(geometry).plot_color(
                 *args,
@@ -1023,30 +1137,35 @@ class GroupEvaluator:
     plot_scatter = plot_color
 
     def plot_contour(self, *args, geometry, **kwargs):
+        """Delegate a contour plot to a selected geometry evaluator."""
         return self._evaluator_for_geometry(geometry).plot_contour(
             *args,
             **kwargs,
         )
 
     def plot_streamline(self, *args, geometry, **kwargs):
+        """Delegate a streamline plot to a selected geometry evaluator."""
         return self._evaluator_for_geometry(geometry).plot_streamline(
             *args,
             **kwargs,
         )
 
     def plot_distribution(self, *args, geometry, **kwargs):
+        """Delegate a distribution plot to a selected geometry evaluator."""
         return self._evaluator_for_geometry(geometry).plot_distribution(
             *args,
             **kwargs,
         )
 
     def plot_loss_curve(self, *args, geometry, **kwargs):
+        """Delegate a loss-curve plot to a selected geometry evaluator."""
         return self._evaluator_for_geometry(geometry).plot_loss_curve(
             *args,
             **kwargs,
         )
 
     def plot_animate(self, *args, geometry, **kwargs):
+        """Delegate an animation to a selected geometry evaluator."""
         return self._evaluator_for_geometry(geometry).plot_animate(
             *args,
             **kwargs,
@@ -1056,13 +1175,18 @@ class GroupEvaluator:
 class ReferenceGroupEvaluator(GroupEvaluator):
     """GroupEvaluator whose children query a solved FEM reference solution.
 
-    This is the ``solve_fem`` result: a real :class:`GroupEvaluator` where each
-    per-geometry :class:`ReferenceEvaluator` re-queries the FEM fields on its
-    geometry.  The underlying :class:`ReferenceSolution` remains available as
+    This is the ``solve_fem`` result: a real ``GroupEvaluator`` where each
+    per-geometry ``ReferenceEvaluator`` re-queries the FEM fields on its
+    geometry.  The underlying ``ReferenceSolution`` remains available as
     ``.reference_solution`` for arbitrary point queries and export.
+
+    Args:
+        reference_solution: Solved reference solution used by child evaluators.
+        domain: Domain containing the geometries to evaluate.
     """
 
     def __init__(self, reference_solution, domain) -> None:
+        """Build reference evaluators for every unique domain geometry."""
         self.reference_solution = reference_solution
         self.model = None
         self.domain = domain

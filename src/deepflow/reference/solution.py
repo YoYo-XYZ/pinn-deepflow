@@ -14,6 +14,11 @@ class ReferenceSolution:
     ``ReferenceSolution`` deliberately keeps the FEM objects alive.  Queries
     therefore evaluate the same fields that were produced by the solver,
     rather than interpolating a second sampled representation.
+
+    Attributes:
+        metadata: JSON-compatible solver metadata.
+        fields: Names of fields available to ``evaluate``.
+        times: Stored transient snapshot times, if any.
     """
 
     def __init__(
@@ -28,6 +33,22 @@ class ReferenceSolution:
         field_evaluator: Optional[Callable[[object, np.ndarray, np.ndarray], np.ndarray]] = None,
         time_from_y: bool = False,
     ):
+        """Initialize a solved steady or transient field collection.
+
+        Args:
+            area: PDE area used to validate query points.
+            mesh: FEM mesh retained by the field evaluator.
+            fields: Steady field objects keyed by field name.
+            snapshots: Transient field mappings ordered by ``times``.
+            times: Strictly increasing transient snapshot times.
+            metadata: Solver metadata retained for inspection and export.
+            field_evaluator: Optional callable overriding point evaluation.
+            time_from_y: Whether the supplied y coordinate represents time.
+
+        Raises:
+            ValueError: If fields/snapshots or transient times are incomplete
+                or inconsistent.
+        """
         if snapshots is not None and times is None:
             raise ValueError("Transient snapshots require corresponding times.")
         if snapshots is None and fields is None:
@@ -77,7 +98,7 @@ class ReferenceSolution:
 
     @property
     def fields(self) -> Tuple[str, ...]:
-        """Names of fields accepted by :meth:`evaluate`."""
+        """Names of fields accepted by ``evaluate``."""
         return self.declared_fields
 
     @property
@@ -87,6 +108,7 @@ class ReferenceSolution:
 
     @property
     def is_transient(self) -> bool:
+        """Whether this solution contains transient snapshots."""
         return self._snapshots is not None
 
     @property
@@ -208,8 +230,26 @@ class ReferenceSolution:
         """Evaluate selected fields at broadcastable point coordinates.
 
         For transient solutions, values are linearly interpolated between the
-        stored solver snapshots.  A transient query must provide ``t``;
-        steady fields ignore a supplied time coordinate.
+        stored solver snapshots. A transient query must provide ``t`` unless
+        ``time_from_y`` is enabled, in which case ``y`` supplies time. Steady
+        fields ignore a supplied time coordinate.
+
+        Args:
+            x: x coordinates, broadcastable with ``y`` and optional ``t``.
+            y: y coordinates, broadcastable with ``x`` and optional ``t``.
+            t: Optional time coordinates for transient solutions, unless
+                ``time_from_y`` is enabled.
+            fields: Optional field name or iterable of field names. ``None``
+                selects every declared field.
+
+        Returns:
+            Dictionary mapping selected field names to NumPy arrays matching
+            the broadcast query shape.
+
+        Raises:
+            KeyError: If a requested field is unknown.
+            ValueError: If points lie outside the PDE area, required transient
+                time is missing, or times are outside the stored interval.
         """
         x_input = np.asarray(x, dtype=float)
         y_input = np.asarray(y, dtype=float)
@@ -327,7 +367,18 @@ class ReferenceSolution:
         return values
 
     def export_npz(self, path, x, y, t=None, fields=None) -> None:
-        """Export queried values and JSON-serializable metadata to ``.npz``."""
+        """Export queried values and metadata to a compressed ``.npz`` file.
+
+        Args:
+            path: Output path.
+            x: x coordinates accepted by ``evaluate``.
+            y: y coordinates accepted by ``evaluate``.
+            t: Optional transient time coordinates.
+            fields: Optional field name or iterable of field names.
+
+        Returns:
+            None.
+        """
         values = self.evaluate(x, y, t=t, fields=fields)
         if t is None:
             x_array, y_array = np.broadcast_arrays(
@@ -346,4 +397,4 @@ class ReferenceSolution:
         payload["metadata"] = np.asarray(
             json.dumps(self._metadata, default=str), dtype=str
         )
-        np.savez(Path(path), **payload)
+        np.savez_compressed(Path(path), **payload)

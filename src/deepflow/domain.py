@@ -1,3 +1,5 @@
+"""Problem-domain orchestration, sampling, and PINN loss construction."""
+
 from typing import TYPE_CHECKING
 
 from .geometry import Area, Bound
@@ -15,6 +17,20 @@ if TYPE_CHECKING:
 
 
 def domain(*geometries):
+    """Build a ``ProblemDomain`` from geometry objects.
+
+    Args:
+        *geometries: Individual ``Bound``, ``Area``, or
+            ``CustomData`` objects, or homogeneous lists of bounds or
+            areas.
+
+    Returns:
+        A problem domain containing separate boundary and area lists.
+
+    Raises:
+        TypeError: If an argument is not a supported geometry or a list mixes
+            geometry types.
+    """
     bound_list = []
     area_list = []
     for geometry in geometries:
@@ -38,7 +54,24 @@ def domain(*geometries):
 
 
 class ProblemDomain():
+    """Collect geometries and coordinate the PINN workflow.
+
+    Args:
+        bound_list: Boundary geometries, including area boundaries.
+        area_list: Areas or custom-data geometries.
+
+    Attributes:
+        bound_list: Boundaries in domain order.
+        area_list: Areas in domain order.
+        sampling_option: Name of the most recent sampling strategy.
+
+    Notes:
+        Domain sampling methods update geometry coordinates in place. Call
+        ``evaluate`` only after every included geometry has coordinates.
+    """
+
     def __init__(self, bound_list:list[Bound], area_list:list[Area]):
+        """Initialize a domain from its boundary and area lists."""
         self.bound_list = bound_list
         self.area_list = area_list
         self.sampling_option = None
@@ -48,7 +81,18 @@ class ProblemDomain():
                 g.process_coordinates()
 
     def evaluate(self, model):
-        """Evaluate every unique sampled geometry in the domain."""
+        """Create evaluators for every unique sampled geometry.
+
+        Args:
+            model: PINN model used to compute predictions and residuals.
+
+        Returns:
+            A ``deepflow.evaluation.GroupEvaluator`` containing one child
+            evaluator per unique geometry.
+
+        Raises:
+            ValueError: If an included geometry has not been sampled.
+        """
         from .evaluation import GroupEvaluator
 
         return GroupEvaluator(model, self)
@@ -63,9 +107,23 @@ class ProblemDomain():
     ) -> "ReferenceGroupEvaluator":
         """Solve the domain with the optional NGSolve FEM backend.
 
-        Returns a :class:`ReferenceGroupEvaluator` whose per-geometry
-        evaluators re-query the solved FEM fields; the underlying
-        :class:`ReferenceSolution` is available as ``.reference_solution``.
+        Args:
+            mesh_size: Target FEM mesh size. If ``None``, infer it from the
+                PDE area extent.
+            boundary_resolution: Number of samples used to construct boundary
+                curves for the mesh.
+            time_step: Time spacing for transient reference snapshots.
+            tolerance: Nonlinear or iterative solver convergence tolerance.
+            max_iterations: Maximum number of solver iterations.
+
+        Returns:
+            A ``ReferenceGroupEvaluator`` whose children query the solved FEM
+            fields. The underlying ``ReferenceSolution`` is available
+            as ``.reference_solution``.
+
+        Raises:
+            ImportError: If the optional NGSolve backend is unavailable.
+            ValueError: If the domain or solver configuration is invalid.
         """
         from .fem import solve_fem as _solve_fem
 
@@ -83,6 +141,15 @@ class ProblemDomain():
 number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list)]}"""
 
     def sampling_uniform(self, bound_sampling_res:list=[], area_sampling_res:list=[]):
+        """Sample boundaries and areas on uniform grids.
+
+        Args:
+            bound_sampling_res: Resolution for each entry in ``bound_list``.
+            area_sampling_res: Resolution for each entry in ``area_list``.
+
+        Returns:
+            None. Geometry coordinates are replaced in place.
+        """
         self.sampling_option = 'uniform'
         for i, res in enumerate(bound_sampling_res):
             self.bound_list[i].sampling_line(res)
@@ -92,6 +159,15 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             self.area_list[i].process_coordinates()
 
     def sampling_random(self, bound_sampling_res:list=[], area_sampling_res:list=[]):
+        """Sample boundaries and areas with uniform random points.
+
+        Args:
+            bound_sampling_res: Number of points for each boundary.
+            area_sampling_res: Number of candidate points for each area.
+
+        Returns:
+            None. Geometry coordinates are replaced in place.
+        """
         self.sampling_option = 'random'
         for i, res in enumerate(bound_sampling_res):
             self.bound_list[i].sampling_line(res, scheme='random')
@@ -101,6 +177,15 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             self.area_list[i].process_coordinates()
 
     def sampling_lhs(self, bound_sampling_res:list=[], area_sampling_res:list=[]):
+        """Sample boundaries and areas with Latin Hypercube Sampling.
+
+        Args:
+            bound_sampling_res: Number of points for each boundary.
+            area_sampling_res: Number of candidate points for each area.
+
+        Returns:
+            None. Geometry coordinates are replaced in place.
+        """
         self.sampling_option = 'lhs'
         for i, res in enumerate(bound_sampling_res):
             self.bound_list[i].sampling_line(res, scheme='lhs')
@@ -110,6 +195,21 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             self.area_list[i].process_coordinates()
 
     def sampling_RAR(self, bound_top_k_list:list=None, area_top_k_list:list=None, bound_candidates_num_list:list=None, area_candidates_num_list:list=None):
+        """Add residual-adaptive points to the existing training samples.
+
+        Args:
+            bound_top_k_list: Number of high-residual points to retain per
+                boundary.
+            area_top_k_list: Number of high-residual points to retain per area.
+            bound_candidates_num_list: Candidate counts per boundary.
+            area_candidates_num_list: Candidate counts per area.
+
+        Returns:
+            None. Selected points are appended to geometry coordinates.
+
+        Notes:
+            Residual fields must have been computed before calling this method.
+        """
         self.sampling_option = self.sampling_option + ' + RAR'
         if bound_top_k_list:
             for i, bound in enumerate(self.bound_list):
@@ -143,6 +243,13 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         threshold set is larger than the budget, the highest-residual points
         are retained instead. The total number of points per geometry therefore
         stays equal to the requested resolution over time.
+
+        Args:
+            bound_sampling_res: Fixed total point budget per boundary.
+            area_sampling_res: Fixed total point budget per area.
+
+        Returns:
+            None. Geometry coordinates are resampled in place.
         """
         self.sampling_option = self.sampling_option + ' + R3'
 
@@ -184,6 +291,13 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         *added* on top of a fresh random sample of size ``res``. The total number
         of points therefore grows over time. This matches the historical
         deepflow behaviour prior to the paper-correct ``sampling_R3`` change.
+
+        Args:
+            bound_sampling_res: Number of fresh candidate points per boundary.
+            area_sampling_res: Number of fresh candidate points per area.
+
+        Returns:
+            None. Geometry point counts may grow after each call.
         """
         self.sampling_option = self.sampling_option + ' + R3'
         
@@ -206,6 +320,15 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
 
     def sampling_accumulate(self, bound_sampling_res:list=None, area_sampling_res:list=None):
         ### EXPERIMENTAL
+        """Accumulate residual-based points across repeated sampling calls.
+
+        Args:
+            bound_sampling_res: Number of fresh points per boundary.
+            area_sampling_res: Number of fresh points per area.
+
+        Returns:
+            None. This experimental method grows the training point set.
+        """
         self.sampling_option = self.sampling_option + ' + R3'
         
         if bound_sampling_res:
@@ -225,6 +348,7 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 self.area_list[i].process_coordinates()
                 # Add RAR point to saved points
     def clear_residual_points(self):
+        """Discard residual-based point buffers from all geometries."""
         for geometry in self.bound_list + self.area_list:
             geometry.clear_residual_based_points()
 #------------------------------------------------------------------------------------------------
@@ -246,6 +370,7 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         return ""
     
     def save_coordinates(self):
+        """Save a copy of every geometry's current coordinates."""
         for area in self.area_list:
             area.saved_X = area.X.clone()
             area.saved_Y = area.Y.clone()
@@ -254,6 +379,7 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             bound.saved_Y = bound.Y.clone()
     
     def load_coordinates(self):
+        """Restore coordinates previously saved by ``save_coordinates``."""
         for area in self.area_list:
             area.X = area.saved_X.clone()
             area.Y = area.saved_Y.clone()
@@ -273,6 +399,15 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 lbl = f"{name} {i}\n{cond}" if cond else f"{name} {i}"
                 ax.text(obj.centers[0], obj.centers[1], lbl, ha='center', va='center', **text_kw)
     def show_coordinates(self, display_physics = False, xlim=None, ylim=None, display_resampling=False):
+        """Plot the currently sampled coordinates.
+
+        Args:
+            display_physics: Annotate geometries with attached BC, IC, or PDE
+                information.
+            xlim: Optional x-axis limits.
+            ylim: Optional y-axis limits.
+            display_resampling: Show buffered residual-based points.
+        """
         fig, ax = plt.subplots(refwidth=7)
         
         self._plot_items(ax, self.area_list, "Area", lambda o, i: (o.X, o.Y),
@@ -302,6 +437,14 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         plt.show()
 
     def show_setup(self, bound_sampling_res:list=None, area_sampling_res:list=None, xlim=None, ylim=None):
+        """Plot the geometry setup and a temporary sampling preview.
+
+        Args:
+            bound_sampling_res: Optional preview resolution per boundary.
+            area_sampling_res: Optional preview resolution per area.
+            xlim: Optional x-axis limits.
+            ylim: Optional y-axis limits.
+        """
         fig, ax = plt.subplots(refwidth=7, grid = False)
         
         if bound_sampling_res is None:
@@ -401,7 +544,15 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         return loss_dict
 
 def calc_loss_simple(domain: ProblemDomain) -> callable:
-    """Returns a simple loss calculation for the given domain for PINN training."""
+    """Create an unweighted PINN loss function for a domain.
+
+    Args:
+        domain: Domain whose boundary, initial, and PDE residuals are evaluated.
+
+    Returns:
+        Callable accepting a model and returning a dictionary containing
+        ``bc_loss``, ``ic_loss``, ``pde_loss``, and ``total_loss``.
+    """
     def calc_loss_function(model):
         loss_dict = domain._batched_loss(model)
         loss_dict["total_loss"] = sum(value for key, value in loss_dict.items() if key != "total_loss")
@@ -410,7 +561,17 @@ def calc_loss_simple(domain: ProblemDomain) -> callable:
     return calc_loss_function
 
 def calc_loss_weighted(domain: ProblemDomain, bc_weights = 1, ic_weights = 1, pde_weights = 1) -> callable:
-    """Returns a weighted loss calculation for the given domain for PINN training."""
+    """Create a weighted PINN loss function for a domain.
+
+    Args:
+        domain: Domain whose residuals are evaluated.
+        bc_weights: Weight applied to boundary-condition loss.
+        ic_weights: Weight applied to initial-condition loss.
+        pde_weights: Weight applied to PDE loss.
+
+    Returns:
+        Callable accepting a model and returning the weighted loss dictionary.
+    """
     weight = {"pde_loss": pde_weights, "bc_loss": bc_weights, "ic_loss": ic_weights}
     def calc_loss_function(model):
         loss_dict = domain._batched_loss(model)

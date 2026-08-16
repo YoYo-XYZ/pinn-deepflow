@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 
-def _transient_solution():
+def _transient_solution(time_from_y=False):
     import deepflow as df
     from deepflow.reference import ReferenceSolution
 
@@ -12,6 +12,7 @@ def _transient_solution():
         mesh=None,
         snapshots=[{"u": 0.0}, {"u": 1.0}],
         times=[0.0, 0.1],
+        time_from_y=time_from_y,
         field_evaluator=lambda field, x, y: np.full_like(x, field, dtype=float),
     )
 
@@ -34,3 +35,11 @@ def test_genuinely_out_of_range_transient_time_is_rejected():
 
     with pytest.raises(ValueError, match="Transient query times"):
         solution.evaluate(0.5, 0.5, t=0.1001, fields=["u"])
+
+
+def test_time_from_y_allows_transient_query_without_t():
+    solution = _transient_solution(time_from_y=True)
+
+    values = solution.evaluate(0.5, 0.05, fields=["u"])
+
+    np.testing.assert_allclose(values["u"], 0.5)

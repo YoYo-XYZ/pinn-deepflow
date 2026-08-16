@@ -1,3 +1,5 @@
+"""Plotting helpers for evaluated DeepFlow fields."""
+
 from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
@@ -7,15 +9,18 @@ from scipy.spatial import QhullError
 
 
 class Visualizer:
-    """
-    Main visualization class for processing data dictionaries.
-    Refactored for simplicity and maintainability.
+    """Create plots from a mapping of field names to NumPy arrays.
+
+    Args:
+        data_dict: Evaluated fields and coordinates. Plot methods expect the
+            requested field keys and usually ``x`` and ``y`` coordinates.
     """
     refwidth_default = 6
     cmap_default = 'viridis'
     color_default = 'blue'
 
     def __init__(self, data_dict: Dict[str, np.ndarray]):
+        """Initialize a visualizer from evaluated data."""
         self.data_dict = data_dict
         # Cache coordinates for convenience, if they exist
         self.X = data_dict.get('x')
@@ -27,7 +32,18 @@ class Visualizer:
 
     def plot_color(self, color_axis: str, x_axis: str = 'x', y_axis: str = 'y', cmap='viridis', s: Union[int, float] = 2, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
-        Creates scatter plots (heatmap style) for the specified keys.
+        Create a scatter plot colored by a field.
+
+        Args:
+            color_axis: Field used for point colors.
+            x_axis: Field used for horizontal coordinates.
+            y_axis: Field used for vertical coordinates.
+            cmap: Matplotlib colormap name.
+            s: Marker size.
+            return_ax: Return ``(figure, axes)`` instead of only the figure.
+
+        Returns:
+            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
         """
         fig, ax = self._create_subplot()
 
@@ -49,9 +65,18 @@ class Visualizer:
 
     def plot(self, z_axis: str = None, x_axis:str = 'x', y_axis:str = 'y', return_ax: bool = False, color = None) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
-        General plotting method.
-        With ``z_axis`` set, creates a 3-D scatter plot; otherwise creates a
-        1-D line plot using ``x_axis`` and ``y_axis``.
+        Create a line plot or a three-dimensional scatter plot.
+
+        Args:
+            z_axis: Optional field for a 3-D scatter plot. If omitted, plot
+                ``y_axis`` against ``x_axis`` as a line.
+            x_axis: Field used for horizontal coordinates.
+            y_axis: Field used for vertical coordinates.
+            return_ax: Return ``(figure, axes)`` instead of only the figure.
+            color: Optional line color or colormap name.
+
+        Returns:
+            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
         """
         if z_axis is None:
             fig, ax = self._create_subplot()
@@ -74,7 +99,15 @@ class Visualizer:
 
     def plot_distribution(self, key: str, bins: Union[str, int] = 'fd', return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
-        Plots histograms for the specified keys.
+        Plot a histogram for a field.
+
+        Args:
+            key: Field to plot.
+            bins: Number of bins or a NumPy binning strategy.
+            return_ax: Return ``(figure, axes)`` instead of only the figure.
+
+        Returns:
+            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
         """
         fig, ax = self._create_subplot()
         ax.hist(self.data_dict[key], bins=bins)
@@ -88,7 +121,17 @@ class Visualizer:
                         start: int = 0, end: Optional[int] = None, 
                         keys: Tuple[str, ...] = ('total_loss', 'bc_loss', 'pde_loss'), return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
-        Plots loss per iteration.
+        Plot recorded losses over training iterations.
+
+        Args:
+            log_scale: Use a logarithmic y-axis.
+            start: First history index to display.
+            end: Exclusive final history index.
+            keys: Loss-history keys to plot when present.
+            return_ax: Return ``(figure, axes)`` instead of only the figure.
+
+        Returns:
+            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
         """
         fig, ax = plt.subplots(refwidth=5, refheight=3)
 
@@ -111,7 +154,18 @@ class Visualizer:
     
     def plot_contour(self, color_axis:str, x_axis:str = 'x', y_axis:str = 'y', cmap = 'jet', levels = 50, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
-        Creates a filled contour plot for the specified field.
+        Create a filled contour plot for an interpolated field.
+
+        Args:
+            color_axis: Field to interpolate and plot.
+            x_axis: x-coordinate field.
+            y_axis: y-coordinate field.
+            cmap: Matplotlib colormap name.
+            levels: Number of contour levels.
+            return_ax: Return ``(figure, axes)`` instead of only the figure.
+
+        Returns:
+            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
         """
         fig, ax = self._create_subplot()
         (C,), (X, Y) = self._interpolate(color_axis, x_key=x_axis, y_key=y_axis)
@@ -131,7 +185,19 @@ class Visualizer:
     
     def plot_streamline(self, u:str, v:str, x_axis:str = 'x', y_axis:str = 'y', cmap = 'viridis', levels = 100, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
-        Creates a streamline plot for two interpolated vector components.
+        Create a streamline plot for two interpolated vector components.
+
+        Args:
+            u: Field containing the x component.
+            v: Field containing the y component.
+            x_axis: x-coordinate field.
+            y_axis: y-coordinate field.
+            cmap: Matplotlib colormap name.
+            levels: Streamline density or plotting level configuration.
+            return_ax: Return ``(figure, axes)`` instead of only the figure.
+
+        Returns:
+            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
         """
         fig, ax = self._create_subplot()
 

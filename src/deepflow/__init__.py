@@ -1,3 +1,5 @@
+"""Public DeepFlow API and optional backend entry points."""
+
 import sys
 import types
 

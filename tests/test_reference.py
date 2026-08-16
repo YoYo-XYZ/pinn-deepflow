@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import zipfile
 
 import numpy as np
 import pytest
@@ -91,6 +92,29 @@ def test_reference_solution_uses_a_single_defensive_query_cache():
     solution.evaluate([0.5], [0.5])
     solution.evaluate([0.25], [0.25])
     assert len(calls) == 3
+
+
+def test_reference_solution_exports_compressed_npz(tmp_path):
+    import deepflow as df
+    from deepflow.reference import ReferenceSolution
+
+    area = df.geometry.rectangle([0, 1], [0, 1])
+    solution = ReferenceSolution(
+        area=area,
+        mesh=None,
+        fields={"u": 1.0},
+        field_evaluator=lambda field, x, y: np.full_like(x, field, dtype=float),
+    )
+    path = tmp_path / "reference.npz"
+
+    solution.export_npz(path, [0.25], [0.5])
+
+    with zipfile.ZipFile(path) as archive:
+        assert archive.infolist()
+        assert all(
+            member.compress_type == zipfile.ZIP_DEFLATED
+            for member in archive.infolist()
+        )
 
 
 def test_reference_solution_rejects_inconsistent_snapshot_fields():

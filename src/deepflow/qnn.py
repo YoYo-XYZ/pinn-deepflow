@@ -1,3 +1,5 @@
+"""Optional quantum-enhanced PINN architectures."""
+
 from typing import List, Optional, Union, Callable
 from .nn import NN
 from .utility import get_dtype
@@ -71,6 +73,20 @@ _QCPINN_LAYER_TYPES = {
 }
 
 class QCPINN(NN):
+    """Quantum-circuit PINN with a configurable trainable circuit block.
+
+    Args:
+        input_vars: Names of coordinate inputs.
+        output_vars: Names of predicted fields.
+        nqubits: Number of qubits in the circuit.
+        q_layer_type: Circuit topology: ``"cascade"`` or ``"hea"``.
+        q_layer_iterations: Number of repeated quantum layers.
+        hidden_layer_pre: Classical layer widths before the quantum layer.
+        hidden_layer_post: Classical layer widths after the quantum layer.
+        activation: PyTorch activation module for classical layers.
+        weight_init: Weight initialization scheme inherited from ``NN``.
+    """
+
     def __init__(
         self,
         input_vars: Optional[List[str]] = None,
@@ -83,6 +99,7 @@ class QCPINN(NN):
         activation: nn.Module = nn.Tanh(),
         weight_init: Union[str, Callable, None] = 'kaiming',
     ):
+        """Initialize and build the quantum-circuit PINN."""
         super().__init__(input_vars, output_vars, weight_init=weight_init)
         self.nqubits = nqubits
         self.hidden_layer_pre = hidden_layer_pre if hidden_layer_pre is not None else []
@@ -137,78 +154,117 @@ class QCPINN(NN):
         self._init_weights()
 
 class QPINN(NN):
+    """Quantum PINN with configurable feature map and ansatz layers.
+
+    Args:
+        input_vars: Names of coordinate inputs.
+        output_vars: Names of predicted fields.
+        nqubits: Number of qubits in the circuit.
+        q_depth: Number of trainable quantum layers.
+        feature_map: Feature map: ``"simple"``, ``"product"``, or
+            ``"chebyshev"``.
+        ansatz: Trainable circuit block: ``"simple"``, ``"hea"``, or
+            ``"cascade"``.
+        cost_func: Measurement block. Only ``"simple"`` is currently
+            supported.
+        hidden_layer_pre: Classical layer widths before the quantum layer.
+        hidden_layer_post: Classical layer widths after the quantum layer.
+        activation: PyTorch activation module for classical layers.
+        weight_init: Weight initialization scheme inherited from ``NN``.
+    """
+
     def __init__(
         self,
         input_vars: Optional[List[str]] = None,
         output_vars: Optional[List[str]] = None,
         nqubits: Optional[int] = 4,
         q_depth: int = 4,
+        feature_map: str = "simple",
+        ansatz: str = "hea",
+        cost_func: str = "simple",
         hidden_layer_pre: Optional[List[int]] = None,
         hidden_layer_post: Optional[List[int]] = None,
         activation: nn.Module = nn.Tanh(),
         weight_init: Union[str, Callable, None] = 'kaiming',
     ):
+        """Initialize and build the quantum PINN."""
         super().__init__(input_vars, output_vars, weight_init=weight_init)
+        if isinstance(nqubits, bool) or not isinstance(nqubits, int) or nqubits < 1:
+            raise ValueError("nqubits must be a positive integer")
+        if isinstance(q_depth, bool) or not isinstance(q_depth, int) or q_depth < 1:
+            raise ValueError("q_depth must be a positive integer")
+        if feature_map not in {"simple", "product", "chebyshev"}:
+            raise ValueError(
+                "Unsupported feature_map. Expected one of: "
+                "simple, product, chebyshev."
+            )
+        if ansatz not in {"simple", "hea", "cascade"}:
+            raise ValueError(
+                "Unsupported ansatz. Expected one of: simple, hea, cascade."
+            )
+        if cost_func != "simple":
+            raise ValueError("Unsupported cost_func. Expected: simple.")
         self.nqubits = nqubits
         self.q_depth = q_depth
+        self.feature_map = feature_map
+        self.ansatz = ansatz
+        self.cost_func = cost_func
         self.hidden_layer_pre = hidden_layer_pre if hidden_layer_pre is not None else []
         self.hidden_layer_post = hidden_layer_post if hidden_layer_post is not None else []
         self.activation = activation
         self._build_network()
         self.to(get_dtype())
 
-    def _feature_map(self, qml_device):
-        @qml.qnode(qml_device, interface="torch")
-        def simple(inputs, weights):
-            qml.AngleEmbedding(inputs, wires=range(self.nqubits), rotation="Y")
-            qml.BasicEntanglerLayers(weights, wires=range(self.nqubits))
-        
-        @qml.qnode(qml_device, interface="torch")
-        def product(inputs, weights):
-            qml.AngleEmbedding(qml.math.asin(inputs), wires=range(self.nqubits), rotation="Y")
-            qml.BasicEntanglerLayers(weights, wires=range(self.nqubits))
-        
-        @qml.qnode(qml_device, interface="torch")
-        def chebyshev(inputs, weights):
-            qml.AngleEmbedding(inputs, wires=range(self.nqubits), rotation="Y")
-            qml.BasicEntanglerLayers(weights, wires=range(self.nqubits))
-        
-        return {"simple":simple, "product":product, "chebyshev":chebyshev}
-    
-    def _cost(self, qml_device):
-        @qml.qnode(qml_device, interface="torch")
-        def simple():
-            return [qml.expval(qml.PauliZ(i)) for i in range(self.nqubits)]
-        
-        return {"simple":simple}
-
-    def _ansatz(self, qml_device, iterations=1):
-        @qml.qnode(qml_device, interface="torch")
-        def simple(weights):
-            qml.basic_entangler(weights, wires=range(self.nqubits))
-
-        @qml.qnode(qml_device, interface="torch")
-        def hea(weights):
-            qml.RY(weights, wires=range(self.nqubits))
-            qml.strongly_entangling(weights, wires=range(self.nqubits))
-            qml.strongly_entangling(weights, wires=range(self.nqubits))
-            qml.strongly_entangling(weights, wires=range(self.nqubits))
-
-        @qml.qnode(qml_device, interface="torch")
-        def cascade(weights):
-            for i in range(self.nqubits):
-                qml.RX(weights[0, i], wires=i)
-                qml.RY(weights[1, i], wires=i)
-            for i in range(self.nqubits): # entanglement
-                qml.CRX(weights[2, i], wires=[i, (i-1) % self.nqubits])
-
-        return {"simple":simple, "hea":hea, "cascade":cascade}
-
-    def _qnn_layer(self, feature_map = "angle", ansatz = "hea", cost_func = "simple"):
+    def _qnn_layer(self):
         qml_device = qml.device("default.qubit", wires=self.nqubits)
-        self._feature_map(qml_device)[feature_map]()
-        self._ansatz(qml_device)[ansatz]()
-        self._cost(qml_device)[cost_func]()
+
+        feature_map = self.feature_map
+        ansatz = self.ansatz
+        nqubits = self.nqubits
+        q_depth = self.q_depth
+
+        @qml.qnode(qml_device, interface="torch")
+        def qnn_layer(inputs, weights):
+            if feature_map == "product":
+                embedded_inputs = qml.math.asin(
+                    qml.math.clip(inputs, -1.0, 1.0)
+                )
+            elif feature_map == "chebyshev":
+                clipped_inputs = qml.math.clip(inputs, -1.0, 1.0)
+                embedded_inputs = 2.0 * clipped_inputs.square() - 1.0
+            else:
+                embedded_inputs = inputs
+            qml.AngleEmbedding(
+                embedded_inputs,
+                wires=range(nqubits),
+                rotation="Y",
+            )
+
+            for layer in range(q_depth):
+                if ansatz == "simple":
+                    for wire in range(nqubits):
+                        qml.RY(weights[layer, 0, wire], wires=wire)
+                elif ansatz == "hea":
+                    for wire in range(nqubits):
+                        qml.RX(weights[layer, 0, wire], wires=wire)
+                        qml.RY(weights[layer, 1, wire], wires=wire)
+                        qml.RZ(weights[layer, 2, wire], wires=wire)
+                    for wire in range(nqubits - 1):
+                        qml.CNOT(wires=[wire, wire + 1])
+                else:
+                    for wire in range(nqubits):
+                        qml.RX(weights[layer, 0, wire], wires=wire)
+                        qml.RY(weights[layer, 1, wire], wires=wire)
+                    if nqubits > 1:
+                        for wire in range(nqubits):
+                            qml.CRX(
+                                weights[layer, 2, wire],
+                                wires=[wire, (wire - 1) % nqubits],
+                            )
+
+            return [qml.expval(qml.PauliZ(wire)) for wire in range(nqubits)]
+
+        return qnn_layer
 
     def _build_network(self):
         layers = []
@@ -220,7 +276,10 @@ class QPINN(NN):
             layers.append(self.activation)
         
         # Quantum layers
-        q_layer = qml.qnn.TorchLayer(self._qnn_layer(), weight_shapes={"weights":(self.q_depth,self.nqubits)})
+        q_layer = qml.qnn.TorchLayer(
+            self._qnn_layer(),
+            weight_shapes={"weights": (self.q_depth, 3, self.nqubits)},
+        )
         layers.append(q_layer)
         layers.append(self.activation)
         

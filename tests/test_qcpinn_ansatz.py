@@ -69,3 +69,36 @@ def test_q_layer_type_is_case_insensitive():
 def test_invalid_q_layer_type_raises_clear_error():
     with pytest.raises(ValueError, match="Unsupported q_layer_type.*cascade.*hea"):
         df.QCPINN(input_vars=["x"], output_vars=["u"], nqubits=2, q_layer_type="layered")
+
+
+@pytest.mark.parametrize("feature_map", ["simple", "product", "chebyshev"])
+@pytest.mark.parametrize("ansatz", ["simple", "hea", "cascade"])
+def test_qpinn_supports_configured_quantum_blocks(feature_map, ansatz):
+    model = df.QPINN(
+        input_vars=["x", "y"],
+        output_vars=["u"],
+        nqubits=2,
+        q_depth=1,
+        feature_map=feature_map,
+        ansatz=ansatz,
+    )
+
+    outputs = model(
+        {
+            "x": torch.tensor([0.1, 0.2]),
+            "y": torch.tensor([0.3, 0.4]),
+        }
+    )
+
+    assert outputs["u"].shape == (2,)
+
+
+def test_qpinn_rejects_unknown_quantum_blocks():
+    with pytest.raises(ValueError, match="Unsupported feature_map"):
+        df.QPINN(feature_map="angle")
+
+    with pytest.raises(ValueError, match="Unsupported ansatz"):
+        df.QPINN(ansatz="unknown")
+
+    with pytest.raises(ValueError, match="Unsupported cost_func"):
+        df.QPINN(cost_func="unknown")

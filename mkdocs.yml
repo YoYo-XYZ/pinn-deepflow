@@ -20,6 +20,16 @@ plugins:
       handlers:
         python:
           paths: [src]
+          options:
+            docstring_style: google
+            docstring_options:
+              warn_missing_types: false
+            filters:
+              - "!^_"
+            members_order: source
+            merge_init_into_class: true
+            show_signature_annotations: true
+            show_source: false
 
 extra_javascript:
   - javascripts/mathjax.js

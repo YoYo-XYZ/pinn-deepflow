@@ -126,6 +126,29 @@ def test_sampling_area_filters_candidates_through_contains():
     assert not geometry.circle(1, 1, 0.5).contains(x, y).any()
 
 
+def test_scalar_area_sampling_documents_scheme_specific_counts():
+    area = geometry.rectangle([0, 1], [0, 1])
+
+    uniform_x, _ = area.sampling_area(4, scheme="uniform")
+    random_x, _ = area.sampling_area(4, scheme="random")
+    lhs_x, _ = area.sampling_area(4, scheme="lhs")
+
+    assert uniform_x.shape == (16,)
+    assert random_x.shape == (4,)
+    assert lhs_x.shape == (4,)
+
+
+def test_sampling_lines_rejects_unequal_dense_resolutions():
+    area = geometry.rectangle([0, 1], [0, 1])
+
+    x, y = area.sampling_lines(3)
+    assert x.shape == (4, 3)
+    assert y.shape == (4, 3)
+
+    with pytest.raises(ValueError, match="resolutions must match"):
+        area.sampling_lines(3, 4, 3, 3)
+
+
 def test_legacy_area_construction_retains_boundary_masking_fallback():
     explicit_area = geometry.rectangle([0, 2], [0, 1])
     legacy_area = geometry.Area(explicit_area.bound_list.copy())

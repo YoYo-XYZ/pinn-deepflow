@@ -1,3 +1,5 @@
+"""Two-dimensional geometry primitives and sampling helpers."""
+
 from typing import List, Tuple, Callable, Optional, Union, Dict, Any
 
 import torch
@@ -11,13 +13,31 @@ EPS = 1e-6
 LARGE_SLOPE = 1e5
 
 def custom_data(data_dict: Dict[str, Any]) -> 'CustomData':
-    """Factory function to create a CustomData object."""
+    """Create a geometry backed by user-provided coordinate data.
+
+    Args:
+        data_dict: Mapping containing at least ``x`` and ``y`` coordinate
+            tensors. Additional entries are retained as user data.
+
+    Returns:
+        A ``CustomData`` instance representing the supplied points.
+    """
     return CustomData(data_dict)
 class CustomData(PhysicsAttach):
+    """Attach PINN physics and evaluation to a fixed point cloud.
+
+    Args:
+        data_dict: Mapping containing ``x`` and ``y`` coordinate tensors.
+
+    Notes:
+        Custom data is not resampled by area or line samplers. Its coordinates
+        are processed as supplied.
+    """
     dim = 2
     axes = list(range(dim))
     
     def __init__(self, data_dict: Dict[str, Any]):
+        """Initialize a custom-data geometry from coordinate arrays."""
         super().__init__()
         self.ranges: Dict[int, List[float]] = {}
         self.axes_sec = list(self.axes)
@@ -42,25 +62,28 @@ class CustomData(PhysicsAttach):
             self.centers[ax] = self.ranges[ax][0] + self.lengths[ax] / 2
 
 class Bound(PhysicsAttach):
-    """
-    Represents a 1D boundary in a 2D space (e.g., a line segment or curve).
-    
+    """Represent a one-dimensional boundary in a two-dimensional space.
+
+    A boundary is described by a reference-axis interval and one or more
+    functions for the dependent coordinates. Use ``line``, ``curve``, or
+    ``point`` for common constructions.
+
+    Args:
+        range_val: Two-element interval on the reference axis.
+        *func: Functions mapping the reference coordinate to dependent
+            coordinates, or two functions mapping a parameter to ``x`` and
+            ``y`` when ``ref_axis="t"``.
+        ref_axis: Reference axis: ``"x"``, ``"y"``, or ``"t"``.
+
     Attributes:
-        ranges (Dict): Dictionary storing min/max values for axes.
-        funcs (Dict): Dictionary storing parameterization functions.
+        ranges: Minimum and maximum values for each coordinate axis.
+        funcs: Parameterization functions keyed by reference axis.
     """
     dim = 2
     axes = list(range(dim))
 
     def __init__(self, range_val: List[float], *func: Callable, ref_axis: str = 'x'):
-        """
-        Initialize a Boundary.
-
-        Args:
-            range_val: The [min, max] range along the reference axis.
-            *func: Functions defining the geometry.
-            ref_axis: The axis on which the range is defined ('x', 'y', or 't' for parametric).
-        """
+        """Initialize a boundary parameterization."""
         super().__init__()
         self.ranges: Dict[int, List[float]] = {}
         self.funcs: Dict[int, List[Callable]] = {}
@@ -85,7 +108,17 @@ class Bound(PhysicsAttach):
         self._postprocess()
 
     def define_func(self, range_val: List[float], *func: Callable, ref_axis: str = 'y'):
-        """Defines secondary functions or parameterization for the boundary."""
+        """Define or replace a dependent-coordinate parameterization.
+
+        Args:
+            range_val: Interval for the selected reference axis.
+            *func: Functions defining dependent coordinates or a parametric
+                ``x(t), y(t)`` curve.
+            ref_axis: Reference axis: ``"x"``, ``"y"``, or ``"t"``.
+
+        Returns:
+            None. The boundary bounds and sampled preview are updated in place.
+        """
         if ref_axis == 'x':
             ax = 0
         elif ref_axis == 'y':
@@ -113,12 +146,15 @@ class Bound(PhysicsAttach):
             self.centers[ax] = self.ranges[ax][0] + self.lengths[ax] / 2
 
     def sampling_line(self, n_points: int, scheme = 'uniform') -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Generates points along the boundary.
+        """Sample points along the boundary.
 
         Args:
             n_points: Number of points to generate.
-            scheme: Sampling scheme ('uniform' or 'random' or 'lhs'for Latin Hypercube Sampling).
+            scheme: Sampling scheme: ``"uniform"``, ``"random"``, or
+                ``"lhs"`` for Latin Hypercube Sampling.
+
+        Returns:
+            Tuple of one-dimensional ``x`` and ``y`` tensors.
         """
         ax = 2 if self.parameterized else self.ax
         self.coords = {}
@@ -147,7 +183,14 @@ class Bound(PhysicsAttach):
         return self.X, self.Y
 
     def mask_area(self, *x: torch.Tensor) -> torch.Tensor:
-        """Creates a boolean mask for points relative to this boundary."""
+        """Return the mask of points rejected by this boundary.
+
+        Args:
+            *x: Coordinate tensors in ``x``/``y`` axis order.
+
+        Returns:
+            Boolean tensor with the same shape as the coordinate tensors.
+        """
         reject_masks = []
         
         # Check if within the reference axis range
@@ -170,6 +213,7 @@ class Bound(PhysicsAttach):
         return (f'Bound(axis={self.ax}, reject_above={self.reject_above}, ranges={self.ranges}), centers: {self.centers}, lengths: {self.lengths}')
     
     def show(self):
+        """Plot a sampled representation of the boundary."""
         import matplotlib.pyplot as plt
 
         X, Y = self.sampling_line(1000)
@@ -178,8 +222,17 @@ class Bound(PhysicsAttach):
         plt.show()
 
 class Area(PhysicsAttach):
-    """
-    Represents a 2D area defined by a collection of Boundaries.
+    """Represent a two-dimensional area bounded by ``Bound`` objects.
+
+    Args:
+        bound_list: Boundary objects describing the exterior of the area.
+        bounds_negative: Optional boundaries describing holes to exclude.
+        contains_fn: Optional custom point-containment function.
+        ranges: Optional explicit ``{axis: (lower, upper)}`` bounding ranges.
+
+    Notes:
+        Areas support subtraction and union with ``-``, ``|``, and ``+``.
+        ``sampling_area`` filters candidate points through ``contains``.
     """
     dim = 2
     axes = list(range(dim))
@@ -192,6 +245,7 @@ class Area(PhysicsAttach):
         contains_fn: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
         ranges: Optional[Dict[int, Tuple[float, float]]] = None,
     ):
+        """Initialize an area from its boundary and containment definition."""
         super().__init__()
         self.bound_list = bound_list
         self.negative_bound_list = bounds_negative
@@ -220,8 +274,13 @@ class Area(PhysicsAttach):
 
     def checkbound(self):
         """
-        Automatically determines the 'direction' (reject_above) of boundaries
-        using a ray-casting approach from the center.
+        Determine each boundary's interior-facing direction.
+
+        The direction is inferred using a ray-casting check from the area
+        center and stored on each boundary as ``reject_above``.
+
+        Returns:
+            None. Boundary objects are updated in place.
         """
         bound_list = self.bound_list
         def is_inrange(x, range_x):
@@ -264,7 +323,22 @@ class Area(PhysicsAttach):
                         bound.reject_above = True
 
     def contains(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        """Return a boolean mask selecting points inside or on the area."""
+        """Return a boolean mask selecting points inside or on the area.
+
+        Args:
+            x: Floating-point tensor of x coordinates.
+            y: Floating-point tensor of y coordinates with the same shape,
+                device, and dtype as ``x``.
+
+        Returns:
+            Boolean tensor indicating whether each point belongs to the area.
+
+        Raises:
+            TypeError: If coordinates are not compatible floating-point
+                tensors or a custom containment function returns an invalid
+                value.
+            ValueError: If coordinate shapes, devices, or dtypes differ.
+        """
         if not isinstance(x, torch.Tensor) or not isinstance(y, torch.Tensor):
             raise TypeError("x and y must be torch tensors")
         if x.shape != y.shape:
@@ -293,8 +367,20 @@ class Area(PhysicsAttach):
         return mask
 
     def sampling_area(self, n_points_square: Union[int, List[int]], scheme = 'uniform') -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Samples points within the area.
+        """Sample and retain points inside the area.
+
+        Args:
+            n_points_square: For uniform sampling, an integer gives the
+                number of points per axis; for random and LHS sampling, it
+                gives the number of candidate points. ``[nx, ny]`` supplies
+                separate grid resolutions and generates ``nx * ny``
+                candidates.
+            scheme: Sampling scheme: ``"uniform"``, ``"random"``, or
+                ``"lhs"``.
+
+        Returns:
+            Tuple of sampled ``x`` and ``y`` tensors. Candidate points outside
+            the area are removed.
         """
         # Normalize n_points_square to nx, ny, and n_total before branching
         if isinstance(n_points_square, (list, tuple)):
@@ -340,15 +426,46 @@ class Area(PhysicsAttach):
         return self.X, self.Y
 
     def sampling_lines(self, *n_points_per_line, scheme = 'random') -> Tuple[torch.Tensor, torch.Tensor]:
+        """Sample every boundary in the area.
+
+        Args:
+            *n_points_per_line: One resolution applied to every boundary. If
+                one value per boundary is supplied, all values must match so
+                the result can be returned as dense stacked tensors.
+            scheme: Sampling scheme passed to ``Bound.sampling_line``.
+
+        Returns:
+            Stacked ``x`` and ``y`` tensors containing the boundary samples.
+
+        Raises:
+            ValueError: If no resolution is supplied, the number of
+                resolutions does not match the number of boundaries, or
+                resolutions differ between boundaries.
+        """
+        if not self.bound_list:
+            raise ValueError("Area has no boundaries to sample.")
+
         output_x = []
         output_y = []
         
         pts_list = list(n_points_per_line)
+        if not pts_list:
+            raise ValueError("At least one boundary sampling resolution is required.")
         if len(pts_list) == 1:
             pts_list = [pts_list[0]] * len(self.bound_list)
+        elif len(pts_list) != len(self.bound_list):
+            raise ValueError(
+                "Provide one resolution for all boundaries or exactly one "
+                "resolution per boundary."
+            )
+        if len(set(pts_list)) != 1:
+            raise ValueError(
+                "All boundary sampling resolutions must match when returning "
+                "stacked tensors."
+            )
             
         for i, bound in enumerate(self.bound_list):
-            num_pts = pts_list[i] if i < len(pts_list) else pts_list[0]
+            num_pts = pts_list[i]
             X, Y = bound.sampling_line(num_pts, scheme=scheme)
             output_x.append(X)
             output_y.append(Y)
@@ -422,6 +539,11 @@ class Area(PhysicsAttach):
         return s
     
     def show(self, show_index: bool = False):
+        """Plot the boundary and a small interior sample of the area.
+
+        Args:
+            show_index: Label exterior boundaries with their list indices.
+        """
         try:
             import matplotlib.pyplot as plt
         except ImportError:
@@ -452,7 +574,19 @@ class Area(PhysicsAttach):
 # --- Factory Functions ---
 
 def circle(x: float, y: float, r: float) -> Area:
-    """Creates a circular Area."""
+    """Create a circular area.
+
+    Args:
+        x: Center x coordinate.
+        y: Center y coordinate.
+        r: Positive radius.
+
+    Returns:
+        A circular ``Area``.
+
+    Raises:
+        ValueError: If ``r`` is not positive.
+    """
     if r <= 0:
         raise ValueError("radius must be positive")
 
@@ -480,7 +614,15 @@ def circle(x: float, y: float, r: float) -> Area:
     )
 
 def rectangle(x_range: List[float], y_range: List[float]) -> Area:
-    """Creates a rectangular Area."""
+    """Create an axis-aligned rectangular area.
+
+    Args:
+        x_range: Two-element x interval.
+        y_range: Two-element y interval.
+
+    Returns:
+        A rectangular ``Area``.
+    """
     p1 = [x_range[0], y_range[0]]
     p2 = [x_range[1], y_range[0]]
     p3 = [x_range[1], y_range[1]]
@@ -488,9 +630,11 @@ def rectangle(x_range: List[float], y_range: List[float]) -> Area:
     return polygon(p1, p2, p3, p4)
 
 def line_horizontal(y: float, range_x: List[float]) -> Bound:
+    """Create a horizontal boundary at a fixed y coordinate."""
     return Bound(range_x, lambda x: y * torch.ones_like(x), ref_axis='x')
 
 def line_vertical(x: float, range_y: List[float]) -> Bound:
+    """Create a vertical boundary at a fixed x coordinate."""
     bound = Bound(range_y, lambda y: x * torch.ones_like(y), ref_axis='y')
     # Using a large slope to approximate verticality for x-based lookups
     bound.define_func([x - EPS, x + EPS], 
@@ -499,7 +643,15 @@ def line_vertical(x: float, range_y: List[float]) -> Bound:
     return bound
 
 def line(pos1: List[float], pos2: List[float]) -> Bound:
-    """Creates a boundary line between two points."""
+    """Create a straight boundary between two points.
+
+    Args:
+        pos1: First ``[x, y]`` endpoint.
+        pos2: Second ``[x, y]`` endpoint.
+
+    Returns:
+        A ``Bound`` representing the line segment.
+    """
     x1, y1 = pos1
     x2, y2 = pos2
     
@@ -515,9 +667,18 @@ def line(pos1: List[float], pos2: List[float]) -> Bound:
                  ref_axis='x')
 
 def polygon(*pos: List[float]) -> Area:
-    """
-    Creates a polygon from a sequence of vertex coordinates.
-    Vertices should be ordered (clockwise or counter-clockwise).
+    """Create a polygon from ordered vertex coordinates.
+
+    Args:
+        *pos: At least three ``[x, y]`` vertices in clockwise or
+            counter-clockwise order.
+
+    Returns:
+        A polygonal ``Area``.
+
+    Raises:
+        ValueError: If fewer than three vertices are supplied, vertices do not
+            have shape ``(n, 2)``, or a coordinate is non-finite.
     """
     if len(pos) < 3:
         raise ValueError("polygon requires at least three vertices")
@@ -586,8 +747,18 @@ def _polygon_contains(
     return inside | on_segment
 
 def curve(range_val: List[float], *func, ref_axis='x') -> Bound:
+    """Create a parameterized boundary from coordinate functions.
+
+    Args:
+        range_val: Interval for the reference axis or parameter.
+        *func: Boundary functions accepted by ``Bound``.
+        ref_axis: Reference axis: ``"x"``, ``"y"``, or ``"t"``.
+
+    Returns:
+        A parameterized ``Bound``.
+    """
     return Bound(range_val, *func, ref_axis=ref_axis)
 
 def point(x, y) -> Bound:
-    """Creates a point boundary (degenerate case)."""
+    """Create a point-like boundary at ``(x, y)``."""
     return line_horizontal(y, [x-EPS, x+EPS])

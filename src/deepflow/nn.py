@@ -1,3 +1,5 @@
+"""Neural-network models and training helpers for PINNs."""
+
 import copy
 import math
 import platform
@@ -16,14 +18,30 @@ class _NonFiniteLossError(RuntimeError):
 
 
 class HardConstraint:
-    """
-    Defines a hard constraint for the PINN.
+    """Represent a constant boundary or initial-condition constraint.
+
+    Args:
+        constant: Value imposed by the constraint.
+
+    Notes:
+        Use ``hard_constraint`` as a concise factory when defining a
+        geometry condition.
     """
     def __init__(self, constant: float = 0.0):
+        """Initialize a constant hard constraint."""
         self.constant = constant
 
     @staticmethod
     def define_zero_func(bound):
+        """Create a function that vanishes on a boundary.
+
+        Args:
+            bound: Boundary whose parameterization defines the zero set.
+
+        Returns:
+            Callable accepting a coordinate mapping and returning the signed
+            distance-like constraint factor.
+        """
         def zero_func(coords):
             return coords[bound.axes_sec[0]] - bound.funcs[bound.ax][0](coords[bound.ax])
         return zero_func
@@ -31,7 +49,16 @@ class HardConstraint:
     def __str__(self):
         return str(self.constant)
 
-hard_constraint = lambda constant = 0: HardConstraint(constant)
+def hard_constraint(constant=0):
+    """Create a ``HardConstraint`` with a prescribed constant.
+
+    Args:
+        constant: Value imposed on the constrained boundary or initial slice.
+
+    Returns:
+        A ``HardConstraint`` instance.
+    """
+    return HardConstraint(constant)
 
 class NN(ABC, nn.Module):
     """
@@ -40,6 +67,16 @@ class NN(ABC, nn.Module):
     A feedforward neural network that takes input coordinates (e.g., x, y, t)
     and outputs physical quantities (e.g., u, v, p), with support for 
     hard constraints.
+
+    Args:
+        input_vars: Names of coordinate inputs, such as ``["x", "y"]``.
+        output_vars: Names of predicted fields, such as ``["u", "v", "p"]``.
+        weight_init: Initialization alias (``"kaiming"``/``"he"`` or
+            ``"xavier"``/``"glorot"``), ``None``, or a callable.
+
+    Attributes:
+        loss_history: Recorded total, boundary, PDE, and optional initial
+            condition losses.
     """
 
     def __init__(
@@ -140,6 +177,10 @@ class NN(ABC, nn.Module):
         
         Args:
             inputs_dict: Dictionary containing input tensors (e.g., {'x': tensor, 'y': tensor})
+
+        Returns:
+            Dictionary mapping each configured output name to a prediction
+            tensor. Hard constraints are applied when configured.
         """
         # Efficient stacking
         input_tensor = torch.stack([inputs_dict[key] for key in self.input_keys], dim=1)
@@ -162,8 +203,15 @@ class NN(ABC, nn.Module):
         return output_dict
 
     def apply_hard_constraints(self, bound_list: list):
-        """
-        Configures hard constraints based on a list of boundary conditions.
+        """Configure output constraints from a list of boundary objects.
+
+        Args:
+            bound_list: Boundaries whose condition dictionaries may contain
+                ``HardConstraint`` values.
+
+        Raises:
+            ValueError: If boundaries impose different constants for the same
+                output field.
         """
         self.hard_constraints = {}
         self.hard_constants = {}
@@ -198,7 +246,7 @@ class NN(ABC, nn.Module):
             if key in self.loss_history: self.loss_history[key].append(value_to_store)
 
     def print_status(self):
-        """Prints the current training status."""
+        """Print the most recently recorded training losses."""
         string_parts = [f"Epoch: {len(self.loss_history['total_loss'])}"]
         for k, v in self.loss_history.items():
             if v:
@@ -233,15 +281,31 @@ class NN(ABC, nn.Module):
         max_grad_norm: Optional[float] = 1.0,
     )-> tuple['NN', 'NN']:
         """
-        Trains the model using the Adam optimizer.
+        Train a copy of the model using the Adam optimizer.
 
         Args:
+            learning_rate: Adam learning rate.
+            epochs: Maximum number of training epochs.
+            calc_loss: Callable returning a loss dictionary with
+                ``total_loss``.
+            use_scheduler: Whether to use a decaying step scheduler.
+            print_every: Print status at this many epochs.
+            threshold_loss: Stop when the best loss falls below this value.
+            do_between_epochs: Optional callback called as ``callback(epoch,
+                model)`` after each epoch.
             compile_model: If ``True``, wraps the model with ``torch.compile``
                 for kernel fusion and reduced overhead. Requires PyTorch 2.0+
                 and the Triton backend (Linux). The first epoch will be slower
                 due to compilation; subsequent epochs benefit from fused kernels.
             max_grad_norm: Maximum global gradient norm used for clipping. Set
                 to ``None`` to disable gradient clipping.
+
+        Returns:
+            Tuple ``(model, best_model)`` containing the trained copy and a
+            copy restored to its lowest recorded loss.
+
+        Raises:
+            ValueError: If ``print_every`` or ``max_grad_norm`` is not positive.
         """
         if max_grad_norm is not None and max_grad_norm <= 0:
             raise ValueError("max_grad_norm must be positive or None")
@@ -339,14 +403,25 @@ class NN(ABC, nn.Module):
         compile_model: bool = False,
     ) -> tuple['NN', 'NN']:
         """
-        Trains the model using the L-BFGS optimizer.
+        Train a copy of the model using the L-BFGS optimizer.
 
         Args:
+            epochs: Maximum number of training epochs.
+            calc_loss: Callable returning a loss dictionary with
+                ``total_loss``.
+            print_every: Print status at this many epochs.
+            threshold_loss: Stop when the loss falls below this value.
+            do_between_epochs: Optional callback called as ``callback(epoch,
+                model)`` after each epoch.
             compile_model: If ``True``, wraps the model with ``torch.compile``
                 for kernel fusion and reduced overhead. Requires PyTorch 2.0+.
         
         Returns:
-            tuple: (model, best_model) — the final model and the model with the lowest loss.
+            Tuple ``(model, best_model)`` containing the trained copy and a
+            copy restored to its lowest recorded loss.
+
+        Raises:
+            ValueError: If ``print_every`` is not positive.
         """
         if print_every <= 0:
             raise ValueError("print_every must be positive")
@@ -445,15 +520,29 @@ class NN(ABC, nn.Module):
         return model, best_model
     
     def save_as_pickle(self, file_name: str = "model.pkl") -> None:
-        """Saves the model as a pickle file."""
+        """Serialize the model to a pickle file.
+
+        Args:
+            file_name: Output path. The ``.pkl`` suffix is added when absent.
+
+        Returns:
+            None.
+        """
         import pickle
         if file_name[-4:] != '.pkl': file_name += '.pkl'
         with open(file_name, 'wb') as f:
             pickle.dump(self, f)
     
 
-def load_from_pickle(file_name: str) -> None:
-    """Loads the model from a pickle file."""
+def load_from_pickle(file_name: str) -> NN:
+    """Load a model serialized by ``NN.save_as_pickle``.
+
+    Args:
+        file_name: Pickle path. The ``.pkl`` suffix is added when absent.
+
+    Returns:
+        The deserialized model instance.
+    """
     import pickle
     if file_name[-4:] != '.pkl': file_name += '.pkl'
     with open(file_name, 'rb') as f:
@@ -496,6 +585,16 @@ class _JointRFFEmbedding(nn.Module):
         return torch.cat((torch.cos(projection), torch.sin(projection)), dim=-1)
     
 class FNN(NN):
+    """Fully connected feedforward neural network for PINN fields.
+
+    Args:
+        input_vars: Names of coordinate inputs.
+        output_vars: Names of predicted fields.
+        hidden_layer: Width of each hidden layer.
+        activation: PyTorch activation module inserted after hidden layers.
+        weight_init: Weight initialization scheme passed to ``NN``.
+    """
+
     def __init__(
         self,
         input_vars: Optional[List[str]] = None,
@@ -504,6 +603,7 @@ class FNN(NN):
         activation: nn.Module = nn.Tanh(),
         weight_init: Union[str, Callable, None] = 'kaiming',
     ):
+        """Initialize and build the feedforward network."""
         super().__init__(input_vars, output_vars, weight_init=weight_init)
         self.activation = activation
         self.hidden_layer = hidden_layer
@@ -527,6 +627,17 @@ class FNN(NN):
         self._init_weights()
 
 class PINN(FNN):
+    """Standard fully connected physics-informed neural network.
+
+    Args:
+        input_vars: Names of coordinate inputs.
+        output_vars: Names of predicted fields.
+        width: Width of every hidden layer.
+        length: Number of hidden layers.
+        activation: PyTorch activation module for hidden layers.
+        weight_init: Weight initialization scheme.
+    """
+
     def __init__(
         self,
         input_vars: Optional[List[str]] = None,
@@ -536,6 +647,7 @@ class PINN(FNN):
         activation: nn.Module = nn.Tanh(),
         weight_init: Union[str, Callable, None] = 'kaiming',
     ):
+        """Initialize a PINN with equally wide hidden layers."""
         super().__init__(
             input_vars, output_vars,
             [width for _ in range(length)],
@@ -545,7 +657,18 @@ class PINN(FNN):
 
 
 class RFFPINN(FNN):
-    """PINN with a fixed joint random Fourier feature input embedding."""
+    """PINN with a fixed joint random Fourier feature input embedding.
+
+    Args:
+        input_vars: Names of coordinate inputs.
+        output_vars: Names of predicted fields.
+        width: Width of each post-embedding hidden layer.
+        length: Number of post-embedding hidden layers.
+        embed_dim: Positive even dimension of the Fourier embedding.
+        alpha: Standard deviation scale of the sampled frequencies.
+        activation: PyTorch activation module for hidden layers.
+        weight_init: Weight initialization scheme.
+    """
 
     def __init__(
         self,
@@ -558,6 +681,7 @@ class RFFPINN(FNN):
         activation: nn.Module = nn.Tanh(),
         weight_init: Union[str, Callable, None] = 'kaiming',
     ):
+        """Initialize a PINN with a fixed random Fourier embedding."""
         self.embed_dim = embed_dim
         self.alpha = alpha
         super().__init__(

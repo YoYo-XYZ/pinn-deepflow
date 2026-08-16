@@ -429,7 +429,15 @@ def _make_solution_evaluator(mesh):
 
 
 class ReferenceSolver:
-    """Solve DeepFlow's built-in PDEs with optional NGSolve/Netgen FEM."""
+    """Solve DeepFlow's built-in PDEs with optional NGSolve/Netgen FEM.
+
+    Args:
+        mesh_size: Target mesh size, or ``None`` to infer it from the PDE area.
+        boundary_resolution: Boundary sampling resolution used during meshing.
+        time_step: Snapshot spacing for transient problems.
+        tolerance: Iterative solver convergence tolerance.
+        max_iterations: Maximum number of solver iterations.
+    """
 
     def __init__(
         self,
@@ -439,6 +447,7 @@ class ReferenceSolver:
         tolerance=1e-8,
         max_iterations=200,
     ):
+        """Validate and store reference-solver configuration."""
         if mesh_size is not None and (not np.isfinite(mesh_size) or mesh_size <= 0):
             raise ValueError("mesh_size must be positive")
         if not isinstance(boundary_resolution, int) or boundary_resolution < 4:
@@ -456,10 +465,27 @@ class ReferenceSolver:
         self.max_iterations = max_iterations
 
     def clear_cache(self):
-        """Retain the historical cache API; solutions are not solver-cached."""
+        """Retain the historical cache API; solutions are not solver-cached.
+
+        Returns:
+            None.
+        """
 
     def solve(self, domain) -> ReferenceSolution:
-        """Solve the PDE attached to one ``ProblemDomain`` area."""
+        """Solve the PDE attached to one ``ProblemDomain`` area.
+
+        Args:
+            domain: Domain containing exactly one area with a supported PDE.
+
+        Returns:
+            A ``ReferenceSolution`` retaining the solved FEM fields.
+
+        Raises:
+            ImportError: If the optional NGSolve/Netgen backend is unavailable.
+            ReferenceConfigurationError: If geometry, conditions, or time
+                configuration is unsupported.
+            UnsupportedReferencePDE: If the attached PDE has no FEM backend.
+        """
         areas = list(getattr(domain, "area_list", ()))
         pde_areas = [area for area in areas if getattr(area, "physics_type", None) == "PDE"]
         if len(pde_areas) != 1:

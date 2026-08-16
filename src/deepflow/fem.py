@@ -1,4 +1,4 @@
-"""FEM evaluation orchestration for :class:`ProblemDomain`."""
+"""FEM evaluation orchestration for ``ProblemDomain``."""
 
 from typing import TYPE_CHECKING
 
@@ -15,7 +15,24 @@ def solve_fem(
     tolerance=1e-8,
     max_iterations=200,
 ) -> "ReferenceGroupEvaluator":
-    """Solve a domain with the optional NGSolve FEM backend."""
+    """Solve a domain with the optional NGSolve FEM backend.
+
+    Args:
+        domain: Domain containing exactly one area with an attached PDE.
+        mesh_size: Target FEM mesh size, or ``None`` to infer it.
+        boundary_resolution: Number of samples used to construct mesh
+            boundary curves.
+        time_step: Time spacing for transient reference snapshots.
+        tolerance: Iterative solver convergence tolerance.
+        max_iterations: Maximum number of solver iterations.
+
+    Returns:
+        A ``deepflow.evaluation.ReferenceGroupEvaluator``.
+
+    Raises:
+        ImportError: If NGSolve/Netgen is not installed.
+        ValueError: If the domain or solver configuration is invalid.
+    """
     from .evaluation import ReferenceGroupEvaluator
     from .reference import ReferenceSolver
 

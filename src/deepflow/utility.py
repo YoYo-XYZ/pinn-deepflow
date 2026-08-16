@@ -1,3 +1,5 @@
+"""Global configuration, reproducibility, and autograd utilities."""
+
 import random
 import numpy as np
 import torch
@@ -20,9 +22,19 @@ def latin_hypercube_sampling(n_samples: int, n_dimensions: int, lower_lim:list, 
     Generates Latin Hypercube Samples scaled to [lower_lim, upper_lim].
 
     Reproducibility:
-        Pass an explicit ``seed``, or set one globally via :func:`manual_seed`.
+        Pass an explicit ``seed``, or set one globally via ``manual_seed``.
         If neither is provided, SciPy's default (``None``) is used and results
         will vary between runs.
+
+    Args:
+        n_samples: Number of samples.
+        n_dimensions: Number of dimensions.
+        lower_lim: Lower bound for each dimension.
+        upper_lim: Upper bound for each dimension.
+        seed: Optional per-call random seed.
+
+    Returns:
+        A tensor of shape ``(n_samples, n_dimensions)``.
     """
     # Resolve seed: explicit > per-call advancing RNG > global fallback > None (non-deterministic)
     seed = seed if seed is not None else (_next_seed() if _RNG is not None else _GLOBAL_SEED)
@@ -34,6 +46,7 @@ def latin_hypercube_sampling(n_samples: int, n_dimensions: int, lower_lim:list, 
 # Module-level device configuration (mirrored by dtype below)
 device = 'cpu' if not torch.cuda.is_available() else 'cuda'
 def get_device():
+    """Return the configured PyTorch device name."""
     global device
     return device
 
@@ -57,6 +70,9 @@ def set_dtype(value: torch.dtype) -> None:
 
     Raises:
         ValueError: If ``value`` is not a supported floating-point dtype.
+
+    Returns:
+        None. The global default dtype is updated in place.
     """
     global _DEFAULT_DTYPE
     if value not in (torch.float32, torch.float64):
@@ -76,6 +92,9 @@ def manual_seed(seed:int, deterministic:bool=False):
         seed: Integer seed passed to all RNGs.
         deterministic: If ``True``, enables PyTorch's deterministic mode via
             ``torch.use_deterministic_algorithms(True)`` (may impact performance).
+
+    Returns:
+        None.
     """
     global _GLOBAL_SEED, _RNG
     _GLOBAL_SEED = seed
@@ -99,6 +118,13 @@ def calc_grad(y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
 
     If ``y`` does not depend on ``x``, return a zero tensor with the same
     shape, device, and dtype as ``x``.
+
+    Args:
+        y: Tensor whose gradient is requested.
+        x: Tensor with respect to which the gradient is taken.
+
+    Returns:
+        Gradient tensor with the same shape as ``x``.
     """
     grad = torch.autograd.grad(
         outputs=y,
@@ -111,7 +137,15 @@ def calc_grad(y: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
 
 def calc_grads(y: torch.Tensor, x_list: Union[Tuple[torch.Tensor, ...], List[torch.Tensor]]) -> Tuple[torch.Tensor, ...]:
     """
-    Calculates gradients of a single tensor y with respect to a list of tensors x_list.
+    Calculate gradients of one tensor with respect to several tensors.
+
+    Args:
+        y: Tensor whose gradients are requested.
+        x_list: Coordinate tensors used as differentiation inputs.
+
+    Returns:
+        Tuple of gradients aligned with ``x_list``. Unused inputs receive zero
+        tensors.
     """
     grads = torch.autograd.grad(
         outputs=y,
@@ -125,7 +159,13 @@ def calc_grads(y: torch.Tensor, x_list: Union[Tuple[torch.Tensor, ...], List[tor
 
 def to_require_grad(*tensors: torch.Tensor) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
     """
-    Clones tensors and sets requires_grad=True for PINN training.
+    Clone tensors and enable gradients for PINN training.
+
+    Args:
+        *tensors: Tensors to detach, clone, and mark differentiable.
+
+    Returns:
+        One tensor for a single input, otherwise a tuple of tensors.
     """
     result = tuple(t.clone().detach().requires_grad_(True) for t in tensors)
     if len(result) == 1:
@@ -134,7 +174,13 @@ def to_require_grad(*tensors: torch.Tensor) -> Union[torch.Tensor, Tuple[torch.T
 
 def torch_to_numpy(*tensors: torch.Tensor) -> Union[float, Tuple]:
     """
-    Helper to convert torch tensors (CPU or GPU) to numpy arrays.
+    Convert CPU or GPU tensors to NumPy arrays.
+
+    Args:
+        *tensors: Tensors to detach and move to CPU.
+
+    Returns:
+        One NumPy array for a single input, otherwise a tuple of arrays.
     """
     def to_numpy(x):
         return x.detach().cpu().numpy()
