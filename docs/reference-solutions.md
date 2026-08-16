@@ -31,9 +31,9 @@ is recorded in `reference.metadata["pressure_gauge"]`.
 
 ## Usage
 
-The primary FEM workflow returns a `ReferenceGroupEvaluator`. It does not
-require DeepFlow point sampling; query the solved fields at any coordinates
-you need:
+The primary FEM workflow returns a `ReferenceGroupEvaluator`. Its per-geometry
+evaluators re-query the FEM fields, and point queries at arbitrary coordinates
+go through the underlying `ReferenceSolution`:
 
 ```python
 import numpy as np
@@ -51,13 +51,18 @@ reference = domain.solve_fem(
 )
 print(reference.metadata)
 
+# Per-geometry FEM evaluation and visualization.
+area_eval = reference.area_list[0]
+area_eval.sampling_area([300, 150])
+area_eval.plot_color("u_ref")
+
 # FEM data is returned by point query.
 x, y = np.meshgrid(
     np.linspace(0.0, 1.0, 300),
     np.linspace(0.0, 1.0, 150),
     indexing="ij",
 )
-u = reference.evaluate(x, y, fields=("u",))["u"]
+u = reference.reference_solution.evaluate(x, y, fields=("u",))["u"]
 ```
 
 Heat, wave, and transient Navier–Stokes problems require a time interval and
@@ -66,11 +71,12 @@ stores 100 uniform steps.  Transient `evaluate` calls linearly interpolate
 between snapshots.  `BurgersEquation1D` is treated as a steady 2D equation in
 the `(x, y)` domain and does not require a time interval.
 
-The returned `ReferenceGroupEvaluator` supports point queries directly, and
-the underlying `ReferenceSolution` (`.reference_solution`) supports export:
+The returned `ReferenceGroupEvaluator` is a `GroupEvaluator` whose children
+re-query the FEM fields; the underlying `ReferenceSolution`
+(`.reference_solution`) supports point queries and export:
 
 ```python
-values = reference.evaluate(np.array([0.25, 0.5]), np.array([0.5, 0.5]))
+values = reference.reference_solution.evaluate(np.array([0.25, 0.5]), np.array([0.5, 0.5]))
 reference.reference_solution.export_npz("reference.npz", x=[0.25, 0.5], y=[0.5, 0.5])
 ```
 

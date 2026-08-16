@@ -18,7 +18,7 @@
     {
       "id": 3,
       "prompt": "Build a DeepFlow Burgers-equation example using a functional boundary condition, explicit x/y-to-u model mappings, a reproducible seed, LHS sampling, best-model persistence, and residual visualization. Include an optional FEM reference comparison only if it is supported by the current public API and clearly separate the optional dependency.",
-      "expected_output": "A complete BurgersEquation1D example using the public DeepFlow API, including the callable boundary-condition syntax, correct geometry/model/PDE contracts, best-model saving/loading, residual plotting, and an accurate optional ReferenceSolution workflow.",
+      "expected_output": "A complete BurgersEquation1D example using the public DeepFlow API, including the callable boundary-condition syntax, correct geometry/model/PDE contracts, best-model saving/loading, residual plotting, and an accurate optional FEM reference workflow.",
       "files": [],
       "expectations": []
     }

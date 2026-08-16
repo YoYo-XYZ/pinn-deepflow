@@ -22,7 +22,7 @@ def _sample_solution(reference, grid):
     x_axis = np.linspace(*CHANNEL_X, grid[0])
     y_axis = np.linspace(*CHANNEL_Y, grid[1])
     query_x, query_y = np.meshgrid(x_axis, y_axis, indexing="ij")
-    fields = reference.evaluate(query_x, query_y, fields=("u", "v", "p"))
+    fields = reference.reference_solution.evaluate(query_x, query_y, fields=("u", "v", "p"))
     x = query_x.reshape(-1)
     y = query_y.reshape(-1)
 
@@ -30,7 +30,7 @@ def _sample_solution(reference, grid):
     outlet_y = np.linspace(
         CHANNEL_Y[0] + epsilon, CHANNEL_Y[1] - epsilon, PROFILE_POINTS
     )
-    outlet = reference.evaluate(
+    outlet = reference.reference_solution.evaluate(
         np.full_like(outlet_y, CHANNEL_X[1] - epsilon),
         outlet_y,
         fields=("u", "v"),
@@ -40,7 +40,7 @@ def _sample_solution(reference, grid):
         CHANNEL_X[1] - epsilon,
         PROFILE_POINTS,
     )
-    wake = reference.evaluate(
+    wake = reference.reference_solution.evaluate(
         wake_x, np.full_like(wake_x, CYLINDER_CY), fields=("u", "v")
     )
     return x, y, fields, outlet_y, outlet, wake_x, wake

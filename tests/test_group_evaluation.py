@@ -72,12 +72,12 @@ def test_problem_domain_evaluate_returns_structured_group():
     group = domain.evaluate(_model())
 
     assert isinstance(group, df.GroupEvaluator)
-    assert len(group.area_evaluators) == 1
-    assert len(group.bound_evaluators) == 4
-    assert group.area_evaluators[0].geometry is area
-    assert "pde_residual" in group.area_evaluators[0].data_dict
-    assert "bc_residual" in group.bound_evaluators[0].data_dict
-    assert list(group) == group.bound_evaluators + group.area_evaluators
+    assert len(group.area_list) == 1
+    assert len(group.bound_list) == 4
+    assert group.area_list[0].geometry is area
+    assert "pde_residual" in group.area_list[0].data_dict
+    assert "bc_residual" in group.bound_list[0].data_dict
+    assert list(group) == group.bound_list + group.area_list
 
 
 def test_group_evaluator_deduplicates_repeated_geometry_references():
@@ -88,10 +88,13 @@ def test_group_evaluator_deduplicates_repeated_geometry_references():
 
     group = domain.evaluate(_model())
 
-    assert len(group.area_evaluators) == 1
-    assert len(group.bound_evaluators) == 4
-    assert group.get_evaluator(area) is group.area_evaluators[0]
-    assert group.get_evaluator(area.bound_list[0]) is group.bound_evaluators[0]
+    assert len(group.area_list) == 1
+    assert len(group.bound_list) == 4
+    assert group.area_list[0].geometry is area
+    assert group.bound_list[0].geometry is area.bound_list[0]
+    assert not hasattr(group, "area_geometries")
+    assert not hasattr(group, "bound_geometries")
+    assert not hasattr(group, "get_evaluator")
 
 
 def test_group_evaluator_rejects_unsampled_geometries():
@@ -111,9 +114,9 @@ def test_group_evaluator_handles_custom_data_without_sampling():
     )
     group = df.domain(custom).evaluate(_model())
 
-    assert len(group.area_evaluators) == 1
-    assert group.area_evaluators[0].geometry is custom
-    assert group.area_evaluators[0].data_dict["x"].shape == (4,)
+    assert len(group.area_list) == 1
+    assert group.area_list[0].geometry is custom
+    assert group.area_list[0].data_dict["x"].shape == (4,)
 
 
 def test_group_sampling_helpers_refresh_child_evaluators():
@@ -128,14 +131,14 @@ def test_group_sampling_helpers_refresh_child_evaluators():
 
     assert [
         evaluator.geometry.X.shape[0]
-        for evaluator in group.bound_evaluators
+        for evaluator in group.bound_list
     ] == [7, 8, 9, 10]
-    assert group.area_evaluators[0].geometry.X.shape[0] == 30
+    assert group.area_list[0].geometry.X.shape[0] == 30
     assert [
         evaluator.data_dict["x"].shape[0]
-        for evaluator in group.bound_evaluators
+        for evaluator in group.bound_list
     ] == [7, 8, 9, 10]
-    assert group.area_evaluators[0].data_dict["x"].shape[0] == 30
+    assert group.area_list[0].data_dict["x"].shape[0] == 30
 
 
 def test_group_define_time_broadcasts_to_all_children():
@@ -166,7 +169,7 @@ def test_group_refresh_recomputes_child_data_after_resampling():
     area.process_coordinates()
     group.refresh()
 
-    assert group.area_evaluators[0].data_dict["x"].shape[0] == 25
+    assert group.area_list[0].data_dict["x"].shape[0] == 25
 
 
 def test_group_plot_delegation_uses_selected_geometry(monkeypatch):
@@ -234,7 +237,7 @@ def test_group_plot_color_skips_children_missing_color_field(monkeypatch):
     _sample_unique_areas(domain)
     group = domain.evaluate(_model())
 
-    missing_evaluator = group.bound_evaluators[0]
+    missing_evaluator = group.bound_list[0]
     missing_points = missing_evaluator.data_dict["x"].shape[0]
     del missing_evaluator.data_dict["u"]
 
@@ -275,7 +278,7 @@ def test_group_plot_color_rejects_mismatched_child_lengths():
     _sample_unique_areas(domain)
     group = domain.evaluate(_model())
 
-    evaluator = group.bound_evaluators[0]
+    evaluator = group.bound_list[0]
     evaluator.data_dict["u"] = evaluator.data_dict["u"][:-1]
 
     with pytest.raises(ValueError, match="Cannot aggregate plot_color"):

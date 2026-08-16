@@ -31,11 +31,13 @@ The main class managing the physics problem.
 - `sampling_R3(bound_sampling_res, area_sampling_res)`: Samples points using R3 refinement.
 - `evaluate(model)`: Returns a structured `GroupEvaluator` for all unique sampled geometries.
 - `solve_fem(...)`: Solves the attached PDE with the optional NGSolve backend
-  and returns a `ReferenceGroupEvaluator` for direct point queries.
+  and returns a `ReferenceGroupEvaluator` whose per-geometry evaluators query
+  the solved FEM fields.
 - `show_setup()`: Plots the domain geometry and boundary conditions.
 - `show_coordinates(display_physics=False)`: Plots the sampled collocation points.
 
-The primary FEM workflow is:
+The primary FEM workflow returns a `ReferenceGroupEvaluator` (a
+`GroupEvaluator` whose children re-query the FEM fields):
 
 ```python
 reference = domain.solve_fem(
@@ -43,15 +45,23 @@ reference = domain.solve_fem(
     boundary_resolution=64,
     max_iterations=200,
 )
-values = reference.evaluate([0.25, 0.5], [0.5, 0.5])
+
+area_eval = reference.area_list[0]
+area_eval.sampling_area([300, 150])
+area_eval.plot_color("u_ref")
 ```
 
-The FEM solve does not require DeepFlow point samples. The returned
-`ReferenceGroupEvaluator` evaluates the FEM fields at any requested
-coordinates and exposes solver metadata through `reference.metadata`. The
-underlying `ReferenceSolution` remains available at
-`reference.reference_solution` for advanced use (`export_npz`, `times`,
-`is_transient`, etc.).
+Arbitrary point queries and export go through the underlying
+`ReferenceSolution`:
+
+```python
+values = reference.reference_solution.evaluate([0.25, 0.5], [0.5, 0.5])
+```
+
+The FEM solve does not require DeepFlow point samples. Solver metadata is
+exposed through `reference.metadata`; advanced `ReferenceSolution` members
+(`export_npz`, `times`, `is_transient`, etc.) are available at
+`reference.reference_solution`.
 
 ### `calc_loss_simple`
 
@@ -210,19 +220,25 @@ fields from different physics types into one data dictionary.
 ```python
 results = domain.evaluate(model)
 
-area_prediction = results.area_evaluators[0]
-bound_prediction = results.get_evaluator(domain.bound_list[0])
+area_prediction = results.area_list[0]
+bound_prediction = results.bound_list[0]
 ```
 
 **Attributes and methods:**
-- `area_evaluators`: Evaluators aligned with the unique entries in `domain.area_list`.
-- `bound_evaluators`: Evaluators aligned with the unique entries in `domain.bound_list`.
-- `get_evaluator(geometry)`: Select an evaluator using the original geometry object.
+- `area_list`: Evaluators aligned with the unique entries in `domain.area_list`.
+- `bound_list`: Evaluators aligned with the unique entries in `domain.bound_list`.
 - `postprocess()` / `refresh()`: Recompute all child results after model or sample changes.
 - `sampling_area(...)` and `sampling_line(...)`: Broadcast sampling to compatible child geometries.
 - `define_time(...)`: Broadcast time-coordinate configuration to all child geometries.
 - `plot_color("u")` / `plot_scatter("u")`: Plot all child geometries that contain `u` in one combined scatter plot.
-- `plot_color("u", geometry=area)`: Delegate visualization to one selected child evaluator.
+- `plot(..., geometry=...)`, `plot_contour(..., geometry=...)`,
+  `plot_streamline(..., geometry=...)`, `plot_distribution(..., geometry=...)`,
+  `plot_loss_curve(..., geometry=...)`, and `plot_animate(..., geometry=...)`:
+  Delegate a geometry-specific plot to its child evaluator.
+
+Child evaluators can also be accessed directly, for example
+`results.area_list[0].plot_color("u")` or
+`results.bound_list[0].plot_loss_curve()`.
 
 All included geometries must have sampled coordinates before
 `domain.evaluate(model)` is called.
@@ -231,12 +247,16 @@ Aggregate color plots skip child evaluators that do not contain the requested
 field or coordinate keys. The temporary concatenated data is used only for the
 plot and is not stored on `GroupEvaluator`.
 
-`ReferenceGroupEvaluator` (returned by `solve_fem`) supports direct point
-queries through `evaluate(...)`. The underlying `ReferenceSolution` is exposed
-as `.reference_solution` and supports `export_npz()`:
+`ReferenceGroupEvaluator` (returned by `solve_fem`) is a `GroupEvaluator`
+whose children are `ReferenceEvaluator` instances that re-query the FEM fields
+on each geometry. The underlying `ReferenceSolution` is exposed as
+`.reference_solution` for point queries and `export_npz()`:
 
 ```python
-values = reference.evaluate(x, y, t=t)
+area_eval = reference.area_list[0]
+area_eval.sampling_area([300, 150])
+area_eval.plot_color("u_ref")
+
+values = reference.reference_solution.evaluate(x, y, t=t)
 reference.reference_solution.export_npz("reference.npz", x=x, y=y, t=t)
 ```
-

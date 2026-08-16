@@ -59,7 +59,7 @@ def solve_reference():
     x_axis = np.linspace(area.ranges[0][0], area.ranges[0][1], EVALUATION_RESOLUTION[0])
     y_axis = np.linspace(area.ranges[1][0], area.ranges[1][1], EVALUATION_RESOLUTION[1])
     x, y = np.meshgrid(x_axis, y_axis, indexing="ij")
-    values = result.evaluate(x, y, fields=("u",))
+    values = result.reference_solution.evaluate(x, y, fields=("u",))
     data = {
         "x": x.reshape(-1),
         "y": y.reshape(-1),

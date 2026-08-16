@@ -201,23 +201,29 @@ prediction.plot_loss_curve()
 ```
 
 `domain.evaluate(best_model)` returns a `GroupEvaluator`, not one merged data
-dictionary. Use `group.area_evaluators`, `group.bound_evaluators`, or
-`group.get_evaluator(original_geometry)` to select a child. All unique included
-geometries must have coordinates before group evaluation. For transient
-visualization, call the evaluator's `define_time(...)` after sampling and
-before plotting or animating.
+dictionary. Use `group.area_list` and `group.bound_list` to select a child;
+each child exposes its underlying geometry through `evaluator.geometry`. All
+unique included geometries must have coordinates before group evaluation. For
+transient visualization, call the group's `define_time(...)` after sampling
+and before plotting or animating.
 
 Evaluators expose coordinate, model-field, residual, and loss-history data via
 `evaluator.data_dict` and `evaluator[key]`. Common public plots are `plot`,
 `plot_color`, `plot_contour`, `plot_streamline`, `plot_distribution`,
-`plot_loss_curve`, and `plot_animate`. Use geometry-specific evaluators when
-different geometries contain different fields.
+`plot_loss_curve`, and `plot_animate`. `GroupEvaluator` retains geometry-specific
+plot delegation through `geometry=...`; direct child access through
+`group.area_list[i]` or `group.bound_list[i]` is also supported when different
+geometries contain different fields.
 
 For optional FEM comparison, `domain.solve_fem(...)` requires the `cfd` extra
-and NGSolve. It returns a `ReferenceSolution` that supports
-`reference.evaluate(x, y, t=None, fields=None)`, `reference.metadata`, and
-`reference.export_npz(...)`. FEM queries must lie inside the PDE area, and
-transient queries need aligned time coordinates.
+and NGSolve. It returns a `ReferenceGroupEvaluator` (a `GroupEvaluator` whose
+children re-query the FEM fields via `reference.area_list`/
+`reference.bound_list`, `sampling_area(...)`, and `plot_color("u_ref")`).
+`reference.metadata` carries solver diagnostics, and the underlying
+`ReferenceSolution` is exposed as `reference.reference_solution` for arbitrary point queries
+(`reference.reference_solution.evaluate(x, y, t=None, fields=None)`) and
+`export_npz(...)`. FEM queries must lie inside the PDE area, and transient
+queries need aligned time coordinates.
 
 ## Failure prevention checklist
 

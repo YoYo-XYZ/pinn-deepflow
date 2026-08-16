@@ -604,6 +604,190 @@ class Evaluator(Visualizer):
         return ani
 
 
+class ReferenceEvaluator(Evaluator):
+    """Evaluate a solved :class:`ReferenceSolution` on one geometry.
+
+    Reference evaluators deliberately do not calculate PINN residuals or copy
+    model training history.  They retain the FEM solution and re-query it
+    whenever the geometry is sampled again or its time coordinates change.
+    """
+
+    def __init__(self, reference_solution, geometry: Area | Bound | CustomData) -> None:
+        self.model = None
+        self.reference_solution = reference_solution
+        self.geometry = geometry
+        self.data_dict: Dict[str, Any] = {}
+        self._derived_expressions: Dict[str, _LazyFieldExpression] = {}
+        self._expression_namespace = _ExpressionNamespace(self)
+        self.is_postprocessed = False
+        self.metadata = reference_solution.metadata
+
+    @staticmethod
+    def _as_numpy(value) -> np.ndarray:
+        if isinstance(value, torch.Tensor):
+            return value.detach().cpu().numpy()
+        return np.asarray(value)
+
+    @staticmethod
+    def _same_coordinates(current, processed) -> bool:
+        if current is None or processed is None:
+            return False
+        current_array = ReferenceEvaluator._as_numpy(current)
+        processed_array = ReferenceEvaluator._as_numpy(processed)
+        return (
+            current_array.shape == processed_array.shape
+            and np.array_equal(current_array, processed_array)
+        )
+
+    def _prepare_coordinates(self) -> None:
+        """Process only when the public coordinates changed.
+
+        ``PhysicsAttach.process_coordinates`` regenerates time samples when a
+        ``range_t`` is present.  Avoiding an unconditional call preserves
+        existing time coordinates when ``solve_fem`` is asked to reuse them.
+        """
+        if getattr(self.geometry, "X", None) is None or getattr(
+            self.geometry, "Y", None
+        ) is None:
+            raise ValueError(
+                "Cannot evaluate an unsampled geometry: coordinates X and Y "
+                "must be defined first."
+            )
+
+        x_processed = getattr(self.geometry, "X_", None)
+        y_processed = getattr(self.geometry, "Y_", None)
+        if not self._same_coordinates(self.geometry.X, x_processed) or not self._same_coordinates(
+            self.geometry.Y, y_processed
+        ):
+            self._process_coordinates_preserving_time()
+            return
+
+        if getattr(self.reference_solution, "is_transient", False) and not getattr(
+            self.reference_solution, "time_from_y", False
+        ):
+            t_values = self._time_values()
+            if t_values is None:
+                if getattr(self.geometry, "range_t", None) is not None:
+                    self._process_coordinates_preserving_time()
+            else:
+                try:
+                    np.broadcast(
+                        np.empty(np.shape(t_values)),
+                        np.empty(np.shape(self.geometry.X)),
+                    )
+                except ValueError:
+                    if getattr(self.geometry, "range_t", None) is not None:
+                        self._process_coordinates_preserving_time()
+
+    def _time_values(self):
+        for name in ("T", "t", "T_"):
+            value = getattr(self.geometry, name, None)
+            if value is not None:
+                return value
+        return None
+
+    def _process_coordinates_preserving_time(self) -> None:
+        """Process coordinates without replacing already aligned time data."""
+        existing_time = self._time_values()
+        existing_shape = (
+            None
+            if existing_time is None
+            else tuple(self._as_numpy(existing_time).shape)
+        )
+
+        self.geometry.process_coordinates()
+
+        if (
+            existing_time is None
+            or existing_shape is None
+            or existing_shape != tuple(self._as_numpy(self.geometry.X).shape)
+        ):
+            return
+
+        self.geometry.t = existing_time
+        self.geometry.T = existing_time
+        if isinstance(existing_time, torch.Tensor):
+            restored = existing_time.detach().clone()
+            if isinstance(getattr(self.geometry, "X_", None), torch.Tensor):
+                restored = restored.to(self.geometry.X_.device)
+            self.geometry.T_ = restored.requires_grad_()
+            if isinstance(
+                getattr(self.geometry, "inputs_tensor_dict", None), dict
+            ):
+                self.geometry.inputs_tensor_dict["t"] = self.geometry.T_
+        else:
+            self.geometry.T_ = existing_time
+
+    def define_time(
+        self,
+        range_t: Union[float, int, List[float]],
+        sampling_scheme: str = "uniform",
+        expo_scaling: Optional[bool] = None,
+    ) -> None:
+        """Update time coordinates and immediately re-query the FEM fields."""
+        self.geometry.define_time(
+            range_t,
+            sampling_scheme=sampling_scheme,
+            expo_scaling=expo_scaling,
+        )
+        self.geometry.process_coordinates()
+        self.postprocess()
+
+    def _create_data_dict(self) -> Dict[str, Any]:
+        self._prepare_coordinates()
+
+        x = self._as_numpy(self.geometry.X)
+        y = self._as_numpy(self.geometry.Y)
+        solution = self.reference_solution
+        fields = getattr(solution, "fields", None)
+        if fields is None:
+            fields = solution.declared_fields
+        fields = tuple(fields)
+
+        if getattr(solution, "is_transient", False) and not getattr(
+            solution, "time_from_y", False
+        ):
+            time_values = self._time_values()
+            if time_values is None:
+                raise ValueError(
+                    "Transient FEM evaluation requires existing time "
+                    "coordinates on every geometry."
+                )
+            try:
+                np.broadcast(
+                    np.empty(np.shape(time_values)),
+                    np.empty(np.shape(self.geometry.X)),
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    "Transient FEM time coordinates must align with the "
+                    "geometry's spatial coordinates."
+                ) from exc
+            t = self._as_numpy(time_values)
+            values = solution.evaluate(x, y, t=t, fields=fields)
+        else:
+            t = None
+            values = solution.evaluate(x, y, fields=fields)
+
+        data_dict = {
+            f"{name}_ref": np.asarray(value)
+            for name, value in values.items()
+        }
+        data_dict["x"] = x
+        data_dict["y"] = y
+        if t is not None:
+            data_dict["t"] = t
+
+        self.data_dict = self._convert_to_numpy(data_dict)
+        return self.data_dict
+
+    def postprocess(self) -> None:
+        self._create_data_dict()
+        self._refresh_derived_fields()
+        self.is_postprocessed = True
+        Visualizer.__init__(self, self.data_dict)
+
+
 class GroupEvaluator:
     """
     Coordinates geometry-specific :class:`Evaluator` instances for a domain.
@@ -616,7 +800,11 @@ class GroupEvaluator:
     def __init__(self, pinns_model: PINN, domain) -> None:
         self.model = pinns_model
         self.domain = domain
+        self._init_entries(domain)
+        self._build_children(domain, Evaluator, pinns_model)
+        self._validate_sampled()
 
+    def _init_entries(self, domain) -> None:
         self._area_entries = _unique_geometry_entries(
             getattr(domain, "area_list", [])
         )
@@ -624,30 +812,18 @@ class GroupEvaluator:
             getattr(domain, "bound_list", [])
         )
 
-        self.area_geometries = [geometry for _, geometry in self._area_entries]
-        self.bound_geometries = [geometry for _, geometry in self._bound_entries]
-
-        self._validate_sampled()
-
-        self.area_evaluators = [
-            Evaluator(self.model, geometry)
+    def _build_children(self, domain, evaluator_type, source) -> None:
+        self.area_list = [
+            evaluator_type(source, geometry)
             for _, geometry in self._area_entries
         ]
-        self.bound_evaluators = [
-            Evaluator(self.model, geometry)
+        self.bound_list = [
+            evaluator_type(source, geometry)
             for _, geometry in self._bound_entries
         ]
-
-        self._evaluators_by_id = {
-            id(geometry): evaluator
-            for geometry, evaluator in zip(
-                self.bound_geometries + self.area_geometries,
-                self.bound_evaluators + self.area_evaluators,
-            )
-        }
         self._ordered_evaluators = [
-            *self.bound_evaluators,
-            *self.area_evaluators,
+            *self.bound_list,
+            *self.area_list,
         ]
 
     def _validate_sampled(self) -> None:
@@ -657,13 +833,6 @@ class GroupEvaluator:
             self._area_entries,
             "evaluate",
         )
-
-    def get_evaluator(self, geometry) -> Evaluator:
-        """Return the child evaluator for an original geometry object."""
-        evaluator = self._evaluators_by_id.get(id(geometry))
-        if evaluator is None or evaluator.geometry is not geometry:
-            raise KeyError("Geometry is not part of this GroupEvaluator.")
-        return evaluator
 
     def __iter__(self):
         """Iterate in the same bound-first order as ``ProblemDomain``."""
@@ -675,8 +844,8 @@ class GroupEvaluator:
     def __str__(self) -> str:
         return (
             "GroupEvaluator("
-            f"bound_evaluators={len(self.bound_evaluators)}, "
-            f"area_evaluators={len(self.area_evaluators)})"
+            f"bound_list={len(self.bound_list)}, "
+            f"area_list={len(self.area_list)})"
         )
 
     def postprocess(self) -> None:
@@ -693,10 +862,10 @@ class GroupEvaluator:
         """Sample and refresh every Bound child."""
         resolutions = _normalize_resolutions(
             n_points,
-            len(self.bound_evaluators),
+            len(self.bound_list),
             "n_points",
         )
-        for evaluator, resolution in zip(self.bound_evaluators, resolutions):
+        for evaluator, resolution in zip(self.bound_list, resolutions):
             evaluator.sampling_line(resolution, scheme=scheme)
 
     def sampling_area(self, res_list, scheme: str = "uniform") -> None:
@@ -706,21 +875,18 @@ class GroupEvaluator:
         ``CustomData`` entries are intentionally left unchanged because they
         represent fixed user-provided coordinates rather than a sampler.
         """
-        area_pairs = [
-            (geometry, evaluator)
-            for geometry, evaluator in zip(
-                self.area_geometries,
-                self.area_evaluators,
-            )
-            if isinstance(geometry, Area)
+        sampleable_areas = [
+            evaluator
+            for evaluator in self.area_list
+            if isinstance(evaluator.geometry, Area)
         ]
         resolutions = _normalize_resolutions(
             res_list,
-            len(area_pairs),
+            len(sampleable_areas),
             "res_list",
             allow_area_pair=True,
         )
-        for (_, evaluator), resolution in zip(area_pairs, resolutions):
+        for evaluator, resolution in zip(sampleable_areas, resolutions):
             evaluator.sampling_area(resolution, scheme=scheme)
 
     def define_time(
@@ -736,6 +902,12 @@ class GroupEvaluator:
                 sampling_scheme=sampling_scheme,
                 expo_scaling=expo_scaling,
             )
+
+    def _evaluator_for_geometry(self, geometry) -> Evaluator:
+        for evaluator in self._ordered_evaluators:
+            if evaluator.geometry is geometry:
+                return evaluator
+        raise KeyError("Geometry is not part of this GroupEvaluator.")
 
     def _aggregate_plot_data(
         self,
@@ -780,9 +952,6 @@ class GroupEvaluator:
             key: np.concatenate([dataset[key] for dataset in datasets])
             for key in required_keys
         }
-
-    def plot(self, *args, geometry, **kwargs):
-        return self.get_evaluator(geometry).plot(*args, **kwargs)
 
     @staticmethod
     def _parse_plot_color_args(args, kwargs) -> Dict[str, Any]:
@@ -833,9 +1002,15 @@ class GroupEvaluator:
             )
         return values
 
+    def plot(self, *args, geometry, **kwargs):
+        return self._evaluator_for_geometry(geometry).plot(*args, **kwargs)
+
     def plot_color(self, *args, geometry=None, **kwargs):
         if geometry is not None:
-            return self.get_evaluator(geometry).plot_color(*args, **kwargs)
+            return self._evaluator_for_geometry(geometry).plot_color(
+                *args,
+                **kwargs,
+            )
 
         plot_args = self._parse_plot_color_args(args, kwargs)
         aggregate_data = self._aggregate_plot_data(
@@ -848,27 +1023,43 @@ class GroupEvaluator:
     plot_scatter = plot_color
 
     def plot_contour(self, *args, geometry, **kwargs):
-        return self.get_evaluator(geometry).plot_contour(*args, **kwargs)
+        return self._evaluator_for_geometry(geometry).plot_contour(
+            *args,
+            **kwargs,
+        )
 
     def plot_streamline(self, *args, geometry, **kwargs):
-        return self.get_evaluator(geometry).plot_streamline(*args, **kwargs)
+        return self._evaluator_for_geometry(geometry).plot_streamline(
+            *args,
+            **kwargs,
+        )
 
     def plot_distribution(self, *args, geometry, **kwargs):
-        return self.get_evaluator(geometry).plot_distribution(*args, **kwargs)
+        return self._evaluator_for_geometry(geometry).plot_distribution(
+            *args,
+            **kwargs,
+        )
 
     def plot_loss_curve(self, *args, geometry, **kwargs):
-        return self.get_evaluator(geometry).plot_loss_curve(*args, **kwargs)
+        return self._evaluator_for_geometry(geometry).plot_loss_curve(
+            *args,
+            **kwargs,
+        )
 
     def plot_animate(self, *args, geometry, **kwargs):
-        return self.get_evaluator(geometry).plot_animate(*args, **kwargs)
+        return self._evaluator_for_geometry(geometry).plot_animate(
+            *args,
+            **kwargs,
+        )
 
 
 class ReferenceGroupEvaluator(GroupEvaluator):
-    """GroupEvaluator backed by a solved FEM reference solution.
+    """GroupEvaluator whose children query a solved FEM reference solution.
 
-    Unlike the PINN path, this group does not build per-geometry evaluators;
-    it exists so ``solve_fem`` can expose the solved fields for point lookups
-    via :meth:`evaluate` while remaining a :class:`GroupEvaluator`.
+    This is the ``solve_fem`` result: a real :class:`GroupEvaluator` where each
+    per-geometry :class:`ReferenceEvaluator` re-queries the FEM fields on its
+    geometry.  The underlying :class:`ReferenceSolution` remains available as
+    ``.reference_solution`` for arbitrary point queries and export.
     """
 
     def __init__(self, reference_solution, domain) -> None:
@@ -876,7 +1067,5 @@ class ReferenceGroupEvaluator(GroupEvaluator):
         self.model = None
         self.domain = domain
         self.metadata = reference_solution.metadata
-
-    def evaluate(self, x, y, t=None, fields=None):
-        """Look up the FEM reference solution at query points."""
-        return self.reference_solution.evaluate(x, y, t=t, fields=fields)
+        self._init_entries(domain)
+        self._build_children(domain, ReferenceEvaluator, reference_solution)

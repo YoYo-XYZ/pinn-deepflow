@@ -77,7 +77,10 @@ def test_solve_fem_returns_reference_solution_without_sampling(fake_reference_so
     assert isinstance(result, df.ReferenceGroupEvaluator)
     assert result.reference_solution is fake_reference_solver.solution
     assert result.metadata["backend"] == "fake"
-    values = result.evaluate(np.array([0.25]), np.array([0.5]))
+    assert len(result.area_list) == 1
+    assert isinstance(result.area_list[0], df.ReferenceEvaluator)
+    assert len(result.bound_list) == 4
+    values = result.reference_solution.evaluate(np.array([0.25]), np.array([0.5]))
     np.testing.assert_allclose(values["u"], [0.25])
     assert len(fake_reference_solver.calls) == 1
     assert fake_reference_solver.calls[0][0] == {
@@ -132,7 +135,7 @@ def test_solve_fem_returns_transient_reference_solution_without_sampling(monkeyp
 
     result = domain.solve_fem()
 
-    values = result.evaluate(
+    values = result.reference_solution.evaluate(
         np.array([0.25, 0.75]),
         np.array([0.5, 0.5]),
         t=np.array([0.0, 1.0]),
@@ -156,7 +159,7 @@ def test_solve_fem_ngsolve_steady_smoke():
 
     assert isinstance(result, df.ReferenceGroupEvaluator)
     assert result.metadata["mesh"]["dimension"] == 2
-    values = result.evaluate(np.array([0.5]), np.array([0.5]))
+    values = result.reference_solution.evaluate(np.array([0.5]), np.array([0.5]))
     assert values["u"].shape == (1,)
 
 
@@ -178,7 +181,7 @@ def test_solve_fem_burgers_is_steady_2d():
     assert not result.reference_solution.time_from_y
     assert result.metadata["mesh"]["dimension"] == 2
     assert "time_values" not in result.metadata
-    values = result.evaluate(
+    values = result.reference_solution.evaluate(
         np.array([0.25, 0.75]), np.array([0.25, 0.75])
     )
     np.testing.assert_allclose(values["u"], 1.0, atol=1e-8)
@@ -206,6 +209,6 @@ def test_solve_fem_accepts_external_matching_boundary_conditions():
         max_iterations=25,
     )
     x = np.array([-0.75, 0.0, 0.75])
-    values = result.evaluate(x, np.zeros_like(x))["u"]
+    values = result.reference_solution.evaluate(x, np.zeros_like(x))["u"]
 
     np.testing.assert_allclose(values, -np.sin(np.pi * x), atol=5e-4)

@@ -119,7 +119,7 @@ def make_reference(mu, eval_grid=(121, 61)):
     area.sampling_area(list(eval_grid))
     x = area.X.detach().cpu().numpy()
     y = area.Y.detach().cpu().numpy()
-    fields = reference.evaluate(x, y, fields=("u", "v", "p"))
+    fields = reference.reference_solution.evaluate(x, y, fields=("u", "v", "p"))
     data = {
         "x": x,
         "y": y,

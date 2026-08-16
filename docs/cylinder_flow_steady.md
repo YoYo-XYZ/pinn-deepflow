@@ -285,9 +285,10 @@ np.savetxt('outlet_velocity.txt', array)
 
 ## 5. FEM reference comparison
 
-The optional NGSolve backend returns a direct `ReferenceSolution`. Sample the
-same area coordinates used for the PINN visualization, query the FEM field,
-and compare the velocity fields:
+The optional NGSolve backend returns a `ReferenceGroupEvaluator`. Sample the
+same area coordinates used for the PINN visualization, query the FEM field via
+`fem_reference.reference_solution.evaluate(...)`, and compare the velocity
+fields:
 
 ```python
 import numpy as np
@@ -297,11 +298,8 @@ fem_reference = domain.solve_fem(
     boundary_resolution=64,
     max_iterations=200,
 )
-area_x, area_y = area.sampling_area([300, 150])
-fem_x = area_x.detach().cpu().numpy()
-fem_y = area_y.detach().cpu().numpy()
-fem_values = fem_reference.evaluate(fem_x, fem_y, fields=['u'])
-fem_area = df.Visualizer({'x': fem_x, 'y': fem_y, 'u_ref': fem_values['u']})
+fem_area = fem_reference.area_list[0]
+fem_area.sampling_area([300, 150])
 print(fem_reference.metadata)
 _ = fem_area.plot_color('u_ref', s=2, cmap='rainbow')
 

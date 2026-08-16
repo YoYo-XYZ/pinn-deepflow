@@ -63,9 +63,9 @@ class ProblemDomain():
     ) -> "ReferenceGroupEvaluator":
         """Solve the domain with the optional NGSolve FEM backend.
 
-        Returns a :class:`ReferenceGroupEvaluator` for point lookups via
-        ``evaluate(...)``; the underlying :class:`ReferenceSolution` is
-        available as ``.reference_solution``.
+        Returns a :class:`ReferenceGroupEvaluator` whose per-geometry
+        evaluators re-query the solved FEM fields; the underlying
+        :class:`ReferenceSolution` is available as ``.reference_solution``.
         """
         from .fem import solve_fem as _solve_fem
 

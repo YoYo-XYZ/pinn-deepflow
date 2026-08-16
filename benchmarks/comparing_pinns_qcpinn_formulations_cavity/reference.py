@@ -32,19 +32,19 @@ def _sample_solution(reference, grid):
     x = np.linspace(*CAVITY_X, grid[0])
     y = np.linspace(*CAVITY_Y, grid[1])
     query_x, query_y = np.meshgrid(x, y, indexing="xy")
-    fields = reference.evaluate(query_x, query_y, fields=("u", "v", "p"))
+    fields = reference.reference_solution.evaluate(query_x, query_y, fields=("u", "v", "p"))
 
     pressure_offset = float(
-        reference.evaluate([CAVITY_X[0]], [CAVITY_Y[0]], fields=["p"])["p"][0]
+        reference.reference_solution.evaluate([CAVITY_X[0]], [CAVITY_Y[0]], fields=["p"])["p"][0]
     )
     fields["p"] = np.asarray(fields["p"]) - pressure_offset
 
     vertical_y = np.linspace(*CAVITY_Y, CENTERLINE_POINTS)
-    vertical_u = reference.evaluate(
+    vertical_u = reference.reference_solution.evaluate(
         np.full_like(vertical_y, 0.5), vertical_y, fields=["u"]
     )["u"]
     horizontal_x = np.linspace(*CAVITY_X, CENTERLINE_POINTS)
-    horizontal_v = reference.evaluate(
+    horizontal_v = reference.reference_solution.evaluate(
         horizontal_x, np.full_like(horizontal_x, 0.5), fields=["v"]
     )["v"]
     return (
