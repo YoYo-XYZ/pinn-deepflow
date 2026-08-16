@@ -1308,35 +1308,42 @@ The main class managing the physics problem.</p>
 - <code>sampling_R3(bound_sampling_res, area_sampling_res)</code>: Samples points using R3 refinement.
 - <code>evaluate(model)</code>: Returns a structured <code>GroupEvaluator</code> for all unique sampled geometries.
 - <code>solve_fem(...)</code>: Solves the attached PDE with the optional NGSolve backend
-  and returns a <code>ReferenceGroupEvaluator</code> for direct point queries.
+  and returns a <code>ReferenceGroupEvaluator</code> whose per-geometry evaluators query
+  the solved FEM fields.
 - <code>show_setup()</code>: Plots the domain geometry and boundary conditions.
 - <code>show_coordinates(display_physics=False)</code>: Plots the sampled collocation points.</p>
-<p>The primary FEM workflow is:</p>
+<p>The primary FEM workflow returns a <code>ReferenceGroupEvaluator</code> (a
+<code>GroupEvaluator</code> whose children re-query the FEM fields):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">reference</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">solve_fem</span><span class="p">(</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">mesh_size</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">boundary_resolution</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">max_iterations</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">)</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">evaluate</span><span class="p">([</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">area_eval</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">area_eval</span><span class="o">.</span><span class="n">sampling_area</span><span class="p">([</span><span class="mi">300</span><span class="p">,</span> <span class="mi">150</span><span class="p">])</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">area_eval</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s2">&quot;u_ref&quot;</span><span class="p">)</span>
 </code></pre></div>
-<p>The FEM solve does not require DeepFlow point samples. The returned
-<code>ReferenceGroupEvaluator</code> evaluates the FEM fields at any requested
-coordinates and exposes solver metadata through <code>reference.metadata</code>. The
-underlying <code>ReferenceSolution</code> remains available at
-<code>reference.reference_solution</code> for advanced use (<code>export_npz</code>, <code>times</code>,
-<code>is_transient</code>, etc.).</p>
+<p>Arbitrary point queries and export go through the underlying
+<code>ReferenceSolution</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span><span class="o">.</span><span class="n">evaluate</span><span class="p">([</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
+</code></pre></div>
+<p>The FEM solve does not require DeepFlow point samples. Solver metadata is
+exposed through <code>reference.metadata</code>; advanced <code>ReferenceSolution</code> members
+(<code>export_npz</code>, <code>times</code>, <code>is_transient</code>, etc.) are available at
+<code>reference.reference_solution</code>.</p>
 <h3 id="calc_loss_simple"><code>calc_loss_simple</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">calc_loss_simple</span><span class="p">(</span><span class="n">domain</span><span class="p">:</span> <span class="n">ProblemDomain</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">callable</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">calc_loss_simple</span><span class="p">(</span><span class="n">domain</span><span class="p">:</span> <span class="n">ProblemDomain</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">callable</span>
 </code></pre></div>
 Returns a loss function that calculates the weighted sum of boundary and PDE losses for the given domain.</p>
 <h2 id="geometry">Geometry</h2>
 <p>The <code>deepflow.geometry</code> module provides helper functions to create 1D and 2D geometries.</p>
 <h3 id="rectangle"><code>rectangle</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">rectangle</span><span class="p">(</span><span class="n">range_x</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">range_y</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Area</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">rectangle</span><span class="p">(</span><span class="n">range_x</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">range_y</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Area</span>
 </code></pre></div>
 Creates a rectangular area.</p>
 <h3 id="circle"><code>circle</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">circle</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">r</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Area</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">circle</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">r</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Area</span>
 </code></pre></div>
 Creates a circular area.</p>
 <h3 id="bound"><code>Bound</code></h3>
@@ -1346,33 +1353,33 @@ Creates a circular area.</p>
 <h2 id="pde">PDE</h2>
 <p>The <code>deepflow.pde</code> module contains standard Partial Differential Equations.</p>
 <h3 id="navierstokes"><code>NavierStokes</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">NavierStokes</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="n">mu</span><span class="p">,</span> <span class="n">rho</span><span class="p">)</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">NavierStokes</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="n">mu</span><span class="p">,</span> <span class="n">rho</span><span class="p">)</span>
 </code></pre></div>
 2D Incompressible Navier-Stokes equations.</p>
 <h3 id="streamfunctionnavierstokes"><code>StreamFunctionNavierStokes</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">StreamFunctionNavierStokes</span><span class="p">(</span><span class="n">mu</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">L</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">StreamFunctionNavierStokes</span><span class="p">(</span><span class="n">mu</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">L</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
 </code></pre></div>
 Steady 2D incompressible Navier-Stokes equations with model outputs <code>psi</code> and
 <code>p</code>. The velocity is derived as <code>u = psi_y</code> and <code>v = -psi_x</code>, so continuity is
 satisfied identically. The model can be constructed as follows:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">pinn</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">PINN</span><span class="p">(</span><span class="n">input_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">output_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;psi&quot;</span><span class="p">,</span> <span class="s2">&quot;p&quot;</span><span class="p">])</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">pde</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">StreamFunctionNavierStokes</span><span class="p">(</span><span class="n">mu</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">pinn</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">PINN</span><span class="p">(</span><span class="n">input_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">],</span> <span class="n">output_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;psi&quot;</span><span class="p">,</span> <span class="s2">&quot;p&quot;</span><span class="p">])</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">pde</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">StreamFunctionNavierStokes</span><span class="p">(</span><span class="n">mu</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
 </code></pre></div>
 <p>This formulation returns the two momentum residuals and currently supports
 steady problems only. Derived <code>u</code> and <code>v</code> fields are available during PDE
 evaluation for plotting streamlines.</p>
 <h3 id="burgersequation1d"><code>BurgersEquation1D</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">BurgersEquation1D</span><span class="p">(</span><span class="n">nu</span><span class="p">)</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">BurgersEquation1D</span><span class="p">(</span><span class="n">nu</span><span class="p">)</span>
 </code></pre></div>
 Steady 2D Burgers equation in the <code>(x, y)</code> domain,
 <code>u_y + u * u_x = nu * u_xx</code>.</p>
 <h3 id="heatequation"><code>HeatEquation</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">HeatEquation</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">HeatEquation</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
 </code></pre></div>
 2D Heat equation.</p>
 <h2 id="neural-network">Neural Network</h2>
 <h3 id="pinn"><code>PINN</code></h3>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">PINN</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">input_vars</span><span class="p">,</span> <span class="n">output_vars</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Tanh</span><span class="p">())</span>
+<p><div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">PINN</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">length</span><span class="p">,</span> <span class="n">input_vars</span><span class="p">,</span> <span class="n">output_vars</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Tanh</span><span class="p">())</span>
 </code></pre></div>
 Physics-Informed Neural Network model.</p>
 <p><strong>Methods:</strong>
@@ -1381,16 +1388,16 @@ Physics-Informed Neural Network model.</p>
 - <code>save_as_pickle(path)</code>: Save model.
 - <code>load_from_pickle(path)</code>: Load model.</p>
 <h3 id="rffpinn"><code>RFFPINN</code></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">RFFPINN</span><span class="p">(</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="n">input_vars</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="n">output_vars</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="n">width</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="n">length</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">embed_dim</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
-<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="n">alpha</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="n">activation</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Tanh</span><span class="p">(),</span>
-<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    <span class="n">weight_init</span><span class="o">=</span><span class="s2">&quot;kaiming&quot;</span><span class="p">,</span>
-<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">RFFPINN</span><span class="p">(</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">input_vars</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">output_vars</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">width</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">length</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">embed_dim</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">alpha</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="n">activation</span><span class="o">=</span><span class="n">nn</span><span class="o">.</span><span class="n">Tanh</span><span class="p">(),</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="n">weight_init</span><span class="o">=</span><span class="s2">&quot;kaiming&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="p">)</span>
 </code></pre></div>
 <p>Physics-Informed Neural Network with a fixed Joint Random Fourier Feature
 embedding. For a stacked coordinate vector <code>x</code>, the model samples
@@ -1399,15 +1406,15 @@ embedding. For a stacked coordinate vector <code>x</code>, the model samples
 <code>[cos(x @ B), sin(x @ B)]</code> before the first dense layer. <code>embed_dim</code> must be a
 positive even integer. The frequency matrix is fixed during training and is
 reproducible through <code>df.manual_seed(...)</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">df</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">69</span><span class="p">)</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">model</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">RFFPINN</span><span class="p">(</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">width</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">length</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">input_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;t&quot;</span><span class="p">],</span>
-<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">output_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;u&quot;</span><span class="p">,</span> <span class="s2">&quot;v&quot;</span><span class="p">,</span> <span class="s2">&quot;p&quot;</span><span class="p">],</span>
-<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">embed_dim</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
-<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="n">alpha</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
-<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">df</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">69</span><span class="p">)</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">model</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">RFFPINN</span><span class="p">(</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">width</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">length</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="n">input_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;t&quot;</span><span class="p">],</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="n">output_vars</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;u&quot;</span><span class="p">,</span> <span class="s2">&quot;v&quot;</span><span class="p">,</span> <span class="s2">&quot;p&quot;</span><span class="p">],</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="n">embed_dim</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>    <span class="n">alpha</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="p">)</span>
 </code></pre></div>
 <h2 id="evaluation">Evaluation</h2>
 <h3 id="evaluator-visualizer"><code>Evaluator</code> (Visualizer)</h3>
@@ -1422,9 +1429,9 @@ reproducible through <code>df.manual_seed(...)</code>.</p>
 - <code>plot_animate(...)</code>: Create animation (for transient problems).</p>
 <p>Derived fields can be defined with normal arithmetic syntax. Expressions are
 stored and recomputed after resampling, time updates, or <code>postprocess()</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">fields</span> <span class="o">=</span> <span class="n">area_prediction</span><span class="o">.</span><span class="n">expr</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">fields</span><span class="p">[</span><span class="s2">&quot;v_magnitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="s2">&quot;u&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">fields</span><span class="p">[</span><span class="s2">&quot;v&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
-<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">fields</span><span class="p">[</span><span class="s2">&quot;energy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">fields</span><span class="p">[</span><span class="s2">&quot;v_magnitude&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">fields</span> <span class="o">=</span> <span class="n">area_prediction</span><span class="o">.</span><span class="n">expr</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">fields</span><span class="p">[</span><span class="s2">&quot;v_magnitude&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="s2">&quot;u&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">fields</span><span class="p">[</span><span class="s2">&quot;v&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">fields</span><span class="p">[</span><span class="s2">&quot;energy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">fields</span><span class="p">[</span><span class="s2">&quot;v_magnitude&quot;</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span>
 </code></pre></div>
 <p>NumPy ufuncs and <code>np.where()</code> are also supported. The existing
 <code>evaluation["u"]</code> and <code>evaluation["name"] = values</code> APIs continue to return
@@ -1433,30 +1440,40 @@ and store materialized NumPy arrays.</p>
 <p>Returned by <code>domain.evaluate(model)</code>.</p>
 <p><code>GroupEvaluator</code> keeps one <code>Evaluator</code> per unique geometry instead of merging
 fields from different physics types into one data dictionary.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">results</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">area_prediction</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">area_evaluators</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">bound_prediction</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">get_evaluator</span><span class="p">(</span><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">results</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">area_prediction</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="n">bound_prediction</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 </code></pre></div>
 <p><strong>Attributes and methods:</strong>
-- <code>area_evaluators</code>: Evaluators aligned with the unique entries in <code>domain.area_list</code>.
-- <code>bound_evaluators</code>: Evaluators aligned with the unique entries in <code>domain.bound_list</code>.
-- <code>get_evaluator(geometry)</code>: Select an evaluator using the original geometry object.
+- <code>area_list</code>: Evaluators aligned with the unique entries in <code>domain.area_list</code>.
+- <code>bound_list</code>: Evaluators aligned with the unique entries in <code>domain.bound_list</code>.
 - <code>postprocess()</code> / <code>refresh()</code>: Recompute all child results after model or sample changes.
 - <code>sampling_area(...)</code> and <code>sampling_line(...)</code>: Broadcast sampling to compatible child geometries.
 - <code>define_time(...)</code>: Broadcast time-coordinate configuration to all child geometries.
 - <code>plot_color("u")</code> / <code>plot_scatter("u")</code>: Plot all child geometries that contain <code>u</code> in one combined scatter plot.
-- <code>plot_color("u", geometry=area)</code>: Delegate visualization to one selected child evaluator.</p>
+- <code>plot(..., geometry=...)</code>, <code>plot_contour(..., geometry=...)</code>,
+  <code>plot_streamline(..., geometry=...)</code>, <code>plot_distribution(..., geometry=...)</code>,
+  <code>plot_loss_curve(..., geometry=...)</code>, and <code>plot_animate(..., geometry=...)</code>:
+  Delegate a geometry-specific plot to its child evaluator.</p>
+<p>Child evaluators can also be accessed directly, for example
+<code>results.area_list[0].plot_color("u")</code> or
+<code>results.bound_list[0].plot_loss_curve()</code>.</p>
 <p>All included geometries must have sampled coordinates before
 <code>domain.evaluate(model)</code> is called.</p>
 <p>Aggregate color plots skip child evaluators that do not contain the requested
 field or coordinate keys. The temporary concatenated data is used only for the
 plot and is not stored on <code>GroupEvaluator</code>.</p>
-<p><code>ReferenceGroupEvaluator</code> (returned by <code>solve_fem</code>) supports direct point
-queries through <code>evaluate(...)</code>. The underlying <code>ReferenceSolution</code> is exposed
-as <code>.reference_solution</code> and supports <code>export_npz()</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+<p><code>ReferenceGroupEvaluator</code> (returned by <code>solve_fem</code>) is a <code>GroupEvaluator</code>
+whose children are <code>ReferenceEvaluator</code> instances that re-query the FEM fields
+on each geometry. The underlying <code>ReferenceSolution</code> is exposed as
+<code>.reference_solution</code> for point queries and <code>export_npz()</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">area_eval</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="n">area_eval</span><span class="o">.</span><span class="n">sampling_area</span><span class="p">([</span><span class="mi">300</span><span class="p">,</span> <span class="mi">150</span><span class="p">])</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">area_eval</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s2">&quot;u_ref&quot;</span><span class="p">)</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">)</span>
 </code></pre></div>
 
 

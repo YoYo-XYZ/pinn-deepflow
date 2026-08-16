@@ -829,9 +829,9 @@ condition.  A pressure field without a pressure Dirichlet condition is
 normalized to zero mean after each Navier–Stokes solve; the normalization mode
 is recorded in <code>reference.metadata["pressure_gauge"]</code>.</p>
 <h2 id="usage">Usage</h2>
-<p>The primary FEM workflow returns a <code>ReferenceGroupEvaluator</code>. It does not
-require DeepFlow point sampling; query the solved fields at any coordinates
-you need:</p>
+<p>The primary FEM workflow returns a <code>ReferenceGroupEvaluator</code>. Its per-geometry
+evaluators re-query the FEM fields, and point queries at arbitrary coordinates
+go through the underlying <code>ReferenceSolution</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">deepflow</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">df</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
@@ -847,22 +847,28 @@ you need:</p>
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="p">)</span>
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="nb">print</span><span class="p">(</span><span class="n">reference</span><span class="o">.</span><span class="n">metadata</span><span class="p">)</span>
 <a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># FEM data is returned by point query.</span>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>    <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">300</span><span class="p">),</span>
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">150</span><span class="p">),</span>
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>    <span class="n">indexing</span><span class="o">=</span><span class="s2">&quot;ij&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="p">)</span>
-<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="n">u</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">fields</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;u&quot;</span><span class="p">,))[</span><span class="s2">&quot;u&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># Per-geometry FEM evaluation and visualization.</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="n">area_eval</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="n">area_eval</span><span class="o">.</span><span class="n">sampling_area</span><span class="p">([</span><span class="mi">300</span><span class="p">,</span> <span class="mi">150</span><span class="p">])</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="n">area_eval</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s2">&quot;u_ref&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="c1"># FEM data is returned by point query.</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>    <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">300</span><span class="p">),</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>    <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mi">150</span><span class="p">),</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>    <span class="n">indexing</span><span class="o">=</span><span class="s2">&quot;ij&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="p">)</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="n">u</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">fields</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;u&quot;</span><span class="p">,))[</span><span class="s2">&quot;u&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p>Heat, wave, and transient Navier–Stokes problems require a time interval and
 initial data.  Set <code>time_step</code> to control the stored snapshots; the default
 stores 100 uniform steps.  Transient <code>evaluate</code> calls linearly interpolate
 between snapshots.  <code>BurgersEquation1D</code> is treated as a steady 2D equation in
 the <code>(x, y)</code> domain and does not require a time interval.</p>
-<p>The returned <code>ReferenceGroupEvaluator</code> supports point queries directly, and
-the underlying <code>ReferenceSolution</code> (<code>.reference_solution</code>) supports export:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]))</span>
+<p>The returned <code>ReferenceGroupEvaluator</code> is a <code>GroupEvaluator</code> whose children
+re-query the FEM fields; the underlying <code>ReferenceSolution</code>
+(<code>.reference_solution</code>) supports point queries and export:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">values</span> <span class="o">=</span> <span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">]))</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">reference</span><span class="o">.</span><span class="n">reference_solution</span><span class="o">.</span><span class="n">export_npz</span><span class="p">(</span><span class="s2">&quot;reference.npz&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="p">[</span><span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
 </code></pre></div>
 <p><code>ReferenceSolver(...).solve(domain)</code> remains available as a lower-level
