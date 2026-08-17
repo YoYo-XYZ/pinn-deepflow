@@ -112,7 +112,7 @@ model0 = df.PINN(width=40, length=4)
 ```
 ```python
 # Train the model using Adam Optimizer
-model1 = model0.train_adam(
+model1, model1_best = model0.train_adam(
     calc_loss=df.calc_loss_simple(domain),
     learning_rate=0.001,
     epochs=2000,)
