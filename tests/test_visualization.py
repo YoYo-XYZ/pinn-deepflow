@@ -1,5 +1,9 @@
 import numpy as np
 import pytest
+import matplotlib
+
+matplotlib.use("Agg")
+
 import ultraplot as plt
 
 from deepflow.visualization import Visualizer
