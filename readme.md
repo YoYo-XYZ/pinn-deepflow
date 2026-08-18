@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/deepflow.svg)](https://badge.fury.io/py/deepflow)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/deepflow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Documentation](https://img.shields.io/badge/docs-DeepFlow-blue.svg)](https://yoyo-xyz.github.io/deepflow/)
+[![Documentation](https://img.shields.io/badge/docs-DeepFlow-blue.svg)](https://yoyo-xyz.github.io/pinn-deepflow/)
 ![DeepFlow Logo](static/logo_name_deepflow.svg)
 
 DeepFlow is a user-friendly framework for solving PDEs, with a focus on fluid dynamics including the Navier–Stokes equations, using **Physics-Informed Neural Networks (PINNs)**. It provides a CFD-solver-style workflow that makes PINN-based simulations accessible and straightforward.
@@ -61,20 +61,20 @@ pip install "deepflow[cfd]"
 For development or to build from source:
 
 ```bash
-git clone https://github.com/YoYo-XYZ/deepflow.git
-cd deepflow
+git clone https://github.com/YoYo-XYZ/pinn-deepflow.git
+cd pinn-deepflow
 pip install -e .
 ```
 
 ## Requirements
 
-- Python >= 3.8
+- Python >= 3.10
 - PyTorch >= 1.7.0
 - NumPy >= 1.19.0
 - Matplotlib >= 3.3.0
 - SymPy >= 1.5.0
 - SciPy >= 1.5.0
-- Ultrplot >= 1.0.0
+- ultraplot >= 1.0.0
 
 ## Quick Start
 

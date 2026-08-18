@@ -7,6 +7,7 @@ on:
       - 'docs/**'             # Only trigger when docs change
       - 'mkdocs.yml'
       - '.github/workflows/deploy-docs.yml'
+  workflow_dispatch:          # Allow manual redeploy
 
 permissions:
   contents: write             # Needed to push to gh-pages branch

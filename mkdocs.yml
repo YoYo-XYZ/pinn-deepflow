@@ -31,11 +31,6 @@ plugins:
             show_signature_annotations: true
             show_source: false
 
-extra_javascript:
-  - javascripts/mathjax.js
-  - https://polyfill.io/v3/polyfill.min.js?features=es6
-  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
-
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
@@ -51,13 +46,20 @@ markdown_extensions:
 nav:                           # Your menu structure – edit as you add pages
   - Home: index.md
   - Quick Start: quickstart.md
+  - Installation: install.md
   - Examples:
     - Overview: examples.md
-    - 1D Burgers Equation: burgers_eq.md
-    - Steady Cavity Flow: cavity_flow_steady.md
-    - Steady Cylinder Flow: cylinder_flow_steady.md
-    - Steady BFS Flow: BFS_flow_steady.md
-    - Transient Channel Flow: channel_flow_transient.md
-    - 2D Heat Equation: heat_eq.md
+    - Steady problems:
+      - Burgers' Equation: burgers_eq.md
+      - Lid-driven Cavity Flow: cavity_flow_steady.md
+      - Flow around a Cylinder: cylinder_flow_steady.md
+      - Backward-facing Step: BFS_flow_steady.md
+    - Transient problems:
+      - Transient Channel Flow: channel_flow_transient.md
+      - 2D Heat Equation: heat_eq.md
   - API: reference.md
   - NGSolve reference solutions: reference-solutions.md
+  - FAQ: faq.md
+  - Contributing: contributing.md
+  - Changelog: changelog.md
+  - Cite: cite.md

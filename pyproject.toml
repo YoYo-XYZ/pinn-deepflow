@@ -9,7 +9,7 @@ description = "Physics-Informed Neural Networks for Fluid Dynamics"
 authors = [{ name = "Thammatorn Jamraschai", email = "thammatorn.j@gmail.com" }]
 readme = "readme.md"
 license = {text = "MIT License"}
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 keywords = ["PINNs", "neural-networks", "fluid-dynamics", "PDEs", "physics-informed", "deep-learning", "machine-learning"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
-urls = {Homepage = "https://github.com/YoYo-XYZ/deepflow"}
+urls = {Homepage = "https://github.com/YoYo-XYZ/pinn-deepflow"}
 dependencies = [
     "torch>=1.7.0",
     "numpy>=1.19.0",
