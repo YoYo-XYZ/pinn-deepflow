@@ -4,7 +4,7 @@ All notable changes to DeepFlow are recorded here, grouped by release. The
 format follows [Keep a Changelog](https://keepachangelog.com/); releases are
 tagged on the `dev` branch.
 
-## [0.1.3] - in development
+## [0.1.3] - 2026-08-18
 
 ### Added
 
@@ -22,6 +22,11 @@ tagged on the `dev` branch.
   union) with tests.
 - Unit tests for PINN training with Adam and L-BFGS optimizers.
 - End-to-end reproducibility test — seeding now covers all RNGs.
+
+### Experimental
+
+- QPINN and QCPINN remain experimental and are not part of the stable 0.1.3
+  support commitment. They require PennyLane separately.
 
 ### Changed
 

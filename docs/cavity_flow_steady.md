@@ -17,7 +17,7 @@ for incompressible flow solvers
     - **Setup cost**: FNN 50 × 5 (outputs `u, v, p`); Adam 2,000 epochs
       (lr 0.004) followed by L-BFGS 350 epochs (threshold 1e-4). Reference
       run: a few minutes on GPU, final `total_loss ≈ 3e-4`.
-    - **Verified against**: DeepFlow v0.1.3 (commit `828f392`).
+    - **Verified against**: DeepFlow v0.1.3 (candidate source commit `9f751fe`).
 
 ## 1. Define the geometry
 

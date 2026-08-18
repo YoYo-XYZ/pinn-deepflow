@@ -42,6 +42,7 @@ DeepFlow is a user-friendly framework for solving PDEs, with a focus on fluid dy
 - **Optimizers**: Adam, L-BFGS
 - **Backend**: PyTorch
 - **Optional FEM reference backend**: NGSolve/Netgen via `pip install "deepflow[cfd]"`
+- **Experimental quantum models**: QPINN/QCPINN via a separate PennyLane install
 
 ## Installation
 

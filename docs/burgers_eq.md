@@ -16,7 +16,7 @@ shock-like front that makes it a stress test for point sampling.
     - **Setup cost**: FNN 16 × 4; Adam 4,000 epochs (lr 0.015) followed by
       L-BFGS 500 epochs; interior collocation points grow from 4,000 to
       ~13,000 via R3. Reference run: a few minutes on GPU.
-    - **Verified against**: DeepFlow v0.1.3 (commit `828f392`).
+    - **Verified against**: DeepFlow v0.1.3 (candidate source commit `9f751fe`).
 
 ## 1. Define the geometry
 

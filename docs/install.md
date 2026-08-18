@@ -19,6 +19,15 @@ pip install "deepflow[cfd]"
 
 The extra requires Python 3.10+.
 
+## Experimental: quantum models
+
+QPINN and QCPINN are experimental and are not part of the stable 0.1.3
+support commitment. If you want to try them, install PennyLane separately:
+
+```bash
+pip install pennylane
+```
+
 ## Install from source
 
 ```bash

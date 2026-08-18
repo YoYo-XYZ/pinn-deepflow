@@ -5,7 +5,9 @@ on:
     branches: [dev]    
     paths:
       - 'docs/**'             # Only trigger when docs change
+      - 'src/**'              # API reference is generated from source
       - 'mkdocs.yml'
+      - 'requirements-docs.txt'
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:          # Allow manual redeploy
 

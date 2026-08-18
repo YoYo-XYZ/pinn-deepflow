@@ -17,7 +17,7 @@ recirculation zone whose length is a classic validation metric.
       (lr 0.001) followed by L-BFGS 350 epochs (threshold 1e-4). Reference
       run: a few minutes on GPU; L-BFGS reached `total_loss ≈ 2.5e-3` when
       its epoch budget ran out.
-    - **Verified against**: DeepFlow v0.1.3 (commit `828f392`).
+    - **Verified against**: DeepFlow v0.1.3 (candidate source commit `9f751fe`).
 
 ## 1. Define the geometry
 

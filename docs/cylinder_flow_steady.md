@@ -18,7 +18,7 @@ geometry (rectangle minus circle) and a non-trivial inflow profile.
       (lr 0.004) followed by L-BFGS 450 epochs (threshold 1e-4); 4,000
       interior points growing to ~7,000 via R3. Reference run: a few minutes
       on GPU.
-    - **Verified against**: DeepFlow v0.1.3 (commit `828f392`).
+    - **Verified against**: DeepFlow v0.1.3 (candidate source commit `9f751fe`).
 
 ## 1. Define the geometry
 

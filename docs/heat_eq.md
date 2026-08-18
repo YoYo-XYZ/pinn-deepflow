@@ -14,7 +14,7 @@ a time range, and the network takes `t` as an input variable.
     - **Setup cost**: FNN 32 × 4 (inputs `x, y, t`); Adam 2,000 epochs
       (lr 0.004) followed by L-BFGS 450 epochs (threshold 5e-3). Reference
       run: a few minutes on GPU.
-    - **Verified against**: DeepFlow v0.1.3 (commit `828f392`).
+    - **Verified against**: DeepFlow v0.1.3 (candidate source commit `9f751fe`).
 
 ## 1. Define the geometry
 

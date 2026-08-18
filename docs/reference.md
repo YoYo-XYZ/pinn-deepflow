@@ -118,10 +118,8 @@ DeepFlow source code. Private implementation helpers are intentionally omitted.
         - ReferenceSolver
         - UnsupportedReferencePDE
 
-## Quantum Models
+## Quantum Models (Experimental)
 
-::: deepflow.qnn
-    options:
-      members:
-        - QCPINN
-        - QPINN
+QPINN and QCPINN remain experimental in DeepFlow 0.1.3 and are not part of
+the stable API support commitment. They require PennyLane separately and are
+intentionally omitted from this stable API reference.

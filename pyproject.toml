@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,11 +8,12 @@ version = "0.1.3"
 description = "Physics-Informed Neural Networks for Fluid Dynamics"
 authors = [{ name = "Thammatorn Jamraschai", email = "thammatorn.j@gmail.com" }]
 readme = "readme.md"
-license = {text = "MIT License"}
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 keywords = ["PINNs", "neural-networks", "fluid-dynamics", "PDEs", "physics-informed", "deep-learning", "machine-learning"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
@@ -33,6 +34,15 @@ dependencies = [
 cfd = [
     "ngsolve>=6.2; python_version >= '3.10'",
 ]
+test = [
+    "pytest>=8,<10",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: extended numerical and reproducibility checks",
+]
