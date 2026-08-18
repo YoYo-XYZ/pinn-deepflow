@@ -62,5 +62,4 @@ that introduces time ranges, initial conditions, and animated solutions.
 ---
 
 Every example ends with an optional FEM comparison that runs when the
-[`deepflow[cfd]`](install.md) extra (NGSolve backend) is installed — see
-[NGSolve reference solutions](reference-solutions.md).
+[`deepflow[cfd]`](install.md) extra (NGSolve backend) is installed.

@@ -10,9 +10,8 @@ pip install deepflow
 
 The `[cfd]` extra installs NGSolve/Netgen, the finite-element backend that
 solves DeepFlow's built-in PDEs on unstructured meshes. You only need it if
-you want to compare PINN results against FEM reference solutions (see
-[NGSolve reference solutions](reference-solutions.md)). It is optional and
-loaded lazily — a plain `import deepflow` never touches it:
+you want to compare PINN results against FEM reference solutions. It is
+optional and loaded lazily — a plain `import deepflow` never touches it:
 
 ```bash
 pip install "deepflow[cfd]"

@@ -167,9 +167,6 @@ else:
     print(f'FEM mean absolute u error: {u_error:.6e}')
 ```
 
-See [NGSolve reference solutions](reference-solutions.md) for the details of
-the FEM backend.
-
 ## Run it yourself
 
 Source notebook:
