@@ -287,25 +287,6 @@
   
   
     <li class="md-tabs__item">
-      <a href="../reference-solutions/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  NGSolve reference solutions
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
       <a href="../faq/" class="md-tabs__link">
         
   
@@ -1074,33 +1055,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference-solutions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    NGSolve reference solutions
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../faq/" class="md-nav__link">
         
   
@@ -1376,9 +1330,8 @@
 <h2 id="optional-fem-reference-backend-deepflowcfd">Optional: FEM reference backend (<code>deepflow[cfd]</code>)</h2>
 <p>The <code>[cfd]</code> extra installs NGSolve/Netgen, the finite-element backend that
 solves DeepFlow's built-in PDEs on unstructured meshes. You only need it if
-you want to compare PINN results against FEM reference solutions (see
-<a href="../reference-solutions/">NGSolve reference solutions</a>). It is optional and
-loaded lazily — a plain <code>import deepflow</code> never touches it:</p>
+you want to compare PINN results against FEM reference solutions. It is
+optional and loaded lazily — a plain <code>import deepflow</code> never touches it:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"deepflow[cfd]"</span>
 </code></pre></div>
 <p>The extra requires Python 3.10+.</p>
