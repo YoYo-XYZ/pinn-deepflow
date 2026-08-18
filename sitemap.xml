@@ -2,46 +2,66 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
     </url>
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/BFS_flow_steady/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
     </url>
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/burgers_eq/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
     </url>
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/cavity_flow_steady/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://yoyo-xyz.github.io/pinn-deepflow/changelog/</loc>
+         <lastmod>2026-08-18</lastmod>
     </url>
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/channel_flow_transient/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://yoyo-xyz.github.io/pinn-deepflow/cite/</loc>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://yoyo-xyz.github.io/pinn-deepflow/contributing/</loc>
+         <lastmod>2026-08-18</lastmod>
     </url>
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/cylinder_flow_steady/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
     </url>
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/examples/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://yoyo-xyz.github.io/pinn-deepflow/faq/</loc>
+         <lastmod>2026-08-18</lastmod>
     </url>
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/heat_eq/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
+    </url>
+    <url>
+         <loc>https://yoyo-xyz.github.io/pinn-deepflow/install/</loc>
+         <lastmod>2026-08-18</lastmod>
     </url>
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/quickstart/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
     </url>
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/reference-solutions/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
     </url>
     <url>
          <loc>https://yoyo-xyz.github.io/pinn-deepflow/reference/</loc>
-         <lastmod>2026-08-17</lastmod>
+         <lastmod>2026-08-18</lastmod>
     </url>
 </urlset>

@@ -25,7 +25,7 @@
     
     
       
-        <title>Steady Cylinder Flow - DeepFlow</title>
+        <title>Flow around a Cylinder - DeepFlow</title>
       
     
     
@@ -68,7 +68,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#channel-flow-steady-demo-code" class="md-skip">
+        <a href="#solving-steady-flow-around-a-cylinder" class="md-skip">
           Skip to content
         </a>
       
@@ -102,7 +102,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Steady Cylinder Flow
+              Flow around a Cylinder
             
           </span>
         </div>
@@ -225,6 +225,25 @@
   
   
   
+  
+    <li class="md-tabs__item">
+      <a href="../install/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Installation
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
     
   
   
@@ -275,6 +294,82 @@
     
   
   NGSolve reference solutions
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../contributing/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../changelog/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../cite/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Cite
 
       </a>
     </li>
@@ -384,6 +479,33 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -405,10 +527,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   
@@ -426,8 +548,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -469,6 +591,63 @@
                 
   
   
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Steady problems
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Steady problems
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
   
   
     <li class="md-nav__item">
@@ -479,7 +658,7 @@
   <span class="md-ellipsis">
     
   
-    1D Burgers Equation
+    Burgers' Equation
   
 
     
@@ -507,7 +686,7 @@
   <span class="md-ellipsis">
     
   
-    Steady Cavity Flow
+    Lid-driven Cavity Flow
   
 
     
@@ -544,7 +723,7 @@
   <span class="md-ellipsis">
     
   
-    Steady Cylinder Flow
+    Flow around a Cylinder
   
 
     
@@ -562,7 +741,7 @@
   <span class="md-ellipsis">
     
   
-    Steady Cylinder Flow
+    Flow around a Cylinder
   
 
     
@@ -588,10 +767,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-define-geometry-domain" class="md-nav__link">
+  <a href="#1-define-the-geometry" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Define Geometry Domain
+        1. Define the geometry
       
     </span>
   </a>
@@ -599,10 +778,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-define-physics" class="md-nav__link">
+  <a href="#2-define-the-physics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Define Physics
+        2. Define the physics
       
     </span>
   </a>
@@ -610,10 +789,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-train-the-pinn-model" class="md-nav__link">
+  <a href="#3-sample-training-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Train the PINN model
+        3. Sample training data
       
     </span>
   </a>
@@ -621,33 +800,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-visualization" class="md-nav__link">
+  <a href="#4-train-the-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Visualization
+        4. Train the model
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="4. Visualization">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-visualize-the-solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Visualize the solution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Visualize the solution">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#41-visualize-area" class="md-nav__link">
+  <a href="#export-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4.1 Visualize area
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#42-visualize-bound" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4.2 Visualize bound
+        Export data
       
     </span>
   </a>
@@ -660,38 +839,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#43-visualize-neural-network-data" class="md-nav__link">
+  <a href="#6-optional-fem-reference-comparison" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4.3 Visualize Neural Network data
+        6. Optional: FEM reference comparison
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="4.3 Visualize Neural Network data">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#44-export-data" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4.4 Export data
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-fem-reference-comparison" class="md-nav__link">
+  <a href="#run-it-yourself" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. FEM reference comparison
+        Run it yourself
       
     </span>
   </a>
@@ -721,7 +883,7 @@
   <span class="md-ellipsis">
     
   
-    Steady BFS Flow
+    Backward-facing Step
   
 
     
@@ -734,6 +896,69 @@
   
 
               
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transient problems
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Transient problems
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -786,6 +1011,14 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -852,6 +1085,114 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cite/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cite
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -879,10 +1220,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-define-geometry-domain" class="md-nav__link">
+  <a href="#1-define-the-geometry" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Define Geometry Domain
+        1. Define the geometry
       
     </span>
   </a>
@@ -890,10 +1231,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-define-physics" class="md-nav__link">
+  <a href="#2-define-the-physics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Define Physics
+        2. Define the physics
       
     </span>
   </a>
@@ -901,10 +1242,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-train-the-pinn-model" class="md-nav__link">
+  <a href="#3-sample-training-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Train the PINN model
+        3. Sample training data
       
     </span>
   </a>
@@ -912,33 +1253,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-visualization" class="md-nav__link">
+  <a href="#4-train-the-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Visualization
+        4. Train the model
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="4. Visualization">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-visualize-the-solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Visualize the solution
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Visualize the solution">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#41-visualize-area" class="md-nav__link">
+  <a href="#export-data" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4.1 Visualize area
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#42-visualize-bound" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4.2 Visualize bound
+        Export data
       
     </span>
   </a>
@@ -951,38 +1292,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#43-visualize-neural-network-data" class="md-nav__link">
+  <a href="#6-optional-fem-reference-comparison" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4.3 Visualize Neural Network data
+        6. Optional: FEM reference comparison
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="4.3 Visualize Neural Network data">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#44-export-data" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4.4 Export data
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-fem-reference-comparison" class="md-nav__link">
+  <a href="#run-it-yourself" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. FEM reference comparison
+        Run it yourself
       
     </span>
   </a>
@@ -1014,181 +1338,169 @@
   
 
 
-<h1 id="channel-flow-steady-demo-code">Channel Flow (Steady) DEMO code</h1>
-<p>This notebook demonstrates solving steady-state Flow around cylinder with the same setup as this paper https://arxiv.org/abs/2002.10558</p>
+<h1 id="solving-steady-flow-around-a-cylinder">Solving Steady Flow around a Cylinder</h1>
+<p>This example solves steady incompressible flow around a circular cylinder in a
+channel — a classic benchmark for flow solvers, here following the setup of
+<a href="https://arxiv.org/abs/2002.10558">arXiv:2002.10558</a>. It demonstrates boolean
+geometry (rectangle minus circle) and a non-trivial inflow profile.</p>
+<div class="admonition note">
+<p class="admonition-title">At a glance</p>
+<ul>
+<li><strong>Physics</strong>: steady incompressible Navier–Stokes equations with
+  <code>mu = 0.02</code>, <code>rho = 1</code>, <code>U = 1</code> (<code>Re ≈ 50</code> on the unit length scale).
+  Parabolic inflow with maximum <code>u = 1</code> at mid-height, no-slip walls and
+  cylinder surface, <code>p = 0</code> at the outlet.</li>
+<li><strong>What to expect</strong>: a steady, symmetric wake behind the cylinder with a
+  small recirculation zone — at this Reynolds number there is no vortex
+  shedding (that requires <code>Re ≈ 40–47</code> based on the cylinder diameter).
+  Verify the wake symmetry about the channel mid-line.</li>
+<li><strong>Setup cost</strong>: FNN 32 × 5 (outputs <code>u, v, p</code>); Adam 2,000 epochs
+  (lr 0.004) followed by L-BFGS 450 epochs (threshold 1e-4); 4,000
+  interior points growing to ~7,000 via R3. Reference run: a few minutes
+  on GPU.</li>
+<li><strong>Verified against</strong>: DeepFlow v0.1.3 (commit <code>828f392</code>).</li>
+</ul>
+</div>
+<h2 id="1-define-the-geometry">1. Define the geometry</h2>
+<p>The cylinder is subtracted from the channel with the <code>-</code> operator; its
+boundaries are passed to the domain so they get sampled as obstacles:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">deepflow</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">df</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Deepflow is runned on:&quot;</span><span class="p">,</span> <span class="n">df</span><span class="o">.</span><span class="n">device</span><span class="p">)</span> <span class="c1"># to change to cpu use df.device = &#39;cpu&#39;</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">df</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">69</span><span class="p">)</span> <span class="c1"># for reproducibility</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">df</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="mi">69</span><span class="p">)</span>  <span class="c1"># for reproducibility</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">circle</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">circle</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">rectangle</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">rectangle</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.41</span><span class="p">])</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">area</span> <span class="o">=</span> <span class="n">rectangle</span> <span class="o">-</span> <span class="n">circle</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">domain</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">domain</span><span class="p">(</span><span class="n">area</span><span class="p">,</span> <span class="n">circle</span><span class="o">.</span><span class="n">bound_list</span><span class="p">)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_setup</span><span class="p">()</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>Deepflow is runned on: cuda
+<p><img alt="Domain setup" src="../static/examples/cylinder/domain_setup.png" /></p>
+<h2 id="2-define-the-physics">2. Define the physics</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">'u'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'y'</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="mi">4</span> <span class="o">*</span> <span class="mi">1</span> <span class="o">*</span> <span class="p">(</span><span class="mf">0.41</span> <span class="o">-</span> <span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="mf">0.41</span><span class="o">**</span><span class="mi">2</span><span class="p">],</span> <span class="s1">'v'</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>  <span class="c1"># Inlet</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">'u'</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">'v'</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>  <span class="c1"># Bottom wall</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">'p'</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>          <span class="c1"># Outlet</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">'u'</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">'v'</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>  <span class="c1"># Top wall</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">'u'</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">'v'</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>  <span class="c1"># Cylinder</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">'u'</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">'v'</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>  <span class="c1"># Cylinder</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">domain</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">define_pde</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">NavierStokes</span><span class="p">(</span><span class="n">U</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">L</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_setup</span><span class="p">()</span>
 </code></pre></div>
-<h2 id="1-define-geometry-domain">1. Define Geometry Domain</h2>
-<p>Set up the computational domain: a rectangle with a circular obstacle (cylinder). This defines the area for simulation.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">circle</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">circle</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.05</span><span class="p">)</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">rectangle</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">rectangle</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mf">1.1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mf">0.41</span><span class="p">])</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">area</span> <span class="o">=</span> <span class="n">rectangle</span> <span class="o">-</span> <span class="n">circle</span>
+<p><img alt="Physics setup" src="../static/examples/cylinder/physics_setup.png" /></p>
+<h2 id="3-sample-training-data">3. Sample training data</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">domain</span><span class="o">.</span><span class="n">sampling_lhs</span><span class="p">(</span><span class="n">bound_sampling_res</span><span class="o">=</span><span class="p">[</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">],</span> <span class="n">area_sampling_res</span><span class="o">=</span><span class="p">[</span><span class="mi">4000</span><span class="p">])</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_coordinates</span><span class="p">(</span><span class="n">display_physics</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">domain</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">domain</span><span class="p">(</span><span class="n">area</span><span class="p">,</span> <span class="n">circle</span><span class="o">.</span><span class="n">bound_list</span><span class="p">)</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_setup</span><span class="p">()</span>
+<p><img alt="Sampled coordinates" src="../static/examples/cylinder/sampling_coordinates.png" /></p>
+<h2 id="4-train-the-model">4. Train the model</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">do_in_adam</span><span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="k">if</span> <span class="n">epoch</span> <span class="o">%</span> <span class="mi">100</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">epoch</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        <span class="n">domain</span><span class="o">.</span><span class="n">sampling_R3</span><span class="p">(</span><span class="n">bound_sampling_res</span><span class="o">=</span><span class="p">[</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">],</span> <span class="n">area_sampling_res</span><span class="o">=</span><span class="p">[</span><span class="mi">4000</span><span class="p">])</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">model0</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">PINN</span><span class="p">(</span><span class="n">width</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">input_vars</span><span class="o">=</span><span class="p">[</span><span class="s1">'x'</span><span class="p">,</span> <span class="s1">'y'</span><span class="p">],</span> <span class="n">output_vars</span><span class="o">=</span><span class="p">[</span><span class="s1">'u'</span><span class="p">,</span> <span class="s1">'v'</span><span class="p">,</span> <span class="s1">'p'</span><span class="p">])</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">model1</span><span class="p">,</span> <span class="n">model1_best</span> <span class="o">=</span> <span class="n">model0</span><span class="o">.</span><span class="n">train_adam</span><span class="p">(</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.004</span><span class="p">,</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">epochs</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">calc_loss</span><span class="o">=</span><span class="n">df</span><span class="o">.</span><span class="n">calc_loss_simple</span><span class="p">(</span><span class="n">domain</span><span class="p">),</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">threshold_loss</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="n">do_between_epochs</span><span class="o">=</span><span class="n">do_in_adam</span><span class="p">)</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="n">model2</span><span class="p">,</span> <span class="n">model2_best</span> <span class="o">=</span> <span class="n">model1_best</span><span class="o">.</span><span class="n">train_lbfgs</span><span class="p">(</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="n">calc_loss</span><span class="o">=</span><span class="n">df</span><span class="o">.</span><span class="n">calc_loss_simple</span><span class="p">(</span><span class="n">domain</span><span class="p">),</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="n">epochs</span><span class="o">=</span><span class="mi">450</span><span class="p">,</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>    <span class="n">threshold_loss</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">)</span>
 </code></pre></div>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_5_0.png" /></p>
-<h2 id="2-define-physics">2. Define Physics</h2>
-<p>Define the Navier-Stokes equations for fluid flow and apply boundary conditions (e.g., no-slip walls, inlet velocity).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">&#39;u&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span>  <span class="mi">4</span><span class="o">*</span><span class="mi">1</span><span class="o">*</span><span class="p">(</span><span class="mf">0.41</span><span class="o">-</span><span class="n">x</span><span class="p">)</span><span class="o">*</span><span class="n">x</span><span class="o">/</span><span class="mf">0.41</span><span class="o">**</span><span class="mi">2</span><span class="p">],</span> <span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">&#39;u&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span><span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">&#39;p&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">&#39;u&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span><span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">&#39;u&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="o">.</span><span class="n">define_bc</span><span class="p">({</span><span class="s1">&#39;u&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;v&#39;</span><span class="p">:</span> <span class="mi">0</span><span class="p">})</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">domain</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">define_pde</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">NavierStokes</span><span class="p">(</span><span class="n">U</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">L</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="mf">0.02</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_setup</span><span class="p">()</span>
+<div class="admonition note">
+<p class="admonition-title">Reference-run result</p>
+<p>Adam (2,000 epochs) dropped <code>total_loss</code> to ≈ 0.2; L-BFGS (450 epochs)
+pushed it below 1e-3 before the run was interrupted. The momentum
+residuals near the cylinder surface dominate the remaining error.</p>
+</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_coordinates</span><span class="p">()</span>
 </code></pre></div>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_7_0.png" /></p>
-<p>Sample initial points for training.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">domain</span><span class="o">.</span><span class="n">sampling_lhs</span><span class="p">(</span><span class="n">bound_sampling_res</span><span class="o">=</span><span class="p">[</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">],</span> <span class="n">area_sampling_res</span><span class="o">=</span><span class="p">[</span><span class="mi">4000</span><span class="p">])</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_coordinates</span><span class="p">(</span><span class="n">display_physics</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<p><img alt="R3-densified coordinates" src="../static/examples/cylinder/resampled_coordinates.png" /></p>
+<p>Save (and reload) the trained model:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">model2</span><span class="o">.</span><span class="n">save_as_pickle</span><span class="p">(</span><span class="s2">"model.pkl"</span><span class="p">)</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">model2</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">load_from_pickle</span><span class="p">(</span><span class="s2">"model.pkl"</span><span class="p">)</span>
 </code></pre></div>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_9_0.png" /></p>
-<h2 id="3-train-the-pinn-model">3. Train the PINN model</h2>
-<p>Define how collocation points are sampled during training.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">do_in_adam</span><span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="k">return</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">do_in_lbfgs</span><span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">if</span> <span class="n">epoch</span> <span class="o">%</span> <span class="mi">100</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">epoch</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="n">domain</span><span class="o">.</span><span class="n">sampling_R3</span><span class="p">(</span><span class="n">bound_sampling_res</span><span class="o">=</span><span class="p">[</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">1000</span><span class="p">],</span> <span class="n">area_sampling_res</span><span class="o">=</span><span class="p">[</span><span class="mi">4000</span><span class="p">])</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span>
+<h2 id="5-visualize-the-solution">5. Visualize the solution</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">area_eval</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model2</span><span class="p">)</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">area_eval</span><span class="o">.</span><span class="n">sampling_area</span><span class="p">([</span><span class="mi">300</span><span class="p">,</span> <span class="mi">150</span><span class="p">])</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">area_eval</span><span class="p">)</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">_</span> <span class="o">=</span> <span class="n">area_eval</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s1">'u'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'rainbow'</span><span class="p">)</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s2">"colorplot_u.png"</span><span class="p">)</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">_</span> <span class="o">=</span> <span class="n">area_eval</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s1">'v'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'rainbow'</span><span class="p">)</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">_</span> <span class="o">=</span> <span class="n">area_eval</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s1">'p'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'rainbow'</span><span class="p">)</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">_</span> <span class="o">=</span> <span class="n">area_eval</span><span class="o">.</span><span class="n">plot_streamline</span><span class="p">(</span><span class="s1">'u'</span><span class="p">,</span> <span class="s1">'v'</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'jet'</span><span class="p">)</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">_</span> <span class="o">=</span> <span class="n">area_eval</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">'pde_residual'</span><span class="p">)</span>
 </code></pre></div>
-<p>Train the model using Adam for initial training (faster convergence).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">model0</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">PINN</span><span class="p">(</span><span class="n">width</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">input_vars</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">,</span><span class="s1">&#39;y&#39;</span><span class="p">],</span> <span class="n">output_vars</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;u&#39;</span><span class="p">,</span><span class="s1">&#39;v&#39;</span><span class="p">,</span><span class="s1">&#39;p&#39;</span><span class="p">])</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Train the model</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">model1</span><span class="p">,</span> <span class="n">model1best</span> <span class="o">=</span> <span class="n">model0</span><span class="o">.</span><span class="n">train_adam</span><span class="p">(</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">learning_rate</span><span class="o">=</span><span class="mf">0.004</span><span class="p">,</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">epochs</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="n">calc_loss</span><span class="o">=</span><span class="n">df</span><span class="o">.</span><span class="n">calc_loss_simple</span><span class="p">(</span><span class="n">domain</span><span class="p">),</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">threshold_loss</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">do_between_epochs</span><span class="o">=</span><span class="n">do_in_adam</span><span class="p">)</span>
+<p><img alt="u field" src="../static/examples/cylinder/u_field.png" />
+<img alt="v field" src="../static/examples/cylinder/v_field.png" />
+<img alt="Pressure field" src="../static/examples/cylinder/pressure_field.png" />
+<img alt="Streamlines" src="../static/examples/cylinder/streamlines.png" />
+<img alt="PDE residual" src="../static/examples/cylinder/pde_residual.png" /></p>
+<p>The streamlines show the steady recirculation zone behind the cylinder. The
+residual plot concentrates error near the cylinder and the inlet corners.</p>
+<p>Check the outflow profile against the inflow: the outlet (<code>bound_list[2]</code>)
+should carry a parabolic <code>u</code> profile:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">bound_visual</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model2</span><span class="p">)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">bound_visual</span><span class="o">.</span><span class="n">sampling_line</span><span class="p">(</span><span class="mi">200</span><span class="p">)</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">_</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s1">'u'</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'rainbow'</span><span class="p">)</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">_</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_axis</span><span class="o">=</span><span class="s1">'y'</span><span class="p">,</span> <span class="n">y_axis</span><span class="o">=</span><span class="s1">'u'</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>Epoch: 1, total_loss: 0.73840, bc_loss: 0.73788, pde_loss: 0.00053
-Epoch: 200, total_loss: 0.22851, bc_loss: 0.20319, pde_loss: 0.02532
-Epoch: 400, total_loss: 0.20562, bc_loss: 0.17889, pde_loss: 0.02673
-Epoch: 600, total_loss: 0.19221, bc_loss: 0.16597, pde_loss: 0.02624
-Epoch: 800, total_loss: 0.18192, bc_loss: 0.16069, pde_loss: 0.02123
-Epoch: 1000, total_loss: 0.17445, bc_loss: 0.14232, pde_loss: 0.03212
-Epoch: 1200, total_loss: 0.14289, bc_loss: 0.12102, pde_loss: 0.02187
-Epoch: 1400, total_loss: 0.24062, bc_loss: 0.21394, pde_loss: 0.02669
-Epoch: 1600, total_loss: 0.21580, bc_loss: 0.18649, pde_loss: 0.02930
-Epoch: 1800, total_loss: 0.20538, bc_loss: 0.17723, pde_loss: 0.02815
-Epoch: 2000, total_loss: 0.20238, bc_loss: 0.16498, pde_loss: 0.03740
+<p><img alt="Outlet u (colormap)" src="../static/examples/cylinder/outlet_u_colormap.png" />
+<img alt="Outlet u profile" src="../static/examples/cylinder/outlet_u_profile.png" /></p>
+<p>Training loss:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">_</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">plot_loss_curve</span><span class="p">(</span><span class="n">log_scale</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
-<p>Refine the model using LBFGS for higher precision.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Train the model</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">_</span><span class="p">,</span> <span class="n">model2</span> <span class="o">=</span> <span class="n">model1best</span><span class="o">.</span><span class="n">train_lbfgs</span><span class="p">(</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">calc_loss</span><span class="o">=</span><span class="n">df</span><span class="o">.</span><span class="n">calc_loss_simple</span><span class="p">(</span><span class="n">domain</span><span class="p">),</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">epochs</span><span class="o">=</span><span class="mi">450</span><span class="p">,</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">threshold_loss</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">do_between_epochs</span><span class="o">=</span><span class="n">do_in_lbfgs</span><span class="p">)</span>
+<p><img alt="Loss curve" src="../static/examples/cylinder/loss_curve.png" /></p>
+<h3 id="export-data">Export data</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">x_data</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">'x'</span><span class="p">]</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">y_data</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">'y'</span><span class="p">]</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">u_data</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">'u'</span><span class="p">]</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">x_data</span><span class="p">,</span> <span class="n">y_data</span><span class="p">,</span> <span class="n">u_data</span><span class="p">))</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="n">np</span><span class="o">.</span><span class="n">savetxt</span><span class="p">(</span><span class="s1">'outlet_velocity.txt'</span><span class="p">,</span> <span class="n">array</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>Epoch: 1248, total_loss: 0.13073, bc_loss: 0.10979, pde_loss: 0.02094
-Epoch: 1298, total_loss: 0.02247, bc_loss: 0.01089, pde_loss: 0.01158
-Epoch: 1348, total_loss: 0.00434, bc_loss: 0.00100, pde_loss: 0.00334
-number of bound : [&#39;0: 1437&#39;, &#39;1: 1381&#39;, &#39;2: 1398&#39;, &#39;3: 1516&#39;, &#39;4: 1517&#39;, &#39;5: 1363&#39;]
-number of area : [&#39;0: 5332&#39;]
-Epoch: 1398, total_loss: 0.00307, bc_loss: 0.00057, pde_loss: 0.00250
-Epoch: 1448, total_loss: 0.00160, bc_loss: 0.00033, pde_loss: 0.00127
-number of bound : [&#39;0: 1807&#39;, &#39;1: 1708&#39;, &#39;2: 1987&#39;, &#39;3: 1895&#39;, &#39;4: 1936&#39;, &#39;5: 1821&#39;]
-number of area : [&#39;0: 6368&#39;]
-Epoch: 1498, total_loss: 0.00177, bc_loss: 0.00034, pde_loss: 0.00143
-Epoch: 1548, total_loss: 0.00118, bc_loss: 0.00026, pde_loss: 0.00093
-number of bound : [&#39;0: 2158&#39;, &#39;1: 1938&#39;, &#39;2: 2504&#39;, &#39;3: 2186&#39;, &#39;4: 2344&#39;, &#39;5: 2235&#39;]
-number of area : [&#39;0: 7266&#39;]
-Training interrupted by user.
+<h2 id="6-optional-fem-reference-comparison">6. Optional: FEM reference comparison</h2>
+<p>The NGSolve backend solves the same steady problem on a triangular mesh;
+<code>fem_reference.metadata</code> reports the solve configuration, and <code>u_ref</code> is the
+FEM field queried at the same coordinates:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="kn">import</span><span class="w"> </span><span class="nn">ngsolve</span>  <span class="c1"># noqa: F401</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">except</span> <span class="p">(</span><span class="ne">ImportError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'Skipping optional FEM comparison: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="n">fem_reference</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">solve_fem</span><span class="p">(</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>        <span class="n">mesh_size</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>        <span class="n">boundary_resolution</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>        <span class="n">max_iterations</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>    <span class="p">)</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>    <span class="n">fem_area</span> <span class="o">=</span> <span class="n">fem_reference</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>    <span class="n">fem_area</span><span class="o">.</span><span class="n">sampling_area</span><span class="p">([</span><span class="mi">300</span><span class="p">,</span> <span class="mi">150</span><span class="p">])</span>
+<a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">fem_reference</span><span class="o">.</span><span class="n">metadata</span><span class="p">)</span>
+<a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>    <span class="n">_</span> <span class="o">=</span> <span class="n">fem_area</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s1">'u_ref'</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">'rainbow'</span><span class="p">)</span>
+<a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a>
+<a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>    <span class="n">pinn_area</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model2_best</span><span class="p">)</span>
+<a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a>    <span class="n">u_error</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">pinn_area</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">'u'</span><span class="p">]</span> <span class="o">-</span> <span class="n">fem_area</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">'u_ref'</span><span class="p">])))</span>
+<a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">u_error</span><span class="p">):</span>
+<a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a>        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">'FEM comparison produced a non-finite error'</span><span class="p">)</span>
+<a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'FEM mean absolute u error: </span><span class="si">{</span><span class="n">u_error</span><span class="si">:</span><span class="s1">.6e</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">domain</span><span class="o">.</span><span class="n">show_coordinates</span><span class="p">()</span>
+<h2 id="run-it-yourself">Run it yourself</h2>
+<p>Source notebook:
+<a href="https://github.com/YoYo-XYZ/pinn-deepflow/blob/dev/examples/cylinder_flow_steady/cylinder_flow_steady.ipynb"><code>examples/cylinder_flow_steady/cylinder_flow_steady.ipynb</code></a></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>jupyter<span class="w"> </span>notebook<span class="w"> </span>examples/cylinder_flow_steady/cylinder_flow_steady.ipynb
 </code></pre></div>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_17_0.png" /></p>
-<p>Save or Load the model for later use</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">model2</span><span class="o">.</span><span class="n">save_as_pickle</span><span class="p">(</span><span class="s2">&quot;model.pkl&quot;</span><span class="p">)</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">model2</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">load_from_pickle</span><span class="p">(</span><span class="s2">&quot;model.pkl&quot;</span><span class="p">)</span>
-</code></pre></div>
-<h2 id="4-visualization">4. Visualization</h2>
-<h3 id="41-visualize-area">4.1 Visualize area</h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Create object for evaluation</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">area_eval</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model2</span><span class="p">)</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="c1"># Sampling uniform points</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">area_eval</span><span class="o">.</span><span class="n">sampling_area</span><span class="p">([</span><span class="mi">300</span><span class="p">,</span> <span class="mi">150</span><span class="p">])</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># Show available data&#39;s key</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">area_eval</span><span class="p">)</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code>Available data keys: (&#39;u&#39;, &#39;v&#39;, &#39;p&#39;, &#39;pde_residual&#39;, &#39;x&#39;, &#39;y&#39;, &#39;u_x&#39;, &#39;u_y&#39;, &#39;v_x&#39;, &#39;v_y&#39;, &#39;p_x&#39;, &#39;p_y&#39;, &#39;continuity_residual&#39;, &#39;x_momentum_residual&#39;, &#39;y_momentum_residual&#39;, &#39;total_loss&#39;, &#39;bc_loss&#39;, &#39;pde_loss&#39;)
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">area_eval</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s1">&#39;u&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;rainbow&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s2">&quot;colorplot_u.png&quot;</span><span class="p">)</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">_</span> <span class="o">=</span> <span class="n">area_eval</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s1">&#39;v&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;rainbow&#39;</span><span class="p">)</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">_</span> <span class="o">=</span> <span class="n">area_eval</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s1">&#39;p&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;rainbow&#39;</span><span class="p">)</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">_</span> <span class="o">=</span> <span class="n">area_eval</span><span class="o">.</span><span class="n">plot_streamline</span><span class="p">(</span><span class="s1">&#39;u&#39;</span><span class="p">,</span> <span class="s1">&#39;v&#39;</span><span class="p">,</span> <span class="n">cmap</span> <span class="o">=</span> <span class="s1">&#39;jet&#39;</span><span class="p">)</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">_</span> <span class="o">=</span> <span class="n">area_eval</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="s1">&#39;pde_residual&#39;</span><span class="p">)</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code>C:\Users\thamm\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\IPython\core\events.py:82: UltraPlotWarning: Tick label sharing not implemented for &lt;class &#39;ultraplot.axes.three.ThreeAxes&#39;&gt; subplots.
-  func(*args, **kwargs)
-</code></pre></div>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_23_1.png" /></p>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_23_2.png" /></p>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_23_3.png" /></p>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_23_4.png" /></p>
-<div class="highlight"><pre><span></span><code>C:\Users\thamm\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.11_qbz5n2kfra8p0\LocalCache\local-packages\Python311\site-packages\IPython\core\pylabtools.py:170: UltraPlotWarning: Tick label sharing not implemented for &lt;class &#39;ultraplot.axes.three.ThreeAxes&#39;&gt; subplots.
-  fig.canvas.print_figure(bytes_io, **kw)
-</code></pre></div>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_23_6.png" /></p>
-<h3 id="42-visualize-bound">4.2 Visualize bound</h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Create object for evaluation</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">bound_visual</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">bound_list</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model2</span><span class="p">)</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">bound_visual</span><span class="o">.</span><span class="n">sampling_line</span><span class="p">(</span><span class="mi">200</span><span class="p">)</span> <span class="c1"># Sampling uniform points</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">_</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s1">&#39;u&#39;</span><span class="p">,</span> <span class="n">cmap</span> <span class="o">=</span> <span class="s1">&#39;rainbow&#39;</span><span class="p">)</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">_</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x_axis</span> <span class="o">=</span> <span class="s1">&#39;y&#39;</span><span class="p">,</span> <span class="n">y_axis</span><span class="o">=</span><span class="s1">&#39;u&#39;</span><span class="p">)</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code>C:\Users\thamm\OneDrive\Documents\1 - Projects\0 - STEM\2 - Numerical Physics\9 - PINNs\deepflow\src\deepflow\visualization.py:40: UserWarning: Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
-  ax.set_xlim(self.data_dict[x_axis].min(), self.data_dict[x_axis].max())
-</code></pre></div>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_26_1.png" /></p>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_26_2.png" /></p>
-<h2 id="43-visualize-neural-network-data">4.3 Visualize Neural Network data</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">_</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">plot_loss_curve</span><span class="p">(</span><span class="n">log_scale</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</code></pre></div>
-<p><img alt="png" src="../img/examples/cylinder_flow_steady_files/cylinder_flow_steady_28_0.png" /></p>
-<h3 id="44-export-data">4.4 Export data</h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># store the x,y,velocity_magnitude data</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">x_data</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">y_data</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">]</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">u_data</span> <span class="o">=</span> <span class="n">bound_visual</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">&#39;u&#39;</span><span class="p">]</span>
-<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>
-<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="c1">#save as txt file</span>
-<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="n">array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">((</span><span class="n">x_data</span><span class="p">,</span> <span class="n">y_data</span><span class="p">,</span> <span class="n">u_data</span><span class="p">))</span>
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="n">np</span><span class="o">.</span><span class="n">savetxt</span><span class="p">(</span><span class="s1">&#39;outlet_velocity.txt&#39;</span><span class="p">,</span> <span class="n">array</span><span class="p">)</span>
-</code></pre></div>
-<h2 id="5-fem-reference-comparison">5. FEM reference comparison</h2>
-<p>The optional NGSolve backend returns a <code>ReferenceGroupEvaluator</code>. Sample the
-same area coordinates used for the PINN visualization, query the FEM field via
-<code>fem_reference.reference_solution.evaluate(...)</code>, and compare the velocity
-fields:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
-<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">fem_reference</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">solve_fem</span><span class="p">(</span>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    <span class="n">mesh_size</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
-<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    <span class="n">boundary_resolution</span><span class="o">=</span><span class="mi">64</span><span class="p">,</span>
-<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    <span class="n">max_iterations</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="p">)</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="n">fem_area</span> <span class="o">=</span> <span class="n">fem_reference</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="n">fem_area</span><span class="o">.</span><span class="n">sampling_area</span><span class="p">([</span><span class="mi">300</span><span class="p">,</span> <span class="mi">150</span><span class="p">])</span>
-<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">fem_reference</span><span class="o">.</span><span class="n">metadata</span><span class="p">)</span>
-<a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="n">_</span> <span class="o">=</span> <span class="n">fem_area</span><span class="o">.</span><span class="n">plot_color</span><span class="p">(</span><span class="s1">&#39;u_ref&#39;</span><span class="p">,</span> <span class="n">s</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;rainbow&#39;</span><span class="p">)</span>
-<a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>
-<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a><span class="n">pinn_area</span> <span class="o">=</span> <span class="n">domain</span><span class="o">.</span><span class="n">area_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">model2</span><span class="p">)</span>
-<a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="n">u_error</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">pinn_area</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">&#39;u&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">fem_area</span><span class="o">.</span><span class="n">data_dict</span><span class="p">[</span><span class="s1">&#39;u_ref&#39;</span><span class="p">]))</span>
-<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a><span class="nb">print</span><span class="p">(</span><span class="s1">&#39;mean absolute u error:&#39;</span><span class="p">,</span> <span class="n">u_error</span><span class="p">)</span>
-</code></pre></div>
+<p>This page is hand-authored; the notebook is the source of truth (see
+<a href="https://github.com/YoYo-XYZ/pinn-deepflow/blob/dev/REGENERATE.md">REGENERATE.md</a>).</p>
 
 
 
@@ -1242,12 +1554,6 @@ fields:</p>
     
     
       <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
-      
-        <script src="../javascripts/mathjax.js"></script>
-      
-        <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-      
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>
