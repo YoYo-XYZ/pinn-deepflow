@@ -37,7 +37,8 @@ PINN-based simulations accessible and straightforward.
     - transient & steady 2D incompressible Navier-Stokes equations, 2D Fourier Heat equation, Burgers' equation
 - **Sampling methods**: Uniform, Random, Latin Hypercube Sampling, RAR-G [[0]](https://arxiv.org/abs/2207.10289), R3 [[1]](https://arxiv.org/abs/2207.02338)
 - **2D Geometries**: Custom functions, Rectangle, Circle, Polygon, and combinations & subtractions.
-- **Hard Boundary Conditions**: Automatic Hard BC w.r.t. to geometry.
+- **Hard Constraints**: Explicit constant hard constraints are applied
+  automatically during domain loss evaluation for supported geometries.
 - **Neural Network Architectures**: Fully connected feedforward networks (FNN).
 - **Optimizers**: Adam, L-BFGS
 - **Backend**: PyTorch, with an optional NGSolve FEM reference backend (`pip install "deepflow[cfd]"`)
