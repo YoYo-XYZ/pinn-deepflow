@@ -3,7 +3,7 @@
 import random
 import numpy as np
 import torch
-import scipy
+from scipy.stats import qmc
 from typing import Tuple, List, Union, Generator, Optional
 
 # Module-level seed storage for reproducibility helpers
@@ -38,9 +38,9 @@ def latin_hypercube_sampling(n_samples: int, n_dimensions: int, lower_lim:list, 
     """
     # Resolve seed: explicit > per-call advancing RNG > global fallback > None (non-deterministic)
     seed = seed if seed is not None else (_next_seed() if _RNG is not None else _GLOBAL_SEED)
-    lhs = scipy.stats.qmc.LatinHypercube(d=n_dimensions, strength=1, seed=seed)
+    lhs = qmc.LatinHypercube(d=n_dimensions, strength=1, seed=seed)
     sample = lhs.random(n=n_samples)
-    sample = scipy.stats.qmc.scale(sample, lower_lim, upper_lim)
+    sample = qmc.scale(sample, lower_lim, upper_lim)
     return torch.tensor(sample, dtype=get_dtype())
 
 # Module-level device configuration (mirrored by dtype below)
