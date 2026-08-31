@@ -522,13 +522,16 @@ class NN(ABC, nn.Module):
     def save_as_pickle(self, file_name: str = "model.pkl") -> None:
         """Serialize the model to a pickle file.
 
+        ``cloudpickle`` is used so models with geometry-based hard constraints
+        retain their dynamically defined constraint functions.
+
         Args:
             file_name: Output path. The ``.pkl`` suffix is added when absent.
 
         Returns:
             None.
         """
-        import pickle
+        import cloudpickle as pickle
         if file_name[-4:] != '.pkl': file_name += '.pkl'
         with open(file_name, 'wb') as f:
             pickle.dump(self, f)
@@ -537,13 +540,16 @@ class NN(ABC, nn.Module):
 def load_from_pickle(file_name: str) -> NN:
     """Load a model serialized by ``NN.save_as_pickle``.
 
+    The loader also accepts legacy files produced with the standard pickle
+    module.
+
     Args:
         file_name: Pickle path. The ``.pkl`` suffix is added when absent.
 
     Returns:
         The deserialized model instance.
     """
-    import pickle
+    import cloudpickle as pickle
     if file_name[-4:] != '.pkl': file_name += '.pkl'
     with open(file_name, 'rb') as f:
         return pickle.load(f)
