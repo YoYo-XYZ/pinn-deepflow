@@ -1,0 +1,4 @@
+interface:
+  display_name: "Source to study page"
+  short_description: "Turn PDFs and text into source-faithful study pages"
+  default_prompt: "Use $source-to-study-page to turn the supplied reference into an offline HTML lesson for university students."
