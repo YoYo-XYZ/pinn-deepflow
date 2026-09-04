@@ -45,6 +45,16 @@ def train_one(domain, model_factory: Callable, config: BenchmarkConfig):
     model = model_factory()
     calc_loss = df.calc_loss_simple(domain)
 
+    resample = None
+    if config.r3_interval > 0:
+
+        def resample(epoch, _model):
+            if epoch < config.epochs_adam and epoch % config.r3_interval == 0:
+                domain.sampling_R3(
+                    list(config.boundary_points),
+                    list(config.interior_points),
+                )
+
     if config.epochs_adam > 0:
         start = time.perf_counter()
         _, adam_best = model.train_adam(
@@ -52,6 +62,7 @@ def train_one(domain, model_factory: Callable, config: BenchmarkConfig):
             learning_rate=config.learning_rate,
             epochs=config.epochs_adam,
             print_every=max(1, config.epochs_adam // 10),
+            do_between_epochs=resample,
         )
         adam_time = time.perf_counter() - start
     else:
@@ -94,7 +105,79 @@ def _last(history_values) -> float:
     return float(values[-1]) if values.size else float("nan")
 
 
-def collect_metrics(evaluator, model) -> Dict[str, float]:
+def _relative_l2(error: np.ndarray, reference: np.ndarray) -> float:
+    reference_norm = float(np.linalg.norm(reference))
+    error_norm = float(np.linalg.norm(error))
+    if reference_norm == 0.0:
+        return 0.0 if error_norm == 0.0 else float("inf")
+    return error_norm / reference_norm
+
+
+def collect_reference_metrics(
+    evaluator,
+    reference_solution,
+    *,
+    field: str = "u",
+    final_coordinate: str | None = "y",
+    final_value: float = 1.0,
+) -> Dict[str, float]:
+    """Compare an evaluated model field with a queried reference solution.
+
+    The model values and coordinates come from ``evaluator.data_dict``. The
+    reference is queried at those same coordinates through the public
+    ``ReferenceSolution.evaluate`` API, keeping the comparison independent of
+    training samples or cached field arrays.
+    """
+    data = evaluator.data_dict
+    if field not in data:
+        raise KeyError(f"Evaluator does not contain model field {field!r}.")
+    for coordinate in ("x", "y"):
+        if coordinate not in data:
+            raise KeyError(f"Evaluator does not contain coordinate {coordinate!r}.")
+
+    solution = getattr(reference_solution, "reference_solution", reference_solution)
+    query = {"x": np.asarray(data["x"]), "y": np.asarray(data["y"])}
+    reference_kwargs = {"fields": (field,)}
+    if "t" in data:
+        reference_kwargs["t"] = np.asarray(data["t"])
+    reference_data = solution.evaluate(
+        query["x"], query["y"], **reference_kwargs
+    )
+    prediction = np.asarray(data[field], dtype=np.float64).reshape(-1)
+    reference = np.asarray(reference_data[field], dtype=np.float64).reshape(-1)
+    if prediction.shape != reference.shape:
+        raise ValueError(
+            f"Model and reference field shapes differ: "
+            f"{prediction.shape} != {reference.shape}."
+        )
+
+    error = prediction - reference
+    metrics = {
+        "relative_l2": _relative_l2(error, reference),
+        "rmse": float(np.sqrt(np.mean(error**2))),
+        "mae": float(np.mean(np.abs(error))),
+        "max_abs_error": float(np.max(np.abs(error))),
+    }
+    if final_coordinate is not None and final_coordinate in data:
+        final_mask = np.isclose(
+            np.asarray(data[final_coordinate]).reshape(-1), final_value
+        )
+        if final_mask.any():
+            metrics["final_time_relative_l2"] = _relative_l2(
+                error[final_mask], reference[final_mask]
+            )
+    return metrics
+
+
+def collect_metrics(
+    evaluator,
+    model,
+    reference_solution=None,
+    *,
+    reference_field: str = "u",
+    final_coordinate: str | None = "y",
+    final_value: float = 1.0,
+) -> Dict[str, float]:
     """Derive metrics from evaluation results and loss histories.
 
     Uses ``evaluator.data_dict`` residual fields and
@@ -103,9 +186,10 @@ def collect_metrics(evaluator, model) -> Dict[str, float]:
     """
     data = evaluator.data_dict
     metrics: Dict[str, float] = {}
+    history = getattr(model, "loss_history", {})
     for key in ("total_loss", "bc_loss", "pde_loss", "ic_loss"):
-        if key in model.loss_history:
-            metrics[f"history_last_{key}"] = _last(model.loss_history[key])
+        if key in history:
+            metrics[f"history_last_{key}"] = _last(history[key])
     for key, values in data.items():
         if not key.endswith("_residual"):
             continue
@@ -114,6 +198,16 @@ def collect_metrics(evaluator, model) -> Dict[str, float]:
             continue
         metrics[f"max_{key}"] = float(np.max(np.abs(field)))
         metrics[f"mean_abs_{key}"] = float(np.mean(np.abs(field)))
+    if reference_solution is not None:
+        metrics.update(
+            collect_reference_metrics(
+                evaluator,
+                reference_solution,
+                field=reference_field,
+                final_coordinate=final_coordinate,
+                final_value=final_value,
+            )
+        )
     return metrics
 
 

@@ -10,6 +10,7 @@ from .domains import (
 )
 from .reporting import (
     collect_metrics,
+    collect_reference_metrics,
     evaluate_area,
     plot_results,
     save_model,
@@ -24,6 +25,7 @@ __all__ = [
     "build_channel_domain",
     "build_cylinder_domain",
     "collect_metrics",
+    "collect_reference_metrics",
     "evaluate_area",
     "perimeter_weighted_boundary_counts",
     "plot_results",

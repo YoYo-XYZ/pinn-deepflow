@@ -66,6 +66,7 @@ class BenchmarkConfig:
         learning_rate: Adam learning rate.
         epochs_adam: Adam epochs (0 skips Adam).
         epochs_lbfgs: L-BFGS epochs (0 skips L-BFGS).
+        r3_interval: R3 resampling interval during Adam (0 disables R3).
         seed: Manual seed for one run (the first value in ``seeds``).
         seeds: Manual seeds for independent runs. Defaults to ``[seed]``.
         boundary_points: Points per boundary, in domain bound order.
@@ -85,6 +86,7 @@ class BenchmarkConfig:
     eval_grid: List[int] = field(default_factory=lambda: [8, 8])
     sampling: str = "lhs"
     seeds: Optional[List[int]] = None
+    r3_interval: int = 0
 
     def __post_init__(self) -> None:
         _check_positive_int("width", self.width)
@@ -102,6 +104,14 @@ class BenchmarkConfig:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise ValueError(f"{name} must be a non-negative int, got {value!r}")
+        if (
+            isinstance(self.r3_interval, bool)
+            or not isinstance(self.r3_interval, int)
+            or self.r3_interval < 0
+        ):
+            raise ValueError(
+                f"r3_interval must be a non-negative int, got {self.r3_interval!r}"
+            )
         if (
             isinstance(self.seed, bool)
             or not isinstance(self.seed, int)
@@ -157,6 +167,7 @@ class BenchmarkConfig:
             "learning_rate": self.learning_rate,
             "epochs_adam": self.epochs_adam,
             "epochs_lbfgs": self.epochs_lbfgs,
+            "r3_interval": self.r3_interval,
             "seed": self.seed,
             "seeds": list(self.seeds),
             "boundary_points": _copy_point_counts(self.boundary_points),

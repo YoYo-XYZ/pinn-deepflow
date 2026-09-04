@@ -42,6 +42,15 @@ def test_config_supports_multiple_seeds():
     assert config.to_dict()["seeds"] == [70, 71]
 
 
+def test_config_supports_r3_resampling_interval():
+    config = BenchmarkConfig(r3_interval=100)
+
+    assert config.to_dict()["r3_interval"] == 100
+
+    with pytest.raises(ValueError):
+        BenchmarkConfig(r3_interval=-1)
+
+
 def test_config_rejects_bad_knobs():
     with pytest.raises(ValueError):
         BenchmarkConfig(width=0)
