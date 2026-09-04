@@ -1,0 +1,33 @@
+"""Shared harness package (beside per-suite clones, no suite modified)."""
+
+from .config import BenchmarkConfig
+from .domains import (
+    build_burgers_domain,
+    build_cavity_domain,
+    build_channel_domain,
+    build_cylinder_domain,
+    perimeter_weighted_boundary_counts,
+)
+from .reporting import (
+    collect_metrics,
+    evaluate_area,
+    plot_results,
+    save_model,
+    train_one,
+    write_markdown_report,
+)
+
+__all__ = [
+    "BenchmarkConfig",
+    "build_burgers_domain",
+    "build_cavity_domain",
+    "build_channel_domain",
+    "build_cylinder_domain",
+    "collect_metrics",
+    "evaluate_area",
+    "perimeter_weighted_boundary_counts",
+    "plot_results",
+    "save_model",
+    "train_one",
+    "write_markdown_report",
+]
