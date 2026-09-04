@@ -78,7 +78,7 @@ def test_reporting_smoke(tmp_path):
         tmp_path / "report.md",
         "Shared harness smoke",
         config,
-        {**info, **metrics},
+        {**info, **metrics, "formulation": "burgers"},
         [model_path, *plots],
     )
     text = report.read_text(encoding="utf-8")

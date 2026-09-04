@@ -36,6 +36,13 @@ def test_perimeter_rule_matches_cloned_channel_counts():
     assert perimeter_weighted_boundary_counts(1200, 5.0, 1.0) == [100, 500, 100, 500]
 
 
+def test_perimeter_rule_preserves_budget_for_remainders():
+    counts = perimeter_weighted_boundary_counts(11, 5.0, 1.0)
+
+    assert sum(counts) == 11
+    assert counts == [1, 5, 1, 4]
+
+
 def test_burgers_builder_smoke():
     domain = build_burgers_domain(
         boundary_points=[8, 4, 4], interior_points=[16], sampling="lhs"

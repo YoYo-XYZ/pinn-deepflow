@@ -8,8 +8,10 @@ builders; this object holds only training and sampling knobs.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
-from typing import List, Union
+from numbers import Real
+from typing import List, Optional, Union
 
 InteriorRes = Union[int, List[int]]
 SAMPLING_CHOICES = ("uniform", "random", "lhs")
@@ -41,6 +43,19 @@ def _check_point_counts(name: str, values: list) -> None:
             raise ValueError(f"{name} entries must be int or [nx, ny], got {entry!r}")
 
 
+def _check_seeds(values: object) -> list[int]:
+    if not isinstance(values, (list, tuple)) or not values:
+        raise ValueError(f"seeds must be a non-empty list, got {values!r}")
+    for seed in values:
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+            raise ValueError(f"seeds must contain non-negative ints, got {seed!r}")
+    return list(values)
+
+
+def _copy_point_counts(values: list) -> list:
+    return [list(value) if isinstance(value, (list, tuple)) else value for value in values]
+
+
 @dataclass
 class BenchmarkConfig:
     """Single config object for benchmark suites.
@@ -51,7 +66,8 @@ class BenchmarkConfig:
         learning_rate: Adam learning rate.
         epochs_adam: Adam epochs (0 skips Adam).
         epochs_lbfgs: L-BFGS epochs (0 skips L-BFGS).
-        seed: Manual seed for sampling and model init.
+        seed: Manual seed for one run (the first value in ``seeds``).
+        seeds: Manual seeds for independent runs. Defaults to ``[seed]``.
         boundary_points: Points per boundary, in domain bound order.
         interior_points: Points per area (int counts or [nx, ny] grids).
         eval_grid: Evaluation resolution as [nx, ny].
@@ -68,12 +84,16 @@ class BenchmarkConfig:
     interior_points: Union[int, List[InteriorRes]] = field(default_factory=lambda: [16])
     eval_grid: List[int] = field(default_factory=lambda: [8, 8])
     sampling: str = "lhs"
+    seeds: Optional[List[int]] = None
 
     def __post_init__(self) -> None:
         _check_positive_int("width", self.width)
         _check_positive_int("depth", self.depth)
-        if not isinstance(self.learning_rate, (int, float)) or not (
-            self.learning_rate > 0
+        if (
+            isinstance(self.learning_rate, bool)
+            or not isinstance(self.learning_rate, Real)
+            or not math.isfinite(float(self.learning_rate))
+            or self.learning_rate <= 0
         ):
             raise ValueError(
                 f"learning_rate must be positive, got {self.learning_rate!r}"
@@ -88,7 +108,18 @@ class BenchmarkConfig:
             or self.seed < 0
         ):
             raise ValueError(f"seed must be a non-negative int, got {self.seed!r}")
-        _check_point_counts("boundary_points", list(self.boundary_points))
+        if self.seeds is None:
+            self.seeds = [self.seed]
+        else:
+            self.seeds = _check_seeds(self.seeds)
+            self.seed = self.seeds[0]
+
+        if not isinstance(self.boundary_points, (list, tuple)):
+            raise ValueError(
+                f"boundary_points must be a non-empty list, got {self.boundary_points!r}"
+            )
+        self.boundary_points = list(self.boundary_points)
+        _check_point_counts("boundary_points", self.boundary_points)
         if isinstance(self.interior_points, bool):
             raise ValueError(
                 "interior_points entries must be positive, "
@@ -96,7 +127,12 @@ class BenchmarkConfig:
             )
         if isinstance(self.interior_points, int):
             self.interior_points = [self.interior_points]
-        _check_point_counts("interior_points", list(self.interior_points))
+        if not isinstance(self.interior_points, (list, tuple)):
+            raise ValueError(
+                f"interior_points must be a count list, got {self.interior_points!r}"
+            )
+        self.interior_points = list(self.interior_points)
+        _check_point_counts("interior_points", self.interior_points)
         if (
             not isinstance(self.eval_grid, (list, tuple))
             or len(self.eval_grid) != 2
@@ -122,8 +158,9 @@ class BenchmarkConfig:
             "epochs_adam": self.epochs_adam,
             "epochs_lbfgs": self.epochs_lbfgs,
             "seed": self.seed,
-            "boundary_points": list(self.boundary_points),
-            "interior_points": list(self.interior_points),
+            "seeds": list(self.seeds),
+            "boundary_points": _copy_point_counts(self.boundary_points),
+            "interior_points": _copy_point_counts(self.interior_points),
             "eval_grid": list(self.eval_grid),
             "sampling": self.sampling,
         }

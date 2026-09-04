@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import sys
 import time
+from numbers import Real
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Any, Callable, Dict, List, Mapping, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
@@ -155,7 +156,8 @@ def plot_results(evaluator, out_dir: Path, prefix: str = "harness") -> List[Path
         fig.savefig(field_path)
         plt.close(fig)
         written.append(field_path)
-    if "total_loss" in evaluator.data_dict:
+    loss_values = np.asarray(evaluator.data_dict.get("total_loss", [])).reshape(-1)
+    if loss_values.size:
         fig = evaluator.plot_loss_curve()
         loss_path = out_dir / f"{prefix}_loss_curve.png"
         fig.savefig(loss_path)
@@ -168,8 +170,8 @@ def write_markdown_report(
     path: Path,
     title: str,
     config: BenchmarkConfig,
-    metrics: Dict[str, float],
-    artifacts: List[Path],
+    metrics: Mapping[str, Any],
+    artifacts: Sequence[Path],
 ) -> Path:
     """Write a markdown report listing config, metrics, and artifacts."""
     path = Path(path)
@@ -180,7 +182,12 @@ def write_markdown_report(
     lines += ["", "## Metrics", ""]
     if metrics:
         for key in sorted(metrics):
-            lines.append(f"- {key}: `{metrics[key]:.6e}`")
+            value = metrics[key]
+            if isinstance(value, Real) and not isinstance(value, bool):
+                rendered = f"{float(value):.6e}"
+            else:
+                rendered = str(value)
+            lines.append(f"- {key}: `{rendered}`")
     else:
         lines.append("- _no metrics_")
     lines += ["", "## Artifacts", ""]
