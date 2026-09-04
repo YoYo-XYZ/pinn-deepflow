@@ -16,6 +16,7 @@ class Visualizer:
             requested field keys and usually ``x`` and ``y`` coordinates.
     """
     refwidth_default = 6
+    refheight_max_default = None
     cmap_default = 'viridis'
     color_default = 'blue'
 
@@ -29,6 +30,32 @@ class Visualizer:
     def _create_subplot(self, ref_width = None, ref_height=None):
         fig, ax = plt.subplot(refwidth = (self.refwidth_default if ref_width is None else ref_width), refheight = ref_height)
         return fig, ax
+
+    def _create_equal_aspect_subplot(self, x_values=None, y_values=None, ref_width=None, ref_height=None):
+        max_width = self.refwidth_default if ref_width is None else ref_width
+        if ref_height is not None:
+            max_height = ref_height
+        elif self.refheight_max_default is not None:
+            max_height = self.refheight_max_default
+        else:
+            max_height = max_width
+        try:
+            x = np.asarray(x_values).reshape(-1) if x_values is not None else None
+            y = np.asarray(y_values).reshape(-1) if y_values is not None else None
+            if x is None or y is None or x.size == 0 or y.size == 0:
+                raise ValueError("fallback")
+            if not np.isfinite(x).all() or not np.isfinite(y).all():
+                raise ValueError("fallback")
+            x_range = np.ptp(x)
+            y_range = np.ptp(y)
+            if not np.isfinite(x_range) or not np.isfinite(y_range):
+                raise ValueError("fallback")
+            if x_range <= 0 or y_range <= 0 or max_width <= 0 or max_height <= 0:
+                raise ValueError("fallback")
+            refwidth_eff = min(max_width, max_height / (y_range / x_range))
+        except Exception:
+            return self._create_subplot(ref_width, ref_height)
+        return self._create_subplot(ref_width=refwidth_eff)
 
     def plot_color(self, color_axis: str, x_axis: str = 'x', y_axis: str = 'y', cmap='viridis', s: Union[int, float] = 2, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
@@ -45,7 +72,9 @@ class Visualizer:
         Returns:
             A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
         """
-        fig, ax = self._create_subplot()
+        fig, ax = self._create_equal_aspect_subplot(
+            self.data_dict.get(x_axis), self.data_dict.get(y_axis)
+        )
 
         # Plot
         scatter = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], s=s, c=self.data_dict[color_axis], cmap=cmap, marker='s')
@@ -167,7 +196,9 @@ class Visualizer:
         Returns:
             A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
         """
-        fig, ax = self._create_subplot()
+        fig, ax = self._create_equal_aspect_subplot(
+            self.data_dict.get(x_axis), self.data_dict.get(y_axis)
+        )
         (C,), (X, Y) = self._interpolate(color_axis, x_key=x_axis, y_key=y_axis)
 
         # Plot
@@ -199,7 +230,9 @@ class Visualizer:
         Returns:
             A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
         """
-        fig, ax = self._create_subplot()
+        fig, ax = self._create_equal_aspect_subplot(
+            self.data_dict.get(x_axis), self.data_dict.get(y_axis)
+        )
 
         (U, V), (X, Y) = self._interpolate(u, v, x_key=x_axis, y_key=y_axis, points=2000)
 

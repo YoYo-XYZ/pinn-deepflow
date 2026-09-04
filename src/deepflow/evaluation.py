@@ -618,7 +618,10 @@ class Evaluator(Visualizer):
         """
         import matplotlib.animation as animation
 
-        fig, ax = plt.subplot(refwidth = Visualizer.refwidth_default, grid=False)
+        fig, ax = self._create_equal_aspect_subplot(
+            self.data_dict.get(x_axis), self.data_dict.get(y_axis)
+        )
+        ax.format(grid=False)
 
         # Prepare data to animate
         color_list = []
