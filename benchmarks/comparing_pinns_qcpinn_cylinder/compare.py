@@ -8,68 +8,27 @@ from pathlib import Path
 try:  # Package execution.
     from .benchmark import (  # noqa: E402
         DEFAULT_CONFIG,
-        FORMULATIONS,
-        REPORT_NAME,
+        HARNESS,
         RESULTS_DIR,
         SMOKE_CONFIG,
         VARIANTS,
-        available_variants,
-        evaluate_profiles,
-        build_domain,
     )
     from .reference import load_cached_reference, solve_reference  # noqa: E402
 except ImportError:  # Direct script execution.
     from benchmark import (  # type: ignore  # noqa: E402
         DEFAULT_CONFIG,
-        FORMULATIONS,
-        REPORT_NAME,
+        HARNESS,
         RESULTS_DIR,
         SMOKE_CONFIG,
         VARIANTS,
-        available_variants,
-        evaluate_profiles,
-        build_domain,
     )
     from reference import load_cached_reference, solve_reference  # type: ignore  # noqa: E402
-
-from benchmarks.shared_harness import (  # noqa: E402
-    collect_metrics,
-    collect_reference_metrics,
-    evaluate_area,
-    load_model,
-    plot_results,
-    save_model,
-    write_markdown_report,
-)
-
 
 DEFAULT_MODEL_PATHS = {
     variant: RESULTS_DIR / f"cylinder_{variant.lower().replace('-', '_')}.pkl"
     for variant in VARIANTS
 }
-
-
-def _model_path(path: Path, label: str) -> Path:
-    path = Path(path)
-    if path.suffix != ".pkl":
-        path = Path(f"{path}.pkl")
-    if not path.is_file():
-        raise FileNotFoundError(f"{label} model not found: {path}")
-    return path
-
-
-def _profile_reference_metrics(profiles, reference_solution):
-    metrics = {}
-    for name, evaluator in profiles.items():
-        values = collect_reference_metrics(
-            evaluator,
-            reference_solution,
-            field="u",
-            final_coordinate=None,
-        )
-        metrics.update({f"{name}_{key}": value for key, value in values.items()})
-    return metrics
-
+_AUTO_REFERENCE = object()
 
 def evaluate_variant(
     variant: str,
@@ -79,42 +38,13 @@ def evaluate_variant(
     reference_solution=None,
 ):
     """Load and evaluate one native model through the shared path."""
-    if variant not in VARIANTS:
-        raise ValueError(f"Unknown cylinder benchmark variant: {variant!r}")
-    model_path = _model_path(model_path, variant)
-    model = load_model(model_path)
-    domain = build_domain(FORMULATIONS[variant], config)
-    evaluator = evaluate_area(domain, model, list(config.eval_grid))
-    profiles = evaluate_profiles(model, FORMULATIONS[variant])
-    metrics = {
-        **collect_metrics(evaluator, model, reference_solution=reference_solution),
-        "variant": variant,
-        "formulation": FORMULATIONS[variant],
-        "source_model": str(model_path),
-    }
-    if reference_solution is not None:
-        metrics.update(_profile_reference_metrics(profiles, reference_solution))
-    output_dir = Path(output_dir)
-    persisted_path = save_model(model, output_dir / model_path.stem)
-    artifacts = [persisted_path]
-    artifacts.extend(
-        plot_results(
-            evaluator,
-            output_dir,
-            prefix=f"comparison_{variant.lower().replace('-', '_')}",
-        )
+    return HARNESS.compare_variant(
+        variant,
+        model_path,
+        config=config,
+        output_dir=output_dir,
+        reference_solution=reference_solution,
     )
-    return {
-        "variant": variant,
-        "model": model,
-        "domain": domain,
-        "evaluator": evaluator,
-        "profiles": profiles,
-        "metrics": metrics,
-        "artifacts": artifacts,
-        "model_path": persisted_path,
-        "source_model_path": model_path,
-    }
 
 
 def run_comparison(
@@ -122,56 +52,35 @@ def run_comparison(
     config=DEFAULT_CONFIG,
     output_dir: Path = RESULTS_DIR / "comparison",
     variants=None,
-    reference_solution=None,
+    reference_solution=_AUTO_REFERENCE,
     offline_reference_path: Path | None = None,
 ):
-    """Compare selected native models and write a shared-harness report."""
-    if reference_solution is not None and offline_reference_path is not None:
+    """Compare models, solving a fresh FEM reference unless explicitly skipped."""
+    if (
+        reference_solution is not _AUTO_REFERENCE
+        and reference_solution is not None
+        and offline_reference_path is not None
+    ):
         raise ValueError("Choose a FEM reference or an offline reference, not both.")
     if offline_reference_path is not None:
         reference_solution = load_cached_reference(offline_reference_path)
-    variants = available_variants() if variants is None else tuple(variants)
-    if not variants:
-        raise ValueError("At least one cylinder model is required for comparison.")
+    elif reference_solution is _AUTO_REFERENCE:
+        reference_solution = solve_reference(config)
     model_paths = DEFAULT_MODEL_PATHS if model_paths is None else model_paths
-    output_dir = Path(output_dir)
-    results = {
-        variant: evaluate_variant(
-            variant,
-            model_paths[variant],
-            config,
-            output_dir,
-            reference_solution=reference_solution,
-        )
-        for variant in variants
-    }
-    report_metrics = {
-        "variants": ", ".join(variants),
-        "reference": (
+    return HARNESS.compare_suite(
+        model_paths,
+        config=config,
+        output_dir=output_dir,
+        variants=variants,
+        reference_solution=reference_solution,
+        reference_label=(
             "offline cache"
             if offline_reference_path is not None
             else "FEM"
             if reference_solution is not None
-            else "not requested"
+            else None
         ),
-    }
-    artifacts = []
-    for variant, result in results.items():
-        report_metrics.update(
-            {
-                f"{variant.lower().replace('-', '_')}_{key}": value
-                for key, value in result["metrics"].items()
-            }
-        )
-        artifacts.extend(result["artifacts"])
-    report = write_markdown_report(
-        output_dir / REPORT_NAME,
-        "Cylinder model comparison",
-        config,
-        report_metrics,
-        artifacts,
     )
-    return {"variants": results, "report": report, "artifacts": artifacts}
 
 
 def _parse_args(argv=None):

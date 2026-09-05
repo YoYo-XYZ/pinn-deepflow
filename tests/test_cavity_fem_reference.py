@@ -15,20 +15,22 @@ _BENCHMARK_DIR = (
 if str(_BENCHMARK_DIR) not in sys.path:
     sys.path.insert(0, str(_BENCHMARK_DIR))
 
+import deepflow as df  # noqa: E402
+
 import reference  # noqa: E402
 
 
-def test_fem_reference_exports_legacy_grid_schema_and_pressure_gauge():
-    payload = reference.solve_reference((5, 5), 0.1)
+def test_fem_reference_returns_native_reference_evaluator():
+    result = reference.solve_reference(
+        mesh_size=0.1,
+        boundary_resolution=16,
+    )
 
-    assert payload["converged"] == 1
-    assert payload["nx"] == 5
-    assert payload["ny"] == 5
-    assert payload["u"].shape == (5, 5)
-    assert payload["v"].shape == (5, 5)
-    assert payload["p"].shape == (5, 5)
-    assert np.isfinite(payload["u"]).all()
-    assert np.isfinite(payload["v"]).all()
-    assert np.isfinite(payload["p"]).all()
-    assert payload["pressure_gauge"].item() == "corner_anchored"
-    assert np.isfinite(payload["pressure_offset"])
+    assert isinstance(result, df.ReferenceGroupEvaluator)
+    assert result.metadata["converged"]
+    values = result.reference_solution.evaluate(
+        np.array([0.25, 0.75]),
+        np.array([0.25, 0.75]),
+        fields=("u", "v", "p"),
+    )
+    assert all(np.isfinite(values[field]).all() for field in ("u", "v", "p"))

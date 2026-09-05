@@ -134,13 +134,15 @@ def collect_reference_metrics(
     field: str = "u",
     final_coordinate: str | None = "y",
     final_value: float = 1.0,
+    center: bool = False,
 ) -> Dict[str, float]:
     """Compare an evaluated model field with a queried reference solution.
 
     The model values and coordinates come from ``evaluator.data_dict``. The
     reference is queried at those same coordinates through the public
     ``ReferenceSolution.evaluate`` API, keeping the comparison independent of
-    training samples or cached field arrays.
+    training samples or cached field arrays. Set ``center`` to compare a
+    gauge-invariant field such as pressure.
     """
     data = evaluator.data_dict
     if field not in data:
@@ -164,6 +166,10 @@ def collect_reference_metrics(
             f"Model and reference field shapes differ: "
             f"{prediction.shape} != {reference.shape}."
         )
+
+    if center:
+        prediction = prediction - float(np.mean(prediction))
+        reference = reference - float(np.mean(reference))
 
     error = prediction - reference
     metrics = {

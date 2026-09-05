@@ -22,6 +22,8 @@ from .reporting import (
     train_one,
     write_markdown_report,
 )
+from .flow import FLOW_FORMULATIONS, FLOW_VARIANTS, FlowBenchmarkHarness
+from .reference import CachedReference, export_reference_cache, load_cached_reference
 from .precision import (
     PRECISION_DTYPES,
     PrecisionBaseline,
@@ -54,4 +56,10 @@ __all__ = [
     "build_precision_baseline",
     "run_precision_suite",
     "run_precision_variant",
+    "FlowBenchmarkHarness",
+    "FLOW_FORMULATIONS",
+    "FLOW_VARIANTS",
+    "CachedReference",
+    "export_reference_cache",
+    "load_cached_reference",
 ]

@@ -1,54 +1,82 @@
-"""Small regression test for all four cavity benchmark setups."""
+"""Run the shared-harness smoke path for the cavity benchmark."""
 
-import os
-import sys
+from __future__ import annotations
+
+import argparse
+import tempfile
+from pathlib import Path
 
 import numpy as np
 
-_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if _SCRIPT_DIR not in sys.path:
-    sys.path.insert(0, _SCRIPT_DIR)
-
-from benchmark_common import build_domain, count_params, df  # noqa: E402
-from benchmark_pinn_psip import build_model as build_pinn_psip  # noqa: E402
-from benchmark_pinn_uvp import build_model as build_pinn_uvp  # noqa: E402
-from benchmark_qcpinn_psip import build_model as build_qcpinn_psip  # noqa: E402
-from benchmark_qcpinn_uvp import build_model as build_qcpinn_uvp  # noqa: E402
-
-
-def check_setup(label, formulation, model_factory, expected_params, expected_residuals):
-    df.manual_seed(69)
-    domain = build_domain(
-        formulation,
-        boundary_points=[4, 4, 4, 4, 1],
-        interior_points=[[4, 4]],
+try:  # Package execution.
+    from .benchmark import (  # noqa: E402
+        SMOKE_CONFIG,
+        available_variants,
+        run_suite,
     )
-    model = model_factory().to(df.device)
-    assert count_params(model) == expected_params
-
-    loss = df.calc_loss_simple(domain)(model)
-    assert np.isfinite(loss["total_loss"].detach().cpu().item())
-
-    area_eval = domain.area_list[0].evaluate(model)
-    area_eval.sampling_area([5, 5])
-    for field in ("u", "v", "p"):
-        assert area_eval.data_dict[field].size == 25
-    pde_fields = (
-        ("continuity_residual", "x_momentum_residual", "y_momentum_residual")
-        if formulation == "uvp"
-        else ("x_momentum_residual", "y_momentum_residual")
+    from .reference import solve_reference  # noqa: E402
+except ImportError:  # Direct script execution.
+    from benchmark import (  # type: ignore  # noqa: E402
+        SMOKE_CONFIG,
+        available_variants,
+        run_suite,
     )
-    assert len(pde_fields) == expected_residuals
-    assert all(field in area_eval.data_dict for field in pde_fields)
-    if formulation == "psip":
-        assert area_eval.data_dict["psi"].size == 25
-        assert np.max(np.abs(area_eval.data_dict["continuity_residual"])) < 1.0e-5
-    print(f"{label}: {expected_params} parameters, {expected_residuals} PDE residuals")
+    from reference import solve_reference  # type: ignore  # noqa: E402
 
 
-check_setup("PINN-UVP", "uvp", build_pinn_uvp, 7347, 3)
-check_setup("PINN-PSIP", "psip", build_pinn_psip, 7298, 2)
-check_setup("QCPINN-UVP", "uvp", build_qcpinn_uvp, 607, 3)
-check_setup("QCPINN-PSIP", "psip", build_qcpinn_psip, 574, 2)
+def _assert_suite(result):
+    assert result["report"].exists()
+    for variant, values in result["variants"].items():
+        assert values["evaluator"].data_dict["u"].size > 0
+        assert values["profiles"]["vertical"].data_dict["u"].size > 0
+        assert values["profiles"]["horizontal"].data_dict["v"].size > 0
+        assert np.isfinite(values["metrics"]["final_total_loss"])
+        assert all(path.exists() for path in values["artifacts"])
+        print(f"  {variant}: shared-harness smoke passed")
 
-print("All four cavity benchmark setups passed the smoke test.")
+
+def all_setups_smoke(output_dir: Path):
+    result = run_suite(
+        SMOKE_CONFIG,
+        output_dir,
+        variants=available_variants(),
+    )
+    _assert_suite(result)
+    return result
+
+
+def pinn_reference_smoke():
+    """Exercise the canonical FEM/reference seam when the backend exists."""
+    try:
+        reference = solve_reference(SMOKE_CONFIG)
+    except (ImportError, OSError) as exc:
+        print(f"  FEM reference skipped: {exc}")
+        return None
+    with tempfile.TemporaryDirectory(prefix="deepflow-cavity-reference-smoke-") as directory:
+        result = run_suite(
+            SMOKE_CONFIG,
+            Path(directory),
+            variants=("PINN-UVP",),
+            reference_solution=reference,
+        )
+        _assert_suite(result)
+        assert "relative_l2" in result["variants"]["PINN-UVP"]["metrics"]
+        return result
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pinn-reference", action="store_true")
+    parser.add_argument("--all-setups", action="store_true")
+    args = parser.parse_args(argv)
+    if not args.pinn_reference and not args.all_setups:
+        args.pinn_reference = args.all_setups = True
+    if args.pinn_reference:
+        pinn_reference_smoke()
+    if args.all_setups:
+        with tempfile.TemporaryDirectory(prefix="deepflow-cavity-smoke-") as directory:
+            all_setups_smoke(Path(directory))
+
+
+if __name__ == "__main__":
+    main()

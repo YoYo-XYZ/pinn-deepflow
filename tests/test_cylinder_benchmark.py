@@ -26,6 +26,7 @@ def test_cylinder_standard_variants_run_shared_smoke_path(tmp_path):
         config=SMOKE_CONFIG,
         output_dir=tmp_path / "comparison",
         variants=("PINN-UVP", "PINN-PSIP"),
+        reference_solution=None,
     )
     assert comparison["report"].exists()
     for values in result["variants"].values():

@@ -1,28 +1,15 @@
-#!/usr/bin/env python3
-"""Benchmark a direct-output PINN on the cavity problem."""
+"""Thin model-construction wrapper for the PINN-UVP cavity variant."""
 
-from benchmark_common import df, run_benchmark
-from common_config import PINN_LENGTH, PINN_UVP_RESULTS_FILE, PINN_WIDTH
+try:  # Package execution.
+    from .benchmark import DEFAULT_CONFIG, build_pinn_model, run_variant_cli
+except ImportError:  # Direct script execution.
+    from benchmark import DEFAULT_CONFIG, build_pinn_model, run_variant_cli
 
 
-def build_model():
-    return df.PINN(
-        input_vars=["x", "y"],
-        output_vars=["u", "v", "p"],
-        width=PINN_WIDTH,
-        length=PINN_LENGTH,
-    )
+def build_model(config=DEFAULT_CONFIG):
+    """Construct only the standard velocity-pressure model."""
+    return build_pinn_model("uvp", config)
 
 
 if __name__ == "__main__":
-    run_benchmark(
-        label="PINN-UVP",
-        model_name="PINN",
-        formulation="uvp",
-        description="Benchmark: PINN with direct (u,v,p) Navier-Stokes formulation.",
-        network_description=(
-            f"PINN(width={PINN_WIDTH}, length={PINN_LENGTH}, outputs=[u,v,p])"
-        ),
-        model_factory=build_model,
-        results_file=PINN_UVP_RESULTS_FILE,
-    )
+    run_variant_cli("PINN-UVP", build_model)

@@ -1,4 +1,4 @@
-"""Cylinder-specific adapter for the shared flow benchmark harness."""
+"""Cavity-specific adapter for the shared flow benchmark harness."""
 
 from __future__ import annotations
 
@@ -20,14 +20,13 @@ from benchmarks.shared_harness import (  # noqa: E402
     FLOW_FORMULATIONS,
     FLOW_VARIANTS,
     FlowBenchmarkHarness,
-    build_cylinder_domain,
+    build_cavity_domain,
     build_flow_pde,
 )
 
 
-CHANNEL_X = (0.0, 1.1)
-CHANNEL_Y = (0.0, 0.41)
-CYLINDER = (0.2, 0.2, 0.05)
+CAVITY_X = (0.0, 1.0)
+CAVITY_Y = (0.0, 1.0)
 U_INF = 1.0
 L_CHAR = 1.0
 MU = 0.1
@@ -49,7 +48,7 @@ DEFAULT_CONFIG = BenchmarkConfig(
     epochs_adam=0,
     epochs_lbfgs=100,
     seed=69,
-    boundary_points=[50, 50, 50, 50, 50, 50],
+    boundary_points=[50, 50, 50, 50, 1],
     interior_points=[[50, 50]],
     eval_grid=[50, 50],
     sampling="uniform",
@@ -62,7 +61,7 @@ SMOKE_CONFIG = BenchmarkConfig(
     epochs_adam=2,
     epochs_lbfgs=0,
     seed=69,
-    boundary_points=[4, 4, 4, 4, 4, 4],
+    boundary_points=[4, 4, 4, 4, 1],
     interior_points=[[4, 4]],
     eval_grid=[5, 5],
     sampling="uniform",
@@ -73,7 +72,7 @@ FORMULATIONS = FLOW_FORMULATIONS
 
 
 def build_pde(formulation: str):
-    """Build the shared cylinder flow PDE for one formulation."""
+    """Build the shared cavity flow PDE for one formulation."""
     return build_flow_pde(
         formulation,
         U=U_INF,
@@ -87,16 +86,13 @@ def build_domain(
     formulation: str,
     config: BenchmarkConfig = DEFAULT_CONFIG,
 ):
-    """Build the sampled cylinder domain through the shared domain builder."""
+    """Build the sampled cavity domain through the shared domain builder."""
     df.manual_seed(config.seed)
-    return build_cylinder_domain(
+    return build_cavity_domain(
         formulation=formulation,
         boundary_points=list(config.boundary_points),
         interior_points=list(config.interior_points),
         sampling=config.sampling,
-        channel_x=CHANNEL_X,
-        channel_y=CHANNEL_Y,
-        cylinder=CYLINDER,
         u_inf=U_INF,
         L=L_CHAR,
         mu=MU,
@@ -105,19 +101,18 @@ def build_domain(
 
 
 def _profile_geometries():
-    """Return the cylinder-specific outlet and wake profiles."""
-    cx, cy, radius = CYLINDER
-    x_min, x_max = CHANNEL_X
-    y_min, y_max = CHANNEL_Y
+    """Return the cavity-specific vertical and horizontal centerlines."""
+    x_min, x_max = CAVITY_X
+    y_min, y_max = CAVITY_Y
     epsilon = PROFILE_EPSILON
     return {
-        "outlet": df.geometry.line_vertical(
-            x=x_max - epsilon,
+        "vertical": df.geometry.line_vertical(
+            x=(x_min + x_max) / 2.0,
             range_y=[y_min + epsilon, y_max - epsilon],
         ),
-        "wake": df.geometry.line_horizontal(
-            y=cy,
-            range_x=[cx + radius + epsilon, x_max - epsilon],
+        "horizontal": df.geometry.line_horizontal(
+            y=(y_min + y_max) / 2.0,
+            range_x=[x_min + epsilon, x_max - epsilon],
         ),
     }
 
@@ -125,14 +120,13 @@ def _profile_geometries():
 def _report_metadata():
     return {
         "reynolds": REYNOLDS,
-        "channel_x": CHANNEL_X,
-        "channel_y": CHANNEL_Y,
-        "cylinder": CYLINDER,
+        "cavity_x": CAVITY_X,
+        "cavity_y": CAVITY_Y,
     }
 
 
 HARNESS = FlowBenchmarkHarness(
-    problem="cylinder",
+    problem="cavity",
     results_dir=RESULTS_DIR,
     report_name=REPORT_NAME,
     default_config=DEFAULT_CONFIG,
@@ -140,33 +134,33 @@ HARNESS = FlowBenchmarkHarness(
     domain_builder=build_domain,
     pde_builder=build_pde,
     profile_geometries=_profile_geometries,
-    profile_fields={"outlet": "u", "wake": "u"},
+    profile_fields={"vertical": "u", "horizontal": "v"},
     report_metadata=_report_metadata,
 )
 
 
 def available_variants():
-    """Return the cylinder variants supported by the installed backends."""
+    """Return the cavity variants supported by the installed backends."""
     return HARNESS.available_variants()
 
 
 def build_pinn_model(formulation: str, config: BenchmarkConfig = DEFAULT_CONFIG):
-    """Build a standard PINN for the requested cylinder formulation."""
+    """Build a standard PINN for the requested cavity formulation."""
     return HARNESS.build_pinn_model(formulation, config)
 
 
 def build_qcpinn_model(formulation: str, config: BenchmarkConfig = DEFAULT_CONFIG):
-    """Build a QCPINN for the requested cylinder formulation."""
+    """Build a QCPINN for the requested cavity formulation."""
     return HARNESS.build_qcpinn_model(formulation, config)
 
 
 def build_model(variant: str, config: BenchmarkConfig = DEFAULT_CONFIG):
-    """Build one named cylinder model variant."""
+    """Build one named cavity model variant."""
     return HARNESS.build_model(variant, config)
 
 
 def evaluate_profiles(model, formulation: str, points: int = PROFILE_POINTS):
-    """Evaluate cylinder-specific profiles for a trained model."""
+    """Evaluate cavity-specific centerline profiles for a trained model."""
     return HARNESS.evaluate_profiles(model, formulation, points)
 
 
@@ -176,7 +170,7 @@ def run_once(
     reference_solution=None,
     model_factory=None,
 ):
-    """Train and evaluate one cylinder variant through the shared harness."""
+    """Train and evaluate one cavity variant through the shared harness."""
     return HARNESS.run_once(
         variant,
         config,
@@ -192,7 +186,7 @@ def run_variant(
     reference_solution=None,
     model_factory=None,
 ):
-    """Run, persist, plot, and report one cylinder variant."""
+    """Run, persist, plot, and report one cavity variant."""
     return HARNESS.run_variant(
         variant,
         config,
@@ -208,7 +202,7 @@ def run_suite(
     variants=None,
     reference_solution=None,
 ):
-    """Run selected cylinder variants and write the benchmark report."""
+    """Run selected cavity variants and write the benchmark report."""
     return HARNESS.run_suite(
         config,
         output_dir,
@@ -218,7 +212,7 @@ def run_suite(
 
 
 def run_variant_cli(variant: str, model_factory=None, argv=None):
-    """Run one cylinder variant using shared command-line options."""
+    """Run one cavity variant using shared command-line options."""
     return HARNESS.run_variant_cli(variant, model_factory=model_factory, argv=argv)
 
 
