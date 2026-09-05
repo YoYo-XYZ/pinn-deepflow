@@ -6,6 +6,7 @@ from .domains import (
     build_cavity_domain,
     build_channel_domain,
     build_cylinder_domain,
+    build_flow_pde,
     perimeter_weighted_boundary_counts,
 )
 from .reporting import (
@@ -13,6 +14,7 @@ from .reporting import (
     collect_metrics,
     collect_reference_metrics,
     evaluate_area,
+    evaluate_line,
     load_model,
     plot_results,
     representative_run_index,
@@ -34,10 +36,12 @@ __all__ = [
     "build_cavity_domain",
     "build_channel_domain",
     "build_cylinder_domain",
+    "build_flow_pde",
     "aggregate_metrics",
     "collect_metrics",
     "collect_reference_metrics",
     "evaluate_area",
+    "evaluate_line",
     "load_model",
     "perimeter_weighted_boundary_counts",
     "plot_results",

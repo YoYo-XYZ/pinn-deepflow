@@ -107,6 +107,13 @@ def evaluate_area(domain, model, eval_grid: List[int]):
     return area_eval
 
 
+def evaluate_line(geometry, model, pde, points: int):
+    """Evaluate a sampled line through the public DeepFlow evaluator API."""
+    geometry.define_pde(pde)
+    geometry.sampling_line(points)
+    return geometry.evaluate(model)
+
+
 def _last(history_values) -> float:
     values = np.asarray(history_values, dtype=np.float64).reshape(-1)
     return float(values[-1]) if values.size else float("nan")

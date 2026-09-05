@@ -140,7 +140,7 @@ def build_channel_domain(
     return _apply_sampling(domain, boundary_points, interior_points, sampling)
 
 
-def _flow_pde(
+def build_flow_pde(
     formulation: str,
     *,
     U: float,
@@ -174,7 +174,7 @@ def build_cavity_domain(
     pressure_point = df.geometry.point(0.0, 0.0)
     domain = df.domain(rectangle, pressure_point)
     domain.area_list[0].define_pde(
-        _flow_pde(formulation, U=u_inf, L=L, mu=mu, rho=rho)
+        build_flow_pde(formulation, U=u_inf, L=L, mu=mu, rho=rho)
     )
     if formulation == "uvp":
         for index in (0, 1, 2):
@@ -217,7 +217,7 @@ def build_cylinder_domain(
     rectangle = df.geometry.rectangle(list(channel_x), list(channel_y))
     domain = df.domain(rectangle - circle, circle.bound_list)
     domain.area_list[0].define_pde(
-        _flow_pde(formulation, U=u_inf, L=L, mu=mu, rho=rho)
+        build_flow_pde(formulation, U=u_inf, L=L, mu=mu, rho=rho)
     )
     inlet_u = [
         "y",
