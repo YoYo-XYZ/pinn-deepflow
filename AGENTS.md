@@ -20,7 +20,7 @@ Touch only what you must. Don't improve adjacent code or refactor unrelated thin
 
 ### Issue tracker
 
-Issues live in GitHub Issues (YoYo-XYZ/pinn-deepflow). See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues (YoYo-XYZ/pinn-deepflow). See `docs/agents/issue-tracker.md`. Use github cli if available.
 
 ### Triage labels
 
