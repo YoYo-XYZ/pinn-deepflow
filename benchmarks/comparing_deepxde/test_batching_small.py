@@ -4,12 +4,19 @@
 import sys
 from pathlib import Path
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[2] / "src"
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_PROJECT_SRC = _PROJECT_ROOT / "src"
+for _path in (_PROJECT_ROOT, _PROJECT_SRC):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 import torch  # noqa: E402
 import deepflow as df  # noqa: E402
+from benchmarks.comparing_deepxde.benchmark_deepflow import (  # noqa: E402
+    SMOKE_CONFIG,
+    build_domain,
+    build_model,
+)
 
 
 def _value(value):
@@ -17,26 +24,9 @@ def _value(value):
 
 
 def main():
-    df.manual_seed(69)
-
-    # Channel-flow setup, matching benchmark_deepflow.py.
-    rect = df.geometry.rectangle([0, 5.0], [0, 1.0])
-    domain = df.domain(rect)
-    domain.bound_list[0].define_bc({"u": 1, "v": 0})
-    domain.bound_list[1].define_bc({"u": 0, "v": 0})
-    domain.bound_list[2].define_bc({"p": 0})
-    domain.bound_list[3].define_bc({"u": 0, "v": 0})
-    domain.area_list[0].define_pde(
-        df.pde.NavierStokes(U=0.0001, L=1, mu=0.001, rho=1000)
-    )
-    domain.sampling_random([100, 500, 100, 500], [2000])
-
-    model = df.PINN(
-        width=32,
-        length=4,
-        input_vars=["x", "y"],
-        output_vars=["u", "v", "p"],
-    ).to(df.get_device())
+    df.manual_seed(SMOKE_CONFIG.seed)
+    domain = build_domain(SMOKE_CONFIG)
+    model = build_model(SMOKE_CONFIG).to(df.get_device())
 
     old_loss = {"pde_loss": 0.0, "bc_loss": 0.0, "ic_loss": 0.0}
     for geometry in domain:
