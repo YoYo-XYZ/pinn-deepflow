@@ -17,6 +17,13 @@ from .reporting import (
     train_one,
     write_markdown_report,
 )
+from .precision import (
+    PRECISION_DTYPES,
+    PrecisionBaseline,
+    build_precision_baseline,
+    run_precision_suite,
+    run_precision_variant,
+)
 
 __all__ = [
     "BenchmarkConfig",
@@ -32,4 +39,9 @@ __all__ = [
     "save_model",
     "train_one",
     "write_markdown_report",
+    "PRECISION_DTYPES",
+    "PrecisionBaseline",
+    "build_precision_baseline",
+    "run_precision_suite",
+    "run_precision_variant",
 ]
