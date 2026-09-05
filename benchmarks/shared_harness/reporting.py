@@ -13,6 +13,7 @@ import sys
 import time
 from numbers import Real
 from pathlib import Path
+from statistics import fmean, stdev
 from typing import Any, Callable, Dict, List, Mapping, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
@@ -217,6 +218,48 @@ def collect_metrics(
     return metrics
 
 
+def aggregate_metrics(runs: Sequence[Mapping[str, Any]]) -> Dict[str, float]:
+    """Aggregate numeric metrics shared by every run.
+
+    The returned names use ``*_mean`` and ``*_std`` suffixes. Non-numeric
+    metadata is left to the caller because it describes a run rather than a
+    measurement.
+    """
+    if not runs:
+        raise ValueError("At least one run is required.")
+
+    common_keys = set(runs[0])
+    for run in runs[1:]:
+        common_keys.intersection_update(run)
+
+    aggregate: Dict[str, float] = {}
+    for key in sorted(common_keys):
+        values = [run[key] for run in runs]
+        if not all(
+            isinstance(value, Real) and not isinstance(value, bool)
+            for value in values
+        ):
+            continue
+        numeric_values = [float(value) for value in values]
+        aggregate[f"{key}_mean"] = float(fmean(numeric_values))
+        aggregate[f"{key}_std"] = (
+            float(stdev(numeric_values)) if len(numeric_values) > 1 else 0.0
+        )
+    return aggregate
+
+
+def representative_run_index(
+    runs: Sequence[Mapping[str, Any]], metric: str = "final_total_loss"
+) -> int:
+    """Return the median-ranked run for a numeric metric."""
+    if not runs:
+        raise ValueError("At least one run is required.")
+    if any(metric not in run for run in runs):
+        raise KeyError(f"Every run must contain metric {metric!r}.")
+    ranked = sorted((float(run[metric]), index) for index, run in enumerate(runs))
+    return ranked[len(runs) // 2][1]
+
+
 def save_model(model, path: Path) -> Path:
     """Persist a model via the library native pickle-style save."""
     path = Path(path)
@@ -224,6 +267,11 @@ def save_model(model, path: Path) -> Path:
     model.save_as_pickle(str(path))
     resolved = path if path.name.endswith(".pkl") else Path(f"{path}.pkl")
     return resolved
+
+
+def load_model(path: Path):
+    """Load a native DeepFlow pickle-style model."""
+    return df.load_from_pickle(str(Path(path)))
 
 
 def _first_field(data: dict) -> str | None:

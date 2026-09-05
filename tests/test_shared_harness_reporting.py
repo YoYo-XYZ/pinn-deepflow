@@ -8,9 +8,11 @@ import deepflow as df
 from benchmarks.shared_harness.config import BenchmarkConfig
 from benchmarks.shared_harness.domains import build_burgers_domain
 from benchmarks.shared_harness.reporting import (
+    aggregate_metrics,
     collect_metrics,
     evaluate_area,
     plot_results,
+    representative_run_index,
     save_model,
     train_one,
     write_markdown_report,
@@ -32,6 +34,22 @@ def _tiny_config(**overrides):
     }
     payload.update(overrides)
     return BenchmarkConfig(**payload)
+
+
+def test_reporting_aggregates_runs_and_selects_median():
+    runs = [
+        {"final_total_loss": 3.0, "train_time_s": 1.0},
+        {"final_total_loss": 1.0, "train_time_s": 3.0},
+        {"final_total_loss": 2.0, "train_time_s": 2.0},
+    ]
+
+    assert aggregate_metrics(runs) == {
+        "final_total_loss_mean": 2.0,
+        "final_total_loss_std": 1.0,
+        "train_time_s_mean": 2.0,
+        "train_time_s_std": 1.0,
+    }
+    assert representative_run_index(runs) == 2
 
 
 def test_reporting_smoke(tmp_path):
