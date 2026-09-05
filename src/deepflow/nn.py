@@ -525,6 +525,10 @@ class NN(ABC, nn.Module):
         ``cloudpickle`` is used so models with geometry-based hard constraints
         retain their dynamically defined constraint functions.
 
+        Pickle loading is intended for trusted files because deserialization
+        can execute Python code. Use ``save`` for the restricted `.pt` format
+        when the model fits its supported data-only representation.
+
         Args:
             file_name: Output path. The ``.pkl`` suffix is added when absent.
 
@@ -535,6 +539,23 @@ class NN(ABC, nn.Module):
         if file_name[-4:] != '.pkl': file_name += '.pkl'
         with open(file_name, 'wb') as f:
             pickle.dump(self, f)
+
+    def save(self, file_name) -> None:
+        """Save the model as a restricted, versioned PyTorch artifact.
+
+        Supported models are exact instances of ``FNN``, ``PINN``, and
+        ``RFFPINN`` using a registered activation and no hard constraints or
+        other Python-only behavior. The `.pt` suffix is added when omitted.
+
+        Args:
+            file_name: Output path. Existing artifacts are replaced atomically.
+
+        Raises:
+            ModelPersistenceError: If the model or path is not supported.
+        """
+        from ._persistence import save_model
+
+        return save_model(self, file_name)
     
 
 def load_from_pickle(file_name: str) -> NN:
@@ -542,6 +563,8 @@ def load_from_pickle(file_name: str) -> NN:
 
     The loader also accepts legacy files produced with the standard pickle
     module.
+
+    Pickle files must be trusted because loading can execute Python code.
 
     Args:
         file_name: Pickle path. The ``.pkl`` suffix is added when absent.
@@ -654,6 +677,8 @@ class PINN(FNN):
         weight_init: Union[str, Callable, None] = 'kaiming',
     ):
         """Initialize a PINN with equally wide hidden layers."""
+        self.width = width
+        self.length = length
         super().__init__(
             input_vars, output_vars,
             [width for _ in range(length)],
@@ -688,6 +713,8 @@ class RFFPINN(FNN):
         weight_init: Union[str, Callable, None] = 'kaiming',
     ):
         """Initialize a PINN with a fixed random Fourier embedding."""
+        self.width = width
+        self.length = length
         self.embed_dim = embed_dim
         self.alpha = alpha
         super().__init__(
