@@ -1,255 +1,244 @@
 #!/usr/bin/env python3
-"""
-Benchmark the 1D Burgers equation with DeepFlow.
-
-The script intentionally uses only the public API shared by the legacy and
-current DeepFlow versions.  It can be copied with ``common_config_burgers.py``
-to a legacy checkout that does not contain the repository's benchmarks.
-"""
+"""Run one version of the shared Burgers benchmark."""
 
 from __future__ import annotations
 
 import argparse
-import inspect
-import subprocess
+import math
 import sys
-import time
-from datetime import datetime, timezone
+from dataclasses import replace
 from pathlib import Path
 
-# Resolve local configuration and the source checkout regardless of cwd.
-SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
-PROJECT_SRC = Path(__file__).resolve().parents[2] / "src"
-if str(PROJECT_SRC) not in sys.path:
-    sys.path.insert(0, str(PROJECT_SRC))
 
-import numpy as np  # noqa: E402
-from torch import pi, sin  # noqa: E402
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parents[1]
+PROJECT_SRC = PROJECT_ROOT / "src"
+for path in (PROJECT_ROOT, PROJECT_SRC):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 import deepflow as df  # noqa: E402
-
-from common_config_burgers import (  # noqa: E402
-    BOUNDARY_POINTS,
-    DEPTH,
-    EPOCHS,
-    INTERIOR_POINTS,
-    LR,
-    NU,
-    NEW_RESULTS_FILE,
-    RESULTS_DIR,
-    SEED,
-    WIDTH,
-    X_RANGE,
-    Y_RANGE,
+from benchmarks.shared_harness import (  # noqa: E402
+    BenchmarkConfig,
+    aggregate_metrics,
+    build_burgers_domain,
+    collect_metrics,
+    evaluate_area,
+    plot_results,
+    representative_run_index,
+    save_model,
+    train_one,
+    write_markdown_report,
 )
 
 
-PYTORCH_DEFAULT_INITIALIZATION = "pytorch_default (weight_init=None)"
-LEGACY_DEFAULT_INITIALIZATION = "legacy_constructor_default"
+NU = 0.01 / math.pi
+RESULTS_DIR = SCRIPT_DIR / "results"
+REPORT_NAME = "REPORT.md"
+DEFAULT_VERSION = "new"
+
+DEFAULT_CONFIG = BenchmarkConfig(
+    width=16,
+    depth=4,
+    learning_rate=0.004,
+    epochs_adam=2000,
+    epochs_lbfgs=0,
+    seed=69,
+    boundary_points=[1000, 500, 500],
+    interior_points=[4000],
+    eval_grid=[500, 250],
+    sampling="lhs",
+)
+
+SMOKE_CONFIG = BenchmarkConfig(
+    width=8,
+    depth=2,
+    learning_rate=0.004,
+    epochs_adam=2,
+    epochs_lbfgs=0,
+    seed=69,
+    boundary_points=[8, 4, 4],
+    interior_points=[16],
+    eval_grid=[8, 8],
+    sampling="lhs",
+)
 
 
-def _get_commit_metadata() -> dict:
-    """Return the active repository's git hash and commit date."""
-    repo_root = Path(__file__).resolve().parents[2]
-    metadata = {"commit_hash": "unknown", "commit_date": "unknown"}
-    try:
-        metadata["commit_hash"] = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=repo_root, text=True
-        ).strip()
-        metadata["commit_date"] = subprocess.check_output(
-            ["git", "log", "-1", "--format=%ci", "HEAD"],
-            cwd=repo_root,
-            text=True,
-        ).strip()
-    except (OSError, subprocess.CalledProcessError):
-        pass
-    return metadata
-
-
-def _build_domain():
-    """Create and sample a fresh Burgers domain for one independent run."""
-    area = df.geometry.rectangle(list(X_RANGE), list(Y_RANGE))
-    initial_condition = df.geometry.line_horizontal(
-        y=Y_RANGE[0], range_x=list(X_RANGE)
+def build_domain(config: BenchmarkConfig = DEFAULT_CONFIG):
+    """Build one sampled Burgers domain through the shared builder."""
+    df.manual_seed(config.seed)
+    return build_burgers_domain(
+        nu=NU,
+        boundary_points=list(config.boundary_points),
+        interior_points=list(config.interior_points),
+        sampling=config.sampling,
     )
-    left_boundary = df.geometry.line_vertical(
-        x=X_RANGE[0], range_y=list(Y_RANGE)
-    )
-    right_boundary = df.geometry.line_vertical(
-        x=X_RANGE[1], range_y=list(Y_RANGE)
-    )
-    domain = df.domain(
-        area.area_list, initial_condition, left_boundary, right_boundary
-    )
-    domain.area_list[0].define_pde(df.pde.BurgersEquation1D(nu=NU))
-    domain.bound_list[0].define_bc({"u": ["x", lambda x: -sin(pi * x)]})
-    domain.bound_list[1].define_bc({"u": 0})
-    domain.bound_list[2].define_bc({"u": 0})
-    domain.sampling_lhs(BOUNDARY_POINTS, INTERIOR_POINTS)
-    return domain
 
 
-def _build_model():
-    """Build a model using the initialization supported by this DeepFlow."""
-    model_kwargs = {
-        "input_vars": ["x", "y"],
-        "output_vars": ["u"],
-        "width": WIDTH,
-        "length": DEPTH,
+def build_model(config: BenchmarkConfig = DEFAULT_CONFIG):
+    """Build the PINN used for both version runs."""
+    return df.PINN(
+        input_vars=["x", "y"],
+        output_vars=["u"],
+        width=config.width,
+        length=config.depth,
+    )
+
+
+def run_once(config: BenchmarkConfig) -> dict:
+    """Train and evaluate one seeded run."""
+    domain = build_domain(config)
+    model, training_info = train_one(
+        domain,
+        lambda: build_model(config),
+        config,
+    )
+    evaluator = evaluate_area(domain, model, list(config.eval_grid))
+    metrics = {
+        **training_info,
+        **collect_metrics(evaluator, model),
+        "seed": config.seed,
+        "trainable_parameters": sum(
+            parameter.numel() for parameter in model.parameters()
+        ),
     }
-    try:
-        supports_weight_init = "weight_init" in inspect.signature(df.PINN).parameters
-    except (TypeError, ValueError):
-        supports_weight_init = False
-
-    if supports_weight_init:
-        model_kwargs["weight_init"] = None
-        initialization_protocol = PYTORCH_DEFAULT_INITIALIZATION
-    else:
-        initialization_protocol = LEGACY_DEFAULT_INITIALIZATION
-
-    return df.PINN(**model_kwargs), initialization_protocol
-
-
-def _run_once(run_idx: int, num_runs: int) -> dict:
-    run_seed = SEED + run_idx
-    df.manual_seed(run_seed)
-    domain = _build_domain()
-    model, initialization_protocol = _build_model()
-
-    print(f"\n--- Run {run_idx + 1}/{num_runs} (seed {run_seed}) ---")
-    start = time.perf_counter()
-    model, _ = model.train_adam(
-        calc_loss=df.calc_loss_simple(domain),
-        learning_rate=LR,
-        epochs=EPOCHS,
-        print_every=200,
-    )
-    elapsed = time.perf_counter() - start
-    history = model.loss_history
     return {
-        "time": elapsed,
-        "first_loss": float(history["total_loss"][0]),
-        "final_loss": float(history["total_loss"][-1]),
-        "total_loss": np.asarray(history["total_loss"], dtype=np.float64),
-        "bc_loss": np.asarray(history["bc_loss"], dtype=np.float64),
-        "pde_loss": np.asarray(history["pde_loss"], dtype=np.float64),
-        "initialization_protocol": initialization_protocol,
+        "model": model,
+        "domain": domain,
+        "evaluator": evaluator,
+        "metrics": metrics,
     }
 
 
-def _mean_and_std(values: np.ndarray) -> tuple[float, float]:
-    """Return mean and sample standard deviation for one or more runs."""
-    return float(values.mean()), float(values.std(ddof=1)) if len(values) > 1 else 0.0
+def run_suite(
+    config: BenchmarkConfig = DEFAULT_CONFIG,
+    output_dir: Path = RESULTS_DIR,
+    version: str = DEFAULT_VERSION,
+) -> dict:
+    """Run, persist, plot, and report one named library version."""
+    if not version or not version.strip():
+        raise ValueError("version must be a non-empty string")
 
-
-def _aggregate_results(runs: list[dict], commit_metadata: dict) -> dict:
-    times = np.asarray([run["time"] for run in runs], dtype=np.float64)
-    final_losses = np.asarray(
-        [run["final_loss"] for run in runs], dtype=np.float64
+    output_dir = Path(output_dir)
+    runs = [
+        run_once(replace(config, seed=seed, seeds=[seed]))
+        for seed in config.seeds
+    ]
+    representative_index = representative_run_index(
+        [run["metrics"] for run in runs]
     )
-    first_losses = np.asarray(
-        [run["first_loss"] for run in runs], dtype=np.float64
-    )
-    median_idx = int(np.argsort(final_losses)[len(runs) // 2])
-    time_mean, time_std = _mean_and_std(times)
-    final_mean, final_std = _mean_and_std(final_losses)
-    first_mean, first_std = _mean_and_std(first_losses)
-    median_run = runs[median_idx]
-    initialization_protocols = {
-        run["initialization_protocol"] for run in runs
-    }
-    if len(initialization_protocols) != 1:
-        raise ValueError("Initialization protocol changed between benchmark runs")
-
-    return {
-        "train_time_s": times,
-        "final_total_loss": final_losses,
-        "first_total_loss": first_losses,
-        "total_loss": median_run["total_loss"],
-        "bc_loss": median_run["bc_loss"],
-        "pde_loss": median_run["pde_loss"],
-        "train_time_mean": time_mean,
-        "train_time_std": time_std,
-        "final_loss_mean": final_mean,
-        "final_loss_std": final_std,
-        "first_loss_mean": first_mean,
-        "first_loss_std": first_std,
+    representative = runs[representative_index]
+    metrics = {
+        **representative["metrics"],
+        **aggregate_metrics([run["metrics"] for run in runs]),
         "num_runs": len(runs),
-        "median_run_idx": median_idx,
-        "commit_hash": commit_metadata["commit_hash"],
-        "commit_date": commit_metadata["commit_date"],
-        "epochs": EPOCHS,
-        "width": WIDTH,
-        "depth": DEPTH,
-        "lr": LR,
-        "seed": SEED,
+        "representative_run_idx": representative_index,
+        "version": version,
         "nu": NU,
-        "x_range": np.asarray(X_RANGE, dtype=np.float64),
-        "y_range": np.asarray(Y_RANGE, dtype=np.float64),
-        "boundary_points": np.asarray(BOUNDARY_POINTS, dtype=np.int64),
-        "interior_points": np.asarray(INTERIOR_POINTS, dtype=np.int64),
-        "initialization_protocol": next(iter(initialization_protocols)),
-        "run_timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    model_path = save_model(representative["model"], output_dir / version)
+    artifacts = [model_path]
+    artifacts.extend(
+        plot_results(
+            representative["evaluator"],
+            output_dir,
+            prefix=f"burgers_{version}",
+        )
+    )
+    result = {
+        **representative,
+        "version": version,
+        "metrics": metrics,
+        "artifacts": artifacts,
+        "model_path": model_path,
+        "runs": runs,
+        "representative_run_idx": representative_index,
+    }
+    report_metrics = {f"{version}_{key}": value for key, value in metrics.items()}
+    report = write_markdown_report(
+        output_dir / REPORT_NAME,
+        f"Burgers version benchmark ({version})",
+        config,
+        report_metrics,
+        artifacts,
+    )
+    return {
+        "variants": {version: result},
+        "report": report,
+        "artifacts": artifacts,
+        "representative_run_idx": representative_index,
     }
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Benchmark 1D Burgers equation with DeepFlow."
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("must be a positive integer") from exc
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
+def _parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Run the small CPU-friendly suite.",
     )
     parser.add_argument(
         "--num_runs",
-        type=int,
-        default=1,
-        help="Number of independent training runs to average over. Default: 1",
+        type=_positive_int,
+        help="Number of independent seeds to run.",
     )
-    args = parser.parse_args()
-    if args.num_runs < 1:
-        parser.error("--num_runs must be at least 1")
+    parser.add_argument(
+        "--epochs",
+        type=_positive_int,
+        help="Override training with this many Adam epochs.",
+    )
+    parser.add_argument(
+        "--version",
+        default=DEFAULT_VERSION,
+        help=f"Label for the native model output (default: {DEFAULT_VERSION}).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=RESULTS_DIR,
+        help="Directory for the native model, plots, and report.",
+    )
+    return parser.parse_args(argv)
 
-    print("=" * 60)
-    print(f"DeepFlow  -  1D Burgers Equation Benchmark  ({args.num_runs} run(s))")
-    print("=" * 60)
-    print(f"Device: {df.device}")
-    print(f"Base seed: {SEED}")
-    print(f"Width: {WIDTH}, Depth: {DEPTH}, Epochs: {EPOCHS}, LR: {LR}")
 
-    results = _aggregate_results(
-        [_run_once(run_idx, args.num_runs) for run_idx in range(args.num_runs)],
-        _get_commit_metadata(),
-    )
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = RESULTS_DIR / (
-        f"burgers_benchmark_{results['commit_hash'][:7]}.npz"
-    )
-    np.savez(output_path, **results)
-    np.savez(NEW_RESULTS_FILE, **results)
+def _config_from_args(args) -> BenchmarkConfig:
+    config = SMOKE_CONFIG if args.smoke else DEFAULT_CONFIG
+    if args.num_runs is not None:
+        config = replace(
+            config,
+            seeds=[config.seed + index for index in range(args.num_runs)],
+        )
+    if args.epochs is not None:
+        config = replace(config, epochs_adam=args.epochs, epochs_lbfgs=0)
+    return config
 
-    print("\n" + "=" * 60)
-    print("Benchmark complete")
-    print("=" * 60)
-    print(f"Commit:            {results['commit_hash']}")
-    print(f"Commit date:       {results['commit_date']}")
-    print(f"Initialization:    {results['initialization_protocol']}")
-    print(f"Number of runs:    {results['num_runs']}")
-    print(
-        f"Train time (s):    {results['train_time_mean']:.4f} "
-        f"± {results['train_time_std']:.4f}"
+
+def main(argv=None):
+    args = _parse_args(argv)
+    result = run_suite(
+        _config_from_args(args),
+        args.output_dir,
+        version=args.version,
     )
+    values = result["variants"][args.version]
+    metrics = values["metrics"]
     print(
-        f"First total loss:  {results['first_loss_mean']:.6e} "
-        f"± {results['first_loss_std']:.6e}"
+        f"{args.version}: final total loss={metrics['final_total_loss']:.6e}, "
+        f"PDE residual={metrics.get('mean_abs_pde_residual', float('nan')):.6e}"
     )
-    print(
-        f"Final total loss:  {results['final_loss_mean']:.6e} "
-        f"± {results['final_loss_std']:.6e}"
-    )
-    print(f"Median run index:  {results['median_run_idx'] + 1}")
-    print(f"Results written to: {output_path}")
-    print(f"Current results:   {NEW_RESULTS_FILE}")
+    print(f"Report: {result['report']}")
+    return result
 
 
 if __name__ == "__main__":

@@ -1,76 +1,29 @@
-# FP32 vs FP64 Channel-Flow Precision Benchmark
+# FP32 vs FP64 channel-flow benchmark
 
-This folder contains a simple, reproducible benchmark that compares single
-precision (`torch.float32`) and double precision (`torch.float64`) for 2D steady
-channel flow using DeepFlow.
+This suite compares the same DeepFlow PINN in single precision and double
+precision on steady incompressible Navier-Stokes flow through a rectangular
+channel.
 
-## Motivation
-
-The Burgers benchmark in `benchmarks/comparing_precision` may be too small or
-smooth to expose FP64 benefits. This benchmark keeps the same comparison scheme
-but uses steady incompressible Navier-Stokes with coupled `u`, `v`, and `p`
-outputs and second-order residuals.
-
-## How to run
-
-From the repository root:
+Run it from the repository root:
 
 ```bash
 python benchmarks/comparing_precision_channel_flow/benchmark_precision.py
 ```
 
-For more robust statistics, average over multiple independent runs:
+Use the CPU-friendly smoke path while changing the benchmark:
 
 ```bash
-python benchmarks/comparing_precision_channel_flow/benchmark_precision.py --num_runs 5
+python benchmarks/comparing_precision_channel_flow/benchmark_precision.py --smoke
+python benchmarks/comparing_precision_channel_flow/smoke_test.py
 ```
 
-You can also change the number of epochs:
+The suite uses the shared channel domain builder, including its boundary-point
+rule. The shared precision harness builds one FP32 sampled/model baseline per
+seed, casts a copy for each precision, trains both variants, evaluates them on
+the same grid, and reports metrics from the evaluator and loss history. Use
+`--num_runs 5` for paired seeds or `--epochs 500` to run L-BFGS for more
+epochs.
 
-```bash
-python benchmarks/comparing_precision_channel_flow/benchmark_precision.py --epochs 500 --num_runs 3
-```
-
-## What it measures
-
-For each precision, the script:
-
-1. Sets `df.dtype = torch.float32` or `df.dtype = torch.float64`.
-2. Builds the same 2D channel-flow problem (geometry, PDE, BCs, sampling).
-3. Creates one FP32 baseline per seed, including sampled coordinates and initial model weights.
-4. Casts that baseline to FP32 and FP64, then trains each with `torch.optim.LBFGS` for the configured epochs.
-5. Repeats for `--num_runs` paired seeds and reports mean ± std.
-6. Evaluates the selected best model on one canonical uniform `[500, 100]` grid and records the
-   PDE residual fields.
-
-The comparison table reports:
-
-- Final total / BC / PDE loss
-- Max and mean absolute PDE residual
-- Max and mean absolute continuity, x-momentum, and y-momentum residuals
-- Training time
-- Percentage delta (`(FP64 − FP32) / FP32 × 100`)
-
-All per-precision metrics are aggregated over paired seeds. Loss histories and
-fields shown in the figures come from the same representative seed/run index for
-both dtypes.
-
-These results measure training losses and PDE residual behavior on collocation
-and evaluation grids. They do not measure independent solution accuracy against
-a reference solution.
-
-## Outputs
-
-All outputs are written to `benchmarks/comparing_precision_channel_flow/results/`:
-
-- `fp32_results.npz` – raw FP32 metrics, fields, residuals, and loss histories
-- `fp64_results.npz` – raw FP64 metrics, fields, residuals, and loss histories
-- `loss_curves.png` – total / BC / PDE loss curves side by side
-- `velocity_magnitude_comparison.png` – predicted speed fields and difference
-- `pressure_comparison.png` – predicted pressure fields and difference
-- `residual_difference.png` – FP64 minus FP32 residual-difference fields
-
-## Interpreting results
-
-A **negative Delta** for a loss or residual metric means FP64 is lower/better.
-A **positive Delta** for training time means FP64 is slower.
+Outputs are native DeepFlow model files, evaluator plots, and `REPORT.md` in
+`results/`. The checked-in numeric archives from the former benchmark are not
+part of the new workflow.

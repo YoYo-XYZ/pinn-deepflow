@@ -1,135 +1,74 @@
-#!/usr/bin/env python3
-"""Generate DeepFlow FEM references for the combined cavity benchmark."""
+"""Canonical FEM reference and explicit offline-cache support."""
 
-import time
+from __future__ import annotations
+
+import argparse
 from pathlib import Path
 
-import numpy as np
+try:  # Package execution.
+    from .benchmark import (  # noqa: E402
+        DEFAULT_CONFIG,
+        FEM_BOUNDARY_RESOLUTION,
+        FEM_MAX_ITERATIONS,
+        FEM_MESH_SIZE,
+        FEM_TOLERANCE,
+        build_domain,
+    )
+except ImportError:  # Direct script execution.
+    from benchmark import (  # type: ignore  # noqa: E402
+        DEFAULT_CONFIG,
+        FEM_BOUNDARY_RESOLUTION,
+        FEM_MAX_ITERATIONS,
+        FEM_MESH_SIZE,
+        FEM_TOLERANCE,
+        build_domain,
+    )
 
-from benchmark_common import build_domain, df
-from common_config import (
-    CAVITY_X,
-    CAVITY_Y,
-    CENTERLINE_POINTS,
-    FEM_BOUNDARY_RESOLUTION,
-    FEM_DEFAULT_GRID,
-    FEM_MESH_SIZE,
-    FEM_MAX_ITERATIONS,
-    FEM_REFERENCE_FILENAME,
-    FEM_TOLERANCE,
-    REYNOLDS,
-    RESULTS_DIR,
+from benchmarks.shared_harness.reference import (
+    CachedReference,
+    export_reference_cache,
+    load_cached_reference,
 )
 
 
-def _build_reference_domain():
-    """Reuse the UVP benchmark setup without its pressure-point bound."""
-    return df.domain(build_domain("uvp").area_list[0])
-
-
-def _sample_solution(reference, grid):
-    """Query the FEM solution on the requested grid."""
-    x = np.linspace(*CAVITY_X, grid[0])
-    y = np.linspace(*CAVITY_Y, grid[1])
-    query_x, query_y = np.meshgrid(x, y, indexing="xy")
-    fields = reference.reference_solution.evaluate(query_x, query_y, fields=("u", "v", "p"))
-
-    pressure_offset = float(
-        reference.reference_solution.evaluate([CAVITY_X[0]], [CAVITY_Y[0]], fields=["p"])["p"][0]
-    )
-    fields["p"] = np.asarray(fields["p"]) - pressure_offset
-
-    vertical_y = np.linspace(*CAVITY_Y, CENTERLINE_POINTS)
-    vertical_u = reference.reference_solution.evaluate(
-        np.full_like(vertical_y, 0.5), vertical_y, fields=["u"]
-    )["u"]
-    horizontal_x = np.linspace(*CAVITY_X, CENTERLINE_POINTS)
-    horizontal_v = reference.reference_solution.evaluate(
-        horizontal_x, np.full_like(horizontal_x, 0.5), fields=["v"]
-    )["v"]
-    return (
-        x,
-        y,
-        fields,
-        vertical_y,
-        vertical_u,
-        horizontal_x,
-        horizontal_v,
-        pressure_offset,
-    )
-
-
-def _payload(reference, grid, mesh_size, runtime_s):
-    (
-        x,
-        y,
-        fields,
-        vertical_y,
-        vertical_u,
-        horizontal_x,
-        horizontal_v,
-        pressure_offset,
-    ) = _sample_solution(reference, grid)
-    metadata = reference.metadata
-    residuals = np.asarray(metadata.get("solver_residuals", []), dtype=float)
-    mesh = metadata.get("mesh", {})
-    return {
-        "x": x,
-        "y": y,
-        **{name: np.asarray(fields[name]) for name in ("u", "v", "p")},
-        "vertical_y": vertical_y,
-        "vertical_u": np.asarray(vertical_u),
-        "horizontal_x": horizontal_x,
-        "horizontal_v": np.asarray(horizontal_v),
-        "nx": x.size,
-        "ny": y.size,
-        "dx": np.diff(x).mean(),
-        "dy": np.diff(y).mean(),
-        "reynolds": REYNOLDS,
-        "converged": int(metadata["converged"]),
-        "iterations": metadata["iterations"],
-        "final_residual": residuals[-1],
-        "runtime_s": runtime_s,
-        "mesh_size": mesh_size,
-        "mesh_elements": mesh["elements"],
-        "mesh_vertices": mesh["vertices"],
-        "pressure_offset": pressure_offset,
-        "pressure_gauge": np.asarray("corner_anchored"),
-        "backend": np.asarray(metadata["backend"]),
-    }
-
-
-def solve_reference(grid, mesh_size, output_path=None):
-    """Solve and optionally export one FEM reference."""
-    print(f"DeepFlow FEM cavity reference ({grid[0]} x {grid[1]} samples)")
-    start = time.perf_counter()
-    domain = _build_reference_domain()
-    reference = domain.solve_fem(
+def solve_reference(
+    config=DEFAULT_CONFIG,
+    *,
+    mesh_size: float = FEM_MESH_SIZE,
+    boundary_resolution: int = FEM_BOUNDARY_RESOLUTION,
+    tolerance: float = FEM_TOLERANCE,
+    max_iterations: int = FEM_MAX_ITERATIONS,
+    output_path: Path | None = None,
+):
+    """Solve the cavity with DeepFlow's canonical FEM entry point."""
+    reference_domain = build_domain("uvp", config)
+    reference = reference_domain.solve_fem(
         mesh_size=mesh_size,
-        boundary_resolution=FEM_BOUNDARY_RESOLUTION,
-        tolerance=FEM_TOLERANCE,
-        max_iterations=FEM_MAX_ITERATIONS,
+        boundary_resolution=boundary_resolution,
+        tolerance=tolerance,
+        max_iterations=max_iterations,
     )
-    payload = _payload(reference, grid, mesh_size, time.perf_counter() - start)
-    if not payload["converged"]:
-        raise RuntimeError("DeepFlow FEM reference did not converge.")
+    if not reference.metadata.get("converged", True):
+        raise RuntimeError("DeepFlow FEM cavity reference did not converge.")
     if output_path is not None:
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(output_path, **payload)
-    return payload
+        export_reference_cache(reference, output_path, config.eval_grid)
+    return reference
 
 
-def generate_reference():
-    """Generate the FEM reference."""
-    reference = solve_reference(
-        FEM_DEFAULT_GRID,
-        FEM_MESH_SIZE,
-        RESULTS_DIR / FEM_REFERENCE_FILENAME,
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--export-cache",
+        type=Path,
+        help="Explicitly export queried FEM values for later offline comparison.",
     )
-    if not reference["converged"]:
-        raise RuntimeError("FEM reference did not converge.")
+    args = parser.parse_args(argv)
+    reference = solve_reference(DEFAULT_CONFIG, output_path=args.export_cache)
+    print("FEM cavity reference converged")
+    if args.export_cache:
+        print(f"Offline cache: {args.export_cache}")
+    return reference
 
 
 if __name__ == "__main__":
-    generate_reference()
+    main()

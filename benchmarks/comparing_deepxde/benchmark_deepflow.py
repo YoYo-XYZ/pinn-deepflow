@@ -1,127 +1,213 @@
 #!/usr/bin/env python3
-"""
-Benchmark: 2D steady channel flow using DeepFlow.
+"""Shared-harness DeepFlow counterpart for the channel-flow benchmark."""
 
-Matches the setup in ``static/quickstart/code.ipynb``.
+from __future__ import annotations
 
-Results are saved to ``results/deepflow_results.npz``.
-"""
+import argparse
+import sys
+from pathlib import Path
 
-import time
 
-import numpy as np
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parents[1]
+PROJECT_SRC = PROJECT_ROOT / "src"
+for path in (PROJECT_ROOT, PROJECT_SRC):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
-from benchmark_common import RESULTS_DIR
-import deepflow as df
-
-from common_config import (
-    Lx,
-    Ly,
-    WIDTH,
-    DEPTH,
-    LR,
-    EPOCHS,
-    BOUNDARY_POINTS,
-    INTERIOR_POINTS,
-    EVAL_GRID,
-    SEED,
+import deepflow as df  # noqa: E402
+from benchmarks.shared_harness import (  # noqa: E402
+    BenchmarkConfig,
+    build_channel_domain,
+    collect_metrics,
+    evaluate_area,
+    perimeter_weighted_boundary_counts,
+    plot_results,
+    save_model,
+    train_one,
+    write_markdown_report,
 )
 
-def _boundary_points():
-    """Match DeepXDE's perimeter-weighted boundary sampling."""
-    perimeter = 2 * (Lx + Ly)
-    total = sum(BOUNDARY_POINTS)
-    return [
-        int(total * Ly / perimeter),
-        int(total * Lx / perimeter),
-        int(total * Ly / perimeter),
-        int(total * Lx / perimeter),
-    ]
-
-
-def build_domain():
-    """Build and sample the channel-flow domain."""
-    domain = df.domain(df.geometry.rectangle([0, Lx], [0, Ly]))
-    domain.bound_list[0].define_bc({"u": 1, "v": 0})
-    domain.bound_list[1].define_bc({"u": 0, "v": 0})
-    domain.bound_list[2].define_bc({"p": 0})
-    domain.bound_list[3].define_bc({"u": 0, "v": 0})
-    domain.area_list[0].define_pde(
-        df.pde.NavierStokes(U=0.0001, L=1, mu=0.001, rho=1000)
+try:  # Package execution.
+    from .benchmark_common import RESULTS_DIR  # noqa: E402
+    from .common_config import (  # noqa: E402
+        BOUNDARY_POINTS,
+        DEPTH,
+        EPOCHS,
+        EVAL_GRID,
+        INTERIOR_POINTS,
+        Lx,
+        Ly,
+        LR,
+        Re,
+        SEED,
+        WIDTH,
     )
-    boundary_points = _boundary_points()
-    domain.sampling_random(boundary_points, [INTERIOR_POINTS])
-    return domain, boundary_points
+except ImportError:  # Direct script execution.
+    from benchmark_common import RESULTS_DIR  # type: ignore  # noqa: E402
+    from common_config import (  # type: ignore  # noqa: E402
+        BOUNDARY_POINTS,
+        DEPTH,
+        EPOCHS,
+        EVAL_GRID,
+        INTERIOR_POINTS,
+        Lx,
+        Ly,
+        LR,
+        Re,
+        SEED,
+        WIDTH,
+    )
 
 
-def build_model():
+U = 0.0001
+L = 1.0
+MU = 0.001
+RHO = 1000.0
+REPORT_NAME = "REPORT.md"
+
+DEFAULT_CONFIG = BenchmarkConfig(
+    width=WIDTH,
+    depth=DEPTH,
+    learning_rate=LR,
+    epochs_adam=EPOCHS,
+    epochs_lbfgs=0,
+    seed=SEED,
+    boundary_points=perimeter_weighted_boundary_counts(sum(BOUNDARY_POINTS), Lx, Ly),
+    interior_points=[INTERIOR_POINTS],
+    eval_grid=list(EVAL_GRID),
+    sampling="random",
+)
+
+SMOKE_CONFIG = BenchmarkConfig(
+    width=8,
+    depth=2,
+    learning_rate=LR,
+    epochs_adam=2,
+    epochs_lbfgs=0,
+    seed=SEED,
+    boundary_points=[4, 4, 4, 4],
+    interior_points=[16],
+    eval_grid=[8, 4],
+    sampling="random",
+)
+
+
+def build_domain(config: BenchmarkConfig = DEFAULT_CONFIG):
+    """Build the channel domain through the shared DeepFlow builder."""
+    df.manual_seed(config.seed)
+    return build_channel_domain(
+        lx=Lx,
+        ly=Ly,
+        boundary_points=list(config.boundary_points),
+        interior_points=list(config.interior_points),
+        sampling=config.sampling,
+        U=U,
+        L=L,
+        mu=MU,
+        rho=RHO,
+    )
+
+
+def build_model(config: BenchmarkConfig = DEFAULT_CONFIG):
+    """Build the standard DeepFlow model for the channel benchmark."""
     return df.PINN(
-        width=WIDTH,
-        length=DEPTH,
         input_vars=["x", "y"],
         output_vars=["u", "v", "p"],
+        width=config.width,
+        length=config.depth,
     )
 
 
-def _loss_value(losses, name):
-    return float(losses[name].detach().cpu().item())
-
-
-def main():
-    df.manual_seed(SEED)
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    print("=" * 60)
-    print("DeepFlow  -  2D Steady Channel Flow Benchmark")
-    print("=" * 60)
-
-    domain, boundary_points = build_domain()
-    model = build_model()
-    print(f"\nNetwork        : {WIDTH}x{DEPTH}  Tanh  ->  (u, v, p)")
-    print(f"Sampling       : BOUNDARY_POINTS={boundary_points} (total={sum(boundary_points)}), INTERIOR={INTERIOR_POINTS}")
-    print(f"Training       : Adam, lr={LR}, {EPOCHS} epochs\n")
-
-    calc_loss = df.calc_loss_simple(domain)
-    start = time.perf_counter()
-    _, best_model = model.train_adam(
-        calc_loss=calc_loss,
-        learning_rate=LR,
-        epochs=EPOCHS,
+def run_variant(
+    config: BenchmarkConfig = DEFAULT_CONFIG,
+    output_dir: Path = RESULTS_DIR,
+) -> dict:
+    """Train, evaluate, persist, and plot one DeepFlow model."""
+    output_dir = Path(output_dir)
+    domain = build_domain(config)
+    model, training_info = train_one(
+        domain,
+        lambda: build_model(config),
+        config,
     )
-    train_time_s = time.perf_counter() - start
-    print(f"\nTraining time  : {train_time_s:.2f} s")
+    evaluator = evaluate_area(domain, model, list(config.eval_grid))
+    metrics = {
+        **training_info,
+        **collect_metrics(evaluator, model),
+        "reynolds": Re,
+    }
+    model_path = save_model(model, output_dir / "deepflow")
+    artifacts = [model_path]
+    artifacts.extend(plot_results(evaluator, output_dir, prefix="deepflow"))
+    return {
+        "variant": "DeepFlow",
+        "model": model,
+        "domain": domain,
+        "evaluator": evaluator,
+        "metrics": metrics,
+        "artifacts": artifacts,
+        "model_path": model_path,
+    }
 
-    best_model.eval()
-    best_loss = calc_loss(best_model)
-    print("Evaluating on uniform grid ...")
-    prediction = domain.area_list[0].evaluate(best_model)
-    prediction.sampling_area(EVAL_GRID)
-    data = prediction.data_dict
-    final_total = _loss_value(best_loss, "total_loss")
-    final_bc = _loss_value(best_loss, "bc_loss")
-    final_pde = _loss_value(best_loss, "pde_loss")
-    print(f"Final loss     : total={final_total:.6f}  bc={final_bc:.6f}  pde={final_pde:.6f}")
 
-    np.savez(
-        RESULTS_DIR / "deepflow_results.npz",
-        x=np.asarray(data.get("x", [])),
-        y=np.asarray(data.get("y", [])),
-        u=np.asarray(data.get("u", [])),
-        v=np.asarray(data.get("v", [])),
-        p=np.asarray(data.get("p", [])),
-        continuity_residual=np.asarray(data.get("continuity_residual", [])),
-        x_momentum_residual=np.asarray(data.get("x_momentum_residual", [])),
-        y_momentum_residual=np.asarray(data.get("y_momentum_residual", [])),
-        total_loss=np.asarray(data.get("total_loss", [])),
-        bc_loss=np.asarray(data.get("bc_loss", [])),
-        pde_loss=np.asarray(data.get("pde_loss", [])),
-        train_time_s=np.float64(train_time_s),
-        final_total_loss=np.float64(final_total),
-        final_bc_loss=np.float64(final_bc),
-        final_pde_loss=np.float64(final_pde),
-        boundary_points=np.asarray(boundary_points),
+def run_suite(
+    config: BenchmarkConfig = DEFAULT_CONFIG,
+    output_dir: Path = RESULTS_DIR,
+) -> dict:
+    """Run the DeepFlow counterpart through the shared benchmark harness."""
+    output_dir = Path(output_dir)
+    result = run_variant(config, output_dir)
+    report_metrics = {
+        "method": "DeepFlow",
+        "geometry": f"rectangle [0, {Lx}] x [0, {Ly}]",
+        "U": U,
+        "L": L,
+        "mu": MU,
+        "rho": RHO,
+        **result["metrics"],
+    }
+    report = write_markdown_report(
+        output_dir / REPORT_NAME,
+        "DeepFlow channel-flow benchmark",
+        config,
+        report_metrics,
+        result["artifacts"],
     )
-    print("Results saved to results/deepflow_results.npz")
-    print("=" * 60)
+    return {
+        "variants": {"DeepFlow": result},
+        "report": report,
+        "artifacts": result["artifacts"],
+    }
+
+
+def _parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Run the small CPU-friendly shared-harness configuration.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=RESULTS_DIR,
+        help="Directory for the native model, plots, and report.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = _parse_args(argv)
+    result = run_suite(SMOKE_CONFIG if args.smoke else DEFAULT_CONFIG, args.output_dir)
+    metrics = result["variants"]["DeepFlow"]["metrics"]
+    print(
+        f"DeepFlow: final total loss={metrics['final_total_loss']:.6e}, "
+        f"PDE residual={metrics.get('mean_abs_pde_residual', float('nan')):.6e}"
+    )
+    print(f"Model: {result['variants']['DeepFlow']['model_path']}")
+    print(f"Report: {result['report']}")
+    return result
 
 
 if __name__ == "__main__":

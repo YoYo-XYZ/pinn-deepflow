@@ -1,341 +1,258 @@
-"""Short PINN versus RFFPINN benchmark for the 1D Burgers equation."""
+"""Shared-harness Burgers benchmark for PINN and RFFPINN."""
 
 from __future__ import annotations
 
-import json
-import subprocess
+import argparse
+import math
 import sys
-import time
-from datetime import datetime, timezone
 from pathlib import Path
-
-import numpy as np
-import torch
-from torch import pi, sin
+from typing import Callable
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
 PROJECT_SRC = PROJECT_ROOT / "src"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 if str(PROJECT_SRC) not in sys.path:
     sys.path.insert(0, str(PROJECT_SRC))
 
 import deepflow as df  # noqa: E402
+from benchmarks.shared_harness import (  # noqa: E402
+    BenchmarkConfig,
+    build_burgers_domain,
+    collect_metrics,
+    evaluate_area,
+    plot_results,
+    save_model,
+    train_one,
+    write_markdown_report,
+)
 
 
-SEED = 69
-NU = 0.01 / pi
-WIDTH = 16
-DEPTH = 4
-ADAM_EPOCHS = 500
-LBFGS_EPOCHS = 100
-LEARNING_RATE = 0.004
-R3_INTERVAL = 100
-BOUNDARY_POINTS = [512, 256, 256]
-INTERIOR_POINTS = [1024]
-EMBED_DIM = 256
-ALPHA = 5.0
-EVALUATION_RESOLUTION = [161, 81]
+NU = 0.01 / math.pi
+RFF_EMBED_DIM = 256
+RFF_ALPHA = 5.0
 FEM_MESH_SIZE = 0.02
 FEM_TIME_STEP = 0.01
-
 RESULTS_DIR = SCRIPT_DIR / "results"
-METRICS_PATH = RESULTS_DIR / "metrics.json"
-FIELDS_PATH = RESULTS_DIR / "fields.npz"
-HISTORY_PATH = RESULTS_DIR / "training_history.npz"
-PINN_CHECKPOINT_PATH = RESULTS_DIR / "pinn_checkpoint.pt"
-RFFPINN_CHECKPOINT_PATH = RESULTS_DIR / "rffpinn_checkpoint.pt"
+REPORT_PATH = RESULTS_DIR / "REPORT.md"
+VARIANTS = ("PINN", "RFFPINN")
+
+DEFAULT_CONFIG = BenchmarkConfig(
+    width=16,
+    depth=4,
+    learning_rate=0.004,
+    epochs_adam=500,
+    epochs_lbfgs=100,
+    r3_interval=100,
+    seed=69,
+    boundary_points=[512, 256, 256],
+    interior_points=[1024],
+    eval_grid=[161, 81],
+    sampling="lhs",
+)
+
+SMOKE_CONFIG = BenchmarkConfig(
+    width=8,
+    depth=2,
+    learning_rate=0.004,
+    epochs_adam=2,
+    epochs_lbfgs=0,
+    seed=69,
+    boundary_points=[8, 4, 4],
+    interior_points=[16],
+    eval_grid=[8, 8],
+    sampling="lhs",
+)
 
 
-def _build_domain(*, sample_training: bool, for_reference: bool = False):
-    area = df.geometry.rectangle([-1, 1], [0, 1])
-    initial_condition = df.geometry.line_horizontal(y=0, range_x=[-1, 1])
-    left_boundary = df.geometry.line_vertical(x=-1, range_y=[0, 1])
-    right_boundary = df.geometry.line_vertical(x=1, range_y=[0, 1])
-    domain = df.domain(
-        area.area_list,
-        initial_condition,
-        left_boundary,
-        right_boundary,
+def build_domain(config: BenchmarkConfig):
+    """Build one sampled Burgers domain through the shared builder."""
+    df.manual_seed(config.seed)
+    return build_burgers_domain(
+        nu=NU,
+        boundary_points=list(config.boundary_points),
+        interior_points=list(config.interior_points),
+        sampling=config.sampling,
     )
-    domain.area_list[0].define_pde(df.pde.BurgersEquation1D(nu=NU))
-    domain.bound_list[0].define_bc({"u": ["x", lambda x: -sin(pi * x)]})
-    domain.bound_list[1].define_bc({"u": 0})
-    domain.bound_list[2].define_bc({"u": 0})
 
-    if for_reference:
-        domain.area_list[0].define_time(
-            (0.0, 1.0),
-            sampling_scheme="uniform",
-            expo_scaling=False,
+
+def build_pinn(config: BenchmarkConfig):
+    """Construct the standard model variant."""
+    return df.PINN(
+        input_vars=["x", "y"],
+        output_vars=["u"],
+        width=config.width,
+        length=config.depth,
+    )
+
+
+def build_rffpinn(config: BenchmarkConfig):
+    """Construct the random-feature model variant."""
+    return df.RFFPINN(
+        input_vars=["x", "y"],
+        output_vars=["u"],
+        width=config.width,
+        length=config.depth,
+        embed_dim=RFF_EMBED_DIM,
+        alpha=RFF_ALPHA,
+    )
+
+
+MODEL_BUILDERS: dict[str, Callable[[BenchmarkConfig], object]] = {
+    "PINN": build_pinn,
+    "RFFPINN": build_rffpinn,
+}
+
+
+def build_model(variant: str, config: BenchmarkConfig):
+    """Construct a named model variant."""
+    try:
+        builder = MODEL_BUILDERS[variant]
+    except KeyError as exc:
+        raise ValueError(f"Unknown model variant: {variant!r}") from exc
+    return builder(config)
+
+
+def run_variant(
+    variant: str,
+    config: BenchmarkConfig,
+    output_dir: Path,
+    reference_solution=None,
+) -> dict:
+    """Train, evaluate, save, and plot one model variant."""
+    domain = build_domain(config)
+    model, training_info = train_one(
+        domain,
+        lambda: build_model(variant, config),
+        config,
+    )
+    evaluator = evaluate_area(domain, model, list(config.eval_grid))
+    evaluation_metrics = (
+        collect_metrics(
+            evaluator,
+            model,
+            reference_solution=reference_solution,
         )
-    if sample_training:
-        domain.sampling_lhs(BOUNDARY_POINTS, INTERIOR_POINTS)
-    return domain
+        if reference_solution is not None
+        else collect_metrics(evaluator, model)
+    )
+    metrics = {
+        **training_info,
+        **evaluation_metrics,
+        "trainable_parameters": sum(
+            parameter.numel() for parameter in model.parameters()
+        ),
+    }
+    model_path = save_model(model, Path(output_dir) / variant.lower())
+    artifacts = [model_path]
+    artifacts.extend(plot_results(evaluator, output_dir, prefix=variant.lower()))
+    return {
+        "variant": variant,
+        "model": model,
+        "domain": domain,
+        "evaluator": evaluator,
+        "metrics": metrics,
+        "artifacts": artifacts,
+    }
 
 
-def _solve_reference() -> tuple[dict, dict]:
-    domain = _build_domain(sample_training=False, for_reference=True)
-    start = time.perf_counter()
-    reference = domain.solve_fem(
+def run_suite(
+    config: BenchmarkConfig = DEFAULT_CONFIG,
+    output_dir: Path = RESULTS_DIR,
+    reference_solution=None,
+) -> dict:
+    """Run both model variants through the shared benchmark harness."""
+    output_dir = Path(output_dir)
+    results = {
+        variant: run_variant(
+            variant,
+            config,
+            output_dir,
+            reference_solution=reference_solution,
+        )
+        for variant in VARIANTS
+    }
+
+    report_metrics = {}
+    artifacts = []
+    for variant, result in results.items():
+        report_metrics.update(
+            {
+                f"{variant.lower()}_{key}": value
+                for key, value in result["metrics"].items()
+            }
+        )
+        artifacts.extend(result["artifacts"])
+    report = write_markdown_report(
+        output_dir / REPORT_PATH.name,
+        "Burgers PINN vs RFFPINN benchmark",
+        config,
+        report_metrics,
+        artifacts,
+    )
+    return {"variants": results, "report": report, "artifacts": artifacts}
+
+
+def solve_reference(config: BenchmarkConfig = DEFAULT_CONFIG):
+    """Solve the shared Burgers domain with the optional FEM backend."""
+    reference = build_domain(config).solve_fem(
         mesh_size=FEM_MESH_SIZE,
         time_step=FEM_TIME_STEP,
         tolerance=1e-8,
         max_iterations=50,
     )
-    elapsed = time.perf_counter() - start
-    area = domain.area_list[0]
-    x_axis = np.linspace(area.ranges[0][0], area.ranges[0][1], EVALUATION_RESOLUTION[0])
-    y_axis = np.linspace(area.ranges[1][0], area.ranges[1][1], EVALUATION_RESOLUTION[1])
-    x, y = np.meshgrid(x_axis, y_axis, indexing="ij")
-    values = reference.reference_solution.evaluate(x, y, fields=("u",))
-    data = {
-        "x": x.reshape(-1),
-        "y": y.reshape(-1),
-        "u_ref": np.asarray(values["u"]).reshape(-1),
-    }
-    metadata = reference.metadata
-    summary = {
-        "solve_time_s": elapsed,
-        "backend": metadata["backend"],
-        "mesh_elements": metadata["mesh"]["elements"],
-        "time_steps": len(metadata["time_values"]) - 1,
-        "converged": bool(metadata["converged"]),
-        "max_solver_residual": float(max(metadata["solver_residuals"])),
-    }
-    return data, summary
-
-
-def _synchronize() -> None:
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-
-
-def _predict(model, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    parameter = next(model.parameters())
-    inputs = {
-        "x": torch.as_tensor(x, dtype=parameter.dtype, device=parameter.device),
-        "y": torch.as_tensor(y, dtype=parameter.dtype, device=parameter.device),
-    }
-    model.eval()
-    with torch.no_grad():
-        return model(inputs)["u"].detach().cpu().numpy()
-
-
-def _accuracy(prediction: np.ndarray, reference: np.ndarray, y: np.ndarray) -> dict:
-    error = prediction - reference
-    final_mask = np.isclose(y, 1.0)
-    final_error = error[final_mask]
-    final_reference = reference[final_mask]
-    return {
-        "relative_l2": float(np.linalg.norm(error) / np.linalg.norm(reference)),
-        "rmse": float(np.sqrt(np.mean(error**2))),
-        "mae": float(np.mean(np.abs(error))),
-        "max_abs_error": float(np.max(np.abs(error))),
-        "final_time_relative_l2": float(
-            np.linalg.norm(final_error) / np.linalg.norm(final_reference)
-        ),
-    }
-
-
-def _save_checkpoint(model, model_class, model_kwargs, history, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
-            "model_class": model_class.__name__,
-            "model_kwargs": model_kwargs,
-            "state_dict": {
-                key: value.detach().cpu()
-                for key, value in model.state_dict().items()
-            },
-            "loss_history": {
-                key: values.tolist()
-                for key, values in history.items()
-            },
-            "seed": SEED,
-            "dtype": str(df.get_dtype()),
-        },
-        path,
-    )
-
-
-def load_checkpoint(path: Path):
-    """Reconstruct a benchmark model on CPU without rerunning training."""
-    try:
-        checkpoint = torch.load(path, map_location="cpu", weights_only=True)
-    except TypeError:
-        checkpoint = torch.load(path, map_location="cpu")
-    model_class = getattr(df, checkpoint["model_class"])
-    model = model_class(**checkpoint["model_kwargs"])
-    model.load_state_dict(checkpoint["state_dict"])
-    model.loss_history = checkpoint["loss_history"]
-    return model
-
-
-def _train(model_class, reference_data: dict) -> tuple[dict, np.ndarray, dict]:
-    df.manual_seed(SEED)
-    domain = _build_domain(sample_training=True)
-    df.manual_seed(SEED)
-
-    model_kwargs = {
-        "input_vars": ["x", "y"],
-        "output_vars": ["u"],
-        "width": WIDTH,
-        "length": DEPTH,
-    }
-    if model_class is df.RFFPINN:
-        model_kwargs.update(embed_dim=EMBED_DIM, alpha=ALPHA)
-    model = model_class(**model_kwargs)
-    trainable_parameters = sum(p.numel() for p in model.parameters())
-
-    loss_function = df.calc_loss_simple(domain)
-
-    def resample_r3(epoch, _model):
-        if epoch % R3_INTERVAL == 0 and epoch < ADAM_EPOCHS:
-            domain.sampling_R3(BOUNDARY_POINTS, INTERIOR_POINTS)
-
-    _synchronize()
-    start = time.perf_counter()
-    _, best_adam = model.train_adam(
-        learning_rate=LEARNING_RATE,
-        epochs=ADAM_EPOCHS,
-        calc_loss=loss_function,
-        print_every=ADAM_EPOCHS,
-        do_between_epochs=resample_r3,
-    )
-    _, best_model = best_adam.train_lbfgs(
-        epochs=LBFGS_EPOCHS,
-        calc_loss=loss_function,
-        print_every=LBFGS_EPOCHS,
-    )
-    _synchronize()
-    training_time = time.perf_counter() - start
-
-    final_loss = float(loss_function(best_model)["total_loss"].detach().cpu())
-    prediction = _predict(
-        best_model,
-        reference_data["x"],
-        reference_data["y"],
-    )
-    metrics = {
-        "train_time_s": training_time,
-        "trainable_parameters": trainable_parameters,
-        "final_training_loss": final_loss,
-        **_accuracy(
-            prediction,
-            reference_data["u_ref"],
-            reference_data["y"],
-        ),
-    }
-    history = {
-        key: np.asarray(values, dtype=np.float64)
-        for key, values in best_model.loss_history.items()
-    }
-    checkpoint_path = (
-        RFFPINN_CHECKPOINT_PATH
-        if model_class is df.RFFPINN
-        else PINN_CHECKPOINT_PATH
-    )
-    _save_checkpoint(
-        best_model,
-        model_class,
-        model_kwargs,
-        history,
-        checkpoint_path,
-    )
-    metrics["checkpoint"] = checkpoint_path.name
-    return metrics, prediction, history
-
-
-def _commit_hash() -> str:
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
-            cwd=PROJECT_ROOT,
-            text=True,
-        ).strip()
-    except (OSError, subprocess.CalledProcessError):
-        return "unknown"
-
-
-def main() -> None:
-    print("Solving FEM reference...")
-    reference_data, fem_summary = _solve_reference()
-    if not fem_summary["converged"]:
+    if not reference.metadata.get("converged", True):
         raise RuntimeError("FEM reference did not converge")
+    return reference
 
-    results = {}
-    predictions = {}
-    histories = {}
-    for model_class in (df.PINN, df.RFFPINN):
-        print(f"\nTraining {model_class.__name__}...")
-        metrics, prediction, history = _train(model_class, reference_data)
-        results[model_class.__name__] = metrics
-        predictions[model_class.__name__] = prediction
-        histories[model_class.__name__] = history
 
-    payload = {
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "commit_hash": _commit_hash(),
-        "device": str(df.device),
-        "dtype": str(df.get_dtype()),
-        "config": {
-            "seed": SEED,
-            "nu": float(NU),
-            "width": WIDTH,
-            "depth": DEPTH,
-            "adam_epochs": ADAM_EPOCHS,
-            "lbfgs_epochs": LBFGS_EPOCHS,
-            "learning_rate": LEARNING_RATE,
-            "sampling_scheme": "R3",
-            "r3_interval": R3_INTERVAL,
-            "boundary_points": BOUNDARY_POINTS,
-            "interior_points": INTERIOR_POINTS,
-            "embed_dim": EMBED_DIM,
-            "alpha": ALPHA,
-            "evaluation_resolution": EVALUATION_RESOLUTION,
-            "fem_mesh_size": FEM_MESH_SIZE,
-            "fem_time_step": FEM_TIME_STEP,
-        },
-        "fem": fem_summary,
-        "models": results,
-    }
-
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    METRICS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    np.savez_compressed(
-        FIELDS_PATH,
-        x=reference_data["x"],
-        y=reference_data["y"],
-        u_fem=reference_data["u_ref"],
-        u_pinn=predictions["PINN"],
-        u_rffpinn=predictions["RFFPINN"],
+def _parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Run the small CPU-friendly suite without solving FEM.",
     )
-    np.savez_compressed(
-        HISTORY_PATH,
-        pinn_total_loss=histories["PINN"]["total_loss"],
-        pinn_bc_loss=histories["PINN"]["bc_loss"],
-        pinn_pde_loss=histories["PINN"]["pde_loss"],
-        rffpinn_total_loss=histories["RFFPINN"]["total_loss"],
-        rffpinn_bc_loss=histories["RFFPINN"]["bc_loss"],
-        rffpinn_pde_loss=histories["RFFPINN"]["pde_loss"],
+    parser.add_argument(
+        "--no-reference",
+        action="store_true",
+        help="Skip the optional FEM reference solve.",
     )
-    from plot_results import main as plot_results
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=RESULTS_DIR,
+        help="Directory for native models, plots, and the report.",
+    )
+    return parser.parse_args(argv)
 
-    plot_results()
 
+def main(argv=None):
+    args = _parse_args(argv)
+    config = SMOKE_CONFIG if args.smoke else DEFAULT_CONFIG
+    reference = None
+    if not args.smoke and not args.no_reference:
+        try:
+            print("Solving FEM reference...")
+            reference = solve_reference(config)
+        except ImportError as exc:
+            print(f"Skipping optional FEM reference: {exc}")
+
+    result = run_suite(config, args.output_dir, reference_solution=reference)
     print("\nBenchmark results")
-    for name, metrics in results.items():
-        print(
-            f"{name:8s} relative L2={metrics['relative_l2']:.6f}, "
-            f"final-time relative L2={metrics['final_time_relative_l2']:.6f}, "
-            f"time={metrics['train_time_s']:.2f}s"
+    for variant, values in result["variants"].items():
+        metrics = values["metrics"]
+        summary = (
+            f"{variant:7s} total loss={metrics['final_total_loss']:.6e}, "
+            f"PDE residual={metrics['mean_abs_pde_residual']:.6e}"
         )
-    print(f"Metrics: {METRICS_PATH}")
-    print(f"Fields:  {FIELDS_PATH}")
-    print(f"History: {HISTORY_PATH}")
-    print(f"PINN checkpoint:    {PINN_CHECKPOINT_PATH}")
-    print(f"RFFPINN checkpoint: {RFFPINN_CHECKPOINT_PATH}")
+        if "relative_l2" in metrics:
+            summary += f", relative L2={metrics['relative_l2']:.6e}"
+        print(summary)
+    print(f"Report: {result['report']}")
+    return result
 
 
 if __name__ == "__main__":

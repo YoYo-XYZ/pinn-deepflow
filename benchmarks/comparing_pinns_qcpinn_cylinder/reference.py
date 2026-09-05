@@ -1,98 +1,77 @@
-"""Generate the fresh NGSolve FEM reference for cylinder flow."""
+"""Canonical FEM reference and explicit offline-cache support."""
 
-import time
+from __future__ import annotations
+
+import argparse
 from pathlib import Path
 
-import numpy as np
+try:  # Package execution.
+    from .benchmark import (  # noqa: E402
+        DEFAULT_CONFIG,
+        FEM_BOUNDARY_RESOLUTION,
+        FEM_MAX_ITERATIONS,
+        FEM_MESH_SIZE,
+        FEM_TOLERANCE,
+        build_domain,
+    )
+except ImportError:  # Direct script execution.
+    from benchmark import (  # type: ignore  # noqa: E402
+        DEFAULT_CONFIG,
+        FEM_BOUNDARY_RESOLUTION,
+        FEM_MAX_ITERATIONS,
+        FEM_MESH_SIZE,
+        FEM_TOLERANCE,
+        build_domain,
+    )
 
-from benchmark_common import build_domain
-from common_config import (
-    CHANNEL_X, CHANNEL_Y, CYLINDER_CY, CYLINDER_CX, CYLINDER_R,
-    FEM_BOUNDARY_RESOLUTION, FEM_DEFAULT_GRID, FEM_MAX_ITERATIONS,
-    FEM_MESH_SIZE, FEM_REFERENCE_FILENAME, FEM_TOLERANCE, PROFILE_POINTS,
-    RESULTS_DIR, REYNOLDS,
+from benchmarks.shared_harness.reference import (
+    CachedReference,
+    export_reference_cache,
+    load_cached_reference,
 )
 
 
-def _build_reference_domain():
-    return build_domain("uvp")
-
-
-def _sample_solution(reference, grid):
-    x_axis = np.linspace(*CHANNEL_X, grid[0])
-    y_axis = np.linspace(*CHANNEL_Y, grid[1])
-    query_x, query_y = np.meshgrid(x_axis, y_axis, indexing="ij")
-    fields = reference.reference_solution.evaluate(query_x, query_y, fields=("u", "v", "p"))
-    x = query_x.reshape(-1)
-    y = query_y.reshape(-1)
-
-    epsilon = 1.0e-6
-    outlet_y = np.linspace(
-        CHANNEL_Y[0] + epsilon, CHANNEL_Y[1] - epsilon, PROFILE_POINTS
-    )
-    outlet = reference.reference_solution.evaluate(
-        np.full_like(outlet_y, CHANNEL_X[1] - epsilon),
-        outlet_y,
-        fields=("u", "v"),
-    )
-    wake_x = np.linspace(
-        CYLINDER_CX + CYLINDER_R + epsilon,
-        CHANNEL_X[1] - epsilon,
-        PROFILE_POINTS,
-    )
-    wake = reference.reference_solution.evaluate(
-        wake_x, np.full_like(wake_x, CYLINDER_CY), fields=("u", "v")
-    )
-    return x, y, fields, outlet_y, outlet, wake_x, wake
-
-
-def solve_reference(grid=FEM_DEFAULT_GRID, mesh_size=FEM_MESH_SIZE, output_path=None):
-    print(f"DeepFlow FEM cylinder reference ({grid[0]} x {grid[1]} samples, Re={REYNOLDS:g})")
-    start = time.perf_counter()
-    domain = _build_reference_domain()
-    reference = domain.solve_fem(
+def solve_reference(
+    config=DEFAULT_CONFIG,
+    *,
+    mesh_size: float = FEM_MESH_SIZE,
+    boundary_resolution: int = FEM_BOUNDARY_RESOLUTION,
+    tolerance: float = FEM_TOLERANCE,
+    max_iterations: int = FEM_MAX_ITERATIONS,
+    output_path: Path | None = None,
+):
+    """Solve the cylinder domain with DeepFlow's canonical FEM entry point."""
+    reference_domain = build_domain("uvp", config)
+    reference = reference_domain.solve_fem(
         mesh_size=mesh_size,
-        boundary_resolution=FEM_BOUNDARY_RESOLUTION,
-        tolerance=FEM_TOLERANCE,
-        max_iterations=FEM_MAX_ITERATIONS,
+        boundary_resolution=boundary_resolution,
+        tolerance=tolerance,
+        max_iterations=max_iterations,
     )
-    x, y, fields, outlet_y, outlet, wake_x, wake = _sample_solution(reference, grid)
-    metadata = reference.metadata
-    residuals = np.asarray(metadata.get("solver_residuals", []), dtype=float)
-    mesh = metadata.get("mesh", {})
-    payload = {
-        "x": x,
-        "y": y,
-        "u": np.asarray(fields["u"]),
-        "v": np.asarray(fields["v"]),
-        "p": np.asarray(fields["p"]),
-        "outlet_y": outlet_y,
-        "outlet_u": np.asarray(outlet["u"]),
-        "outlet_v": np.asarray(outlet["v"]),
-        "wake_x": wake_x,
-        "wake_u": np.asarray(wake["u"]),
-        "wake_v": np.asarray(wake["v"]),
-        "nx": int(grid[0]),
-        "ny": int(grid[1]),
-        "reynolds": REYNOLDS,
-        "converged": int(metadata["converged"]),
-        "iterations": int(metadata["iterations"]),
-        "final_residual": float(residuals[-1]),
-        "runtime_s": time.perf_counter() - start,
-        "mesh_size": mesh_size,
-        "mesh_elements": mesh.get("elements", -1),
-        "mesh_vertices": mesh.get("vertices", -1),
-        "pressure_gauge": np.asarray("outlet_zero"),
-        "backend": np.asarray(metadata["backend"]),
-    }
-    if not payload["converged"]:
+    if not reference.metadata.get("converged", True):
         raise RuntimeError("DeepFlow FEM cylinder reference did not converge.")
     if output_path is not None:
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(output_path, **payload)
-    return payload
+        export_reference_cache(reference, output_path, config.eval_grid)
+    return reference
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--export-cache",
+        type=Path,
+        help="Explicitly export queried FEM values for later offline comparison.",
+    )
+    args = parser.parse_args(argv)
+    reference = solve_reference(
+        DEFAULT_CONFIG,
+        output_path=args.export_cache,
+    )
+    print("FEM cylinder reference converged")
+    if args.export_cache:
+        print(f"Offline cache: {args.export_cache}")
+    return reference
 
 
 if __name__ == "__main__":
-    solve_reference(output_path=RESULTS_DIR / FEM_REFERENCE_FILENAME)
+    main()
