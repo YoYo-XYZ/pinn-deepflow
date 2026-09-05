@@ -1,189 +1,270 @@
-"""Compare LHS, uniform, and R3 sampling for one Burgers RFFPINN."""
+"""Shared-harness Burgers RFFPINN sampling benchmark."""
 
 from __future__ import annotations
 
-import json
+import argparse
+import math
 import sys
-import time
-from datetime import datetime, timezone
+from dataclasses import replace
 from pathlib import Path
-
-import numpy as np
-import torch
-from torch import pi, sin
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[1]
-sys.path.insert(0, str(PROJECT_ROOT / "src"))
+PROJECT_SRC = PROJECT_ROOT / "src"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+if str(PROJECT_SRC) not in sys.path:
+    sys.path.insert(0, str(PROJECT_SRC))
 
 import deepflow as df  # noqa: E402
-
-
-SEED = 69
-NU = 0.01 / pi
-MODEL_KWARGS = dict(
-    input_vars=["x", "y"], output_vars=["u"], width=16, length=4,
-    embed_dim=256, alpha=5.0,
+from benchmarks.shared_harness import (  # noqa: E402
+    BenchmarkConfig,
+    build_burgers_domain,
+    collect_metrics,
+    evaluate_area,
+    plot_results,
+    save_model,
+    train_one,
+    write_markdown_report,
 )
-ADAM_EPOCHS = 1000
-LEARNING_RATE = 0.004
+
+
+NU = 0.01 / math.pi
+RFF_EMBED_DIM = 256
+RFF_ALPHA = 5.0
 R3_INTERVAL = 100
-BOUNDARY_POINTS = [512, 256, 256]
-INTERIOR_POINTS = [1024]
-UNIFORM_INTERIOR_RESOLUTION = [[32, 32]]
-EVALUATION_RESOLUTION = [161, 81]
+FEM_MESH_SIZE = 0.02
+FEM_TIME_STEP = 0.01
 RESULTS_DIR = SCRIPT_DIR / "results"
+REPORT_PATH = RESULTS_DIR / "REPORT.md"
+SCHEMES = ("lhs", "uniform", "r3")
+
+DEFAULT_CONFIG = BenchmarkConfig(
+    width=16,
+    depth=4,
+    learning_rate=0.004,
+    epochs_adam=1000,
+    epochs_lbfgs=0,
+    r3_interval=R3_INTERVAL,
+    seed=69,
+    boundary_points=[512, 256, 256],
+    interior_points=[[32, 32]],
+    eval_grid=[161, 81],
+    sampling="lhs",
+)
+
+SMOKE_CONFIG = replace(
+    DEFAULT_CONFIG,
+    width=8,
+    depth=2,
+    epochs_adam=2,
+    boundary_points=[8, 4, 4],
+    interior_points=[[4, 4]],
+    eval_grid=[8, 8],
+    r3_interval=1,
+)
 
 
-def build_domain():
-    area = df.geometry.rectangle([-1, 1], [0, 1])
-    initial = df.geometry.line_horizontal(y=0, range_x=[-1, 1])
-    left = df.geometry.line_vertical(x=-1, range_y=[0, 1])
-    right = df.geometry.line_vertical(x=1, range_y=[0, 1])
-    domain = df.domain(area.area_list, initial, left, right)
-    domain.area_list[0].define_pde(df.pde.BurgersEquation1D(nu=NU))
-    domain.bound_list[0].define_bc({"u": ["x", lambda x: -sin(pi * x)]})
-    domain.bound_list[1].define_bc({"u": 0})
-    domain.bound_list[2].define_bc({"u": 0})
-    return domain
+def _check_scheme(scheme: str) -> None:
+    if scheme not in SCHEMES:
+        raise ValueError(f"Unknown sampling scheme: {scheme!r}")
 
 
-def solve_reference():
-    domain = build_domain()
-    domain.area_list[0].define_time((0.0, 1.0), sampling_scheme="uniform", expo_scaling=False)
-    result = domain.solve_fem(
-        mesh_size=0.02, time_step=0.01, tolerance=1e-8, max_iterations=50,
-    )
-    area = domain.area_list[0]
-    x_axis = np.linspace(area.ranges[0][0], area.ranges[0][1], EVALUATION_RESOLUTION[0])
-    y_axis = np.linspace(area.ranges[1][0], area.ranges[1][1], EVALUATION_RESOLUTION[1])
-    x, y = np.meshgrid(x_axis, y_axis, indexing="ij")
-    values = result.reference_solution.evaluate(x, y, fields=("u",))
-    data = {
-        "x": x.reshape(-1),
-        "y": y.reshape(-1),
-        "u_ref": np.asarray(values["u"]).reshape(-1),
-    }
-    return data, result.metadata
+def _initial_sampling(scheme: str) -> str:
+    _check_scheme(scheme)
+    return "lhs" if scheme == "r3" else scheme
 
 
-def predict(model, data):
-    parameter = next(model.parameters())
-    inputs = {
-        key: torch.as_tensor(data[key], dtype=parameter.dtype, device=parameter.device)
-        for key in ("x", "y")
-    }
-    model.eval()
-    with torch.no_grad():
-        return model(inputs)["u"].detach().cpu().numpy()
-
-
-def metrics(prediction, reference, time_values):
-    error = prediction - reference
-    final = np.isclose(time_values, 1.0)
-    return {
-        "relative_l2": float(np.linalg.norm(error) / np.linalg.norm(reference)),
-        "final_time_relative_l2": float(
-            np.linalg.norm(error[final]) / np.linalg.norm(reference[final])
-        ),
-        "rmse": float(np.sqrt(np.mean(error**2))),
-        "mae": float(np.mean(np.abs(error))),
-        "max_abs_error": float(np.max(np.abs(error))),
-    }
-
-
-def train(scheme, reference_data):
-    df.manual_seed(SEED)
-    domain = build_domain()
-    if scheme == "uniform":
-        domain.sampling_uniform(BOUNDARY_POINTS, UNIFORM_INTERIOR_RESOLUTION)
+def config_for_scheme(scheme: str, config: BenchmarkConfig) -> BenchmarkConfig:
+    """Return the shared config with only this scheme's sampling changed."""
+    initial_sampling = _initial_sampling(scheme)
+    if scheme == "r3":
+        r3_interval = config.r3_interval or R3_INTERVAL
     else:
-        domain.sampling_lhs(BOUNDARY_POINTS, INTERIOR_POINTS)
-
-    df.manual_seed(SEED)
-    model = df.RFFPINN(**MODEL_KWARGS)
-    loss_function = df.calc_loss_simple(domain)
-
-    def resample(epoch, _model):
-        if scheme == "r3" and epoch % R3_INTERVAL == 0 and epoch < ADAM_EPOCHS:
-            domain.sampling_R3(BOUNDARY_POINTS, INTERIOR_POINTS)
-
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-    start = time.perf_counter()
-    trained_model, _ = model.train_adam(
-        learning_rate=LEARNING_RATE,
-        epochs=ADAM_EPOCHS,
-        calc_loss=loss_function,
-        print_every=ADAM_EPOCHS,
-        do_between_epochs=resample,
+        r3_interval = 0
+    return replace(
+        config,
+        sampling=initial_sampling,
+        r3_interval=r3_interval,
     )
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-    elapsed = time.perf_counter() - start
 
-    prediction = predict(trained_model, reference_data)
-    result_metrics = metrics(prediction, reference_data["u_ref"], reference_data["y"])
-    result_metrics.update(
-        train_time_s=elapsed,
-        final_training_loss=float(loss_function(trained_model)["total_loss"].detach().cpu()),
+
+def build_domain(
+    scheme: str = "lhs", config: BenchmarkConfig = DEFAULT_CONFIG
+):
+    """Build one sampled Burgers domain through the shared builder."""
+    effective_config = config_for_scheme(scheme, config)
+    df.manual_seed(effective_config.seed)
+    return build_burgers_domain(
+        nu=NU,
+        boundary_points=list(effective_config.boundary_points),
+        interior_points=list(effective_config.interior_points),
+        sampling=effective_config.sampling,
     )
-    history = {key: np.asarray(value) for key, value in trained_model.loss_history.items()}
-    torch.save(
-        {
-            "model_class": "RFFPINN",
-            "model_kwargs": MODEL_KWARGS,
-            "state_dict": {key: value.detach().cpu() for key, value in trained_model.state_dict().items()},
-            "loss_history": {key: value.tolist() for key, value in history.items()},
-            "sampling_scheme": scheme,
-            "seed": SEED,
-        },
-        RESULTS_DIR / f"rffpinn_{scheme}_checkpoint.pt",
+
+
+def build_model(config: BenchmarkConfig):
+    """Construct the one RFFPINN model used by every sampling scheme."""
+    return df.RFFPINN(
+        input_vars=["x", "y"],
+        output_vars=["u"],
+        width=config.width,
+        length=config.depth,
+        embed_dim=RFF_EMBED_DIM,
+        alpha=RFF_ALPHA,
     )
-    return result_metrics, prediction, history
 
 
-def main():
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    print("Solving FEM reference...")
-    reference, fem_metadata = solve_reference()
-    if not fem_metadata["converged"]:
-        raise RuntimeError("FEM reference did not converge")
-
-    all_metrics, predictions, histories = {}, {}, {}
-    for scheme in ("lhs", "uniform", "r3"):
-        print(f"\nTraining RFFPINN with {scheme} sampling...")
-        all_metrics[scheme], predictions[scheme], histories[scheme] = train(scheme, reference)
-
-    payload = {
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "device": str(df.device),
-        "dtype": str(df.get_dtype()),
-        "config": {
-            "seed": SEED, "adam_epochs": ADAM_EPOCHS, "lbfgs_epochs": 0,
-            "learning_rate": LEARNING_RATE, "alpha": MODEL_KWARGS["alpha"],
-            "embed_dim": MODEL_KWARGS["embed_dim"], "boundary_points": BOUNDARY_POINTS,
-            "interior_points": 1024, "uniform_interior_resolution": [32, 32],
-            "r3_interval": R3_INTERVAL,
-        },
-        "models": all_metrics,
+def run_variant(
+    scheme: str,
+    config: BenchmarkConfig,
+    output_dir: Path,
+    reference_solution=None,
+) -> dict:
+    """Train, evaluate, save, and report one sampling scheme."""
+    effective_config = config_for_scheme(scheme, config)
+    domain = build_domain(scheme, config)
+    model, training_info = train_one(
+        domain,
+        lambda: build_model(effective_config),
+        effective_config,
+    )
+    evaluator = evaluate_area(
+        domain, model, list(effective_config.eval_grid)
+    )
+    metrics = {
+        **training_info,
+        **collect_metrics(
+            evaluator,
+            model,
+            reference_solution=reference_solution,
+        ),
+        "sampling_scheme": scheme,
+        "initial_sampling": effective_config.sampling,
+        "r3_interval": effective_config.r3_interval,
+        "trainable_parameters": sum(
+            parameter.numel() for parameter in model.parameters()
+        ),
     }
-    (RESULTS_DIR / "metrics.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    np.savez_compressed(
-        RESULTS_DIR / "fields.npz", x=reference["x"], y=reference["y"],
-        u_fem=reference["u_ref"], **{f"u_{key}": value for key, value in predictions.items()},
+    model_path = save_model(
+        model, Path(output_dir) / f"rffpinn_{scheme}"
     )
-    np.savez_compressed(
-        RESULTS_DIR / "training_history.npz",
-        **{f"{scheme}_{key}": value for scheme, history in histories.items() for key, value in history.items()},
+    artifacts = [model_path]
+    artifacts.extend(
+        plot_results(evaluator, output_dir, prefix=f"rffpinn_{scheme}")
     )
-    from plot_results import main as plot_results
-    plot_results()
+    return {
+        "scheme": scheme,
+        "config": effective_config,
+        "model": model,
+        "domain": domain,
+        "evaluator": evaluator,
+        "metrics": metrics,
+        "artifacts": artifacts,
+    }
 
+
+def run_suite(
+    config: BenchmarkConfig = DEFAULT_CONFIG,
+    output_dir: Path = RESULTS_DIR,
+    reference_solution=None,
+) -> dict:
+    """Run all sampling schemes through the shared benchmark harness."""
+    output_dir = Path(output_dir)
+    results = {
+        scheme: run_variant(
+            scheme,
+            config,
+            output_dir,
+            reference_solution=reference_solution,
+        )
+        for scheme in SCHEMES
+    }
+
+    report_metrics = {
+        "sampling_schemes": ", ".join(SCHEMES),
+        "rff_embed_dim": RFF_EMBED_DIM,
+        "rff_alpha": RFF_ALPHA,
+        "nu": NU,
+    }
+    artifacts = []
+    for scheme, result in results.items():
+        report_metrics.update(
+            {
+                f"{scheme}_{key}": value
+                for key, value in result["metrics"].items()
+            }
+        )
+        artifacts.extend(result["artifacts"])
+    report = write_markdown_report(
+        output_dir / REPORT_PATH.name,
+        "Burgers RFFPINN sampling benchmark",
+        config,
+        report_metrics,
+        artifacts,
+    )
+    return {"variants": results, "report": report, "artifacts": artifacts}
+
+
+def solve_reference(config: BenchmarkConfig = DEFAULT_CONFIG):
+    """Solve the shared Burgers domain with the optional FEM backend."""
+    reference = build_domain("lhs", config).solve_fem(
+        mesh_size=FEM_MESH_SIZE,
+        time_step=FEM_TIME_STEP,
+        tolerance=1e-8,
+        max_iterations=50,
+    )
+    if not reference.metadata.get("converged", True):
+        raise RuntimeError("FEM reference did not converge")
+    return reference
+
+
+def _parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Run the small CPU-friendly suite without solving FEM.",
+    )
+    parser.add_argument(
+        "--no-reference",
+        action="store_true",
+        help="Skip the optional FEM reference solve.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=RESULTS_DIR,
+        help="Directory for native models, plots, and the report.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = _parse_args(argv)
+    config = SMOKE_CONFIG if args.smoke else DEFAULT_CONFIG
+    reference = None
+    if not args.smoke and not args.no_reference:
+        try:
+            print("Solving FEM reference...")
+            reference = solve_reference(config)
+        except (ImportError, OSError) as exc:
+            print(f"Skipping optional FEM reference: {exc}")
+
+    result = run_suite(config, args.output_dir, reference_solution=reference)
     print("\nSampling comparison")
-    for scheme, values in all_metrics.items():
-        print(f"{scheme:7s} L2={values['relative_l2']:.6f}, final={values['final_time_relative_l2']:.6f}, time={values['train_time_s']:.2f}s")
+    for scheme, values in result["variants"].items():
+        metrics = values["metrics"]
+        summary = (
+            f"{scheme:7s} total loss={metrics['final_total_loss']:.6e}, "
+            f"PDE residual={metrics.get('mean_abs_pde_residual', float('nan')):.6e}"
+        )
+        if "relative_l2" in metrics:
+            summary += f", relative L2={metrics['relative_l2']:.6e}"
+        print(summary)
+    print(f"Report: {result['report']}")
+    return result
 
 
 if __name__ == "__main__":

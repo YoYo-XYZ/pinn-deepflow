@@ -35,7 +35,7 @@ def train_one(domain, model_factory: Callable, config: BenchmarkConfig):
     Args:
         domain: Sampled problem domain.
         model_factory: Zero-arg callable returning a fresh model.
-        config: Shared training knobs (seed, lr, epochs).
+        config: Shared training knobs (seed, lr, epochs, and point counts).
 
     Returns:
         Tuple ``(best_model, info)`` where info holds timing and final
@@ -47,12 +47,18 @@ def train_one(domain, model_factory: Callable, config: BenchmarkConfig):
 
     resample = None
     if config.r3_interval > 0:
+        r3_area_points = [
+            entry[0] * entry[1]
+            if isinstance(entry, (list, tuple))
+            else entry
+            for entry in config.interior_points
+        ]
 
         def resample(epoch, _model):
             if epoch < config.epochs_adam and epoch % config.r3_interval == 0:
                 domain.sampling_R3(
                     list(config.boundary_points),
-                    list(config.interior_points),
+                    r3_area_points,
                 )
 
     if config.epochs_adam > 0:
