@@ -47,6 +47,7 @@ nav:                           # Your menu structure – edit as you add pages
   - Home: index.md
   - Quick Start: quickstart.md
   - Installation: install.md
+  - Model Persistence: persistence.md
   - Examples:
     - Overview: examples.md
     - Steady problems:

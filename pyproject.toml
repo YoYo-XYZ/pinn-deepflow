@@ -22,7 +22,7 @@ classifiers = [
 ]
 urls = {Homepage = "https://github.com/YoYo-XYZ/pinn-deepflow"}
 dependencies = [
-    "torch>=1.7.0",
+    "torch>=1.13.0",
     "numpy>=1.19.0",
     "matplotlib>=3.3.0",
     "sympy>=1.5.0",

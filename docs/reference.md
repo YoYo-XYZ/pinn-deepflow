@@ -68,6 +68,14 @@ DeepFlow source code. Private implementation helpers are intentionally omitted.
         - RFFPINN
         - load_from_pickle
 
+## Model Persistence
+
+::: deepflow._persistence
+    options:
+      members:
+        - ModelPersistenceError
+        - load_model
+
 ## Evaluation
 
 ::: deepflow.evaluation
