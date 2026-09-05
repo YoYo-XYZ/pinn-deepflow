@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from importlib import metadata
 from numbers import Real
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Mapping
 
 import torch
@@ -102,29 +103,37 @@ def _require_string_list(value: Any, label: str) -> list[str]:
     return list(value)
 
 
-_ACTIVATION_CLASSES = {
-    "tanh": nn.Tanh,
-    "sigmoid": nn.Sigmoid,
-    "relu": nn.ReLU,
-    "leaky_relu": nn.LeakyReLU,
-    "elu": nn.ELU,
-    "gelu": nn.GELU,
-    "silu": nn.SiLU,
-    "softplus": nn.Softplus,
-    "identity": nn.Identity,
-}
-_ACTIVATION_NAMES = {activation: name for name, activation in _ACTIVATION_CLASSES.items()}
-_ACTIVATION_ARGUMENTS = {
-    "tanh": {},
-    "sigmoid": {},
-    "relu": {"inplace": "bool"},
-    "leaky_relu": {"negative_slope": "real", "inplace": "bool"},
-    "elu": {"alpha": "real", "inplace": "bool"},
-    "gelu": {"approximate": "approximate"},
-    "silu": {"inplace": "bool"},
-    "softplus": {"beta": "real", "threshold": "real"},
-    "identity": {},
-}
+_ACTIVATION_CLASSES = MappingProxyType(
+    {
+        "tanh": nn.Tanh,
+        "sigmoid": nn.Sigmoid,
+        "relu": nn.ReLU,
+        "leaky_relu": nn.LeakyReLU,
+        "elu": nn.ELU,
+        "gelu": nn.GELU,
+        "silu": nn.SiLU,
+        "softplus": nn.Softplus,
+        "identity": nn.Identity,
+    }
+)
+_ACTIVATION_NAMES = MappingProxyType(
+    {activation: name for name, activation in _ACTIVATION_CLASSES.items()}
+)
+_ACTIVATION_ARGUMENTS = MappingProxyType(
+    {
+        "tanh": MappingProxyType({}),
+        "sigmoid": MappingProxyType({}),
+        "relu": MappingProxyType({"inplace": "bool"}),
+        "leaky_relu": MappingProxyType(
+            {"negative_slope": "real", "inplace": "bool"}
+        ),
+        "elu": MappingProxyType({"alpha": "real", "inplace": "bool"}),
+        "gelu": MappingProxyType({"approximate": "approximate"}),
+        "silu": MappingProxyType({"inplace": "bool"}),
+        "softplus": MappingProxyType({"beta": "real", "threshold": "real"}),
+        "identity": MappingProxyType({}),
+    }
+)
 
 
 def _normalize_activation_argument(value: Any, kind: str, label: str) -> Any:

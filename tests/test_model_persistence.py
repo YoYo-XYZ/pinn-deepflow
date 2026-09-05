@@ -7,6 +7,15 @@ import torch.nn as nn
 import deepflow as df
 
 
+class CustomActivation(nn.Module):
+    def forward(self, inputs):
+        return inputs
+
+
+class TanhSubclass(nn.Tanh):
+    pass
+
+
 @pytest.fixture(autouse=True)
 def restore_deepflow_configuration():
     original_device = df.device
@@ -109,20 +118,30 @@ def test_supported_model_types_round_trip(tmp_path, model_class, model_kwargs):
 
 
 @pytest.mark.parametrize(
-    "activation",
+    ("activation", "activation_identifier", "activation_kwargs"),
     [
-        nn.Tanh(),
-        nn.Sigmoid(),
-        nn.ReLU(inplace=True),
-        nn.LeakyReLU(negative_slope=0.2, inplace=True),
-        nn.ELU(alpha=2.0, inplace=True),
-        nn.GELU(approximate="tanh"),
-        nn.SiLU(inplace=True),
-        nn.Softplus(beta=2.0, threshold=10.0),
-        nn.Identity(),
+        (nn.Tanh(), "tanh", {}),
+        (nn.Sigmoid(), "sigmoid", {}),
+        (nn.ReLU(inplace=True), "relu", {"inplace": True}),
+        (
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            "leaky_relu",
+            {"negative_slope": 0.2, "inplace": True},
+        ),
+        (nn.ELU(alpha=2.0, inplace=True), "elu", {"alpha": 2.0, "inplace": True}),
+        (nn.GELU(approximate="tanh"), "gelu", {"approximate": "tanh"}),
+        (nn.SiLU(inplace=True), "silu", {"inplace": True}),
+        (
+            nn.Softplus(beta=2.0, threshold=10.0),
+            "softplus",
+            {"beta": 2.0, "threshold": 10.0},
+        ),
+        (nn.Identity(), "identity", {}),
     ],
 )
-def test_registered_activation_configuration_round_trip(tmp_path, activation):
+def test_registered_activation_configuration_round_trip(
+    tmp_path, activation, activation_identifier, activation_kwargs
+):
     df.device = "cpu"
     model = df.PINN(
         input_vars=["x", "y"],
@@ -133,13 +152,55 @@ def test_registered_activation_configuration_round_trip(tmp_path, activation):
     )
     path = tmp_path / "activation.pt"
     model.save(path)
+
+    artifact = torch.load(path, map_location="cpu", weights_only=True)
+    assert artifact["model"]["config"]["activation"] == {
+        "type": activation_identifier,
+        "kwargs": activation_kwargs,
+    }
+
     loaded = df.load_model(path, device="cpu")
 
     assert type(loaded.activation) is type(activation)
     assert loaded(_small_inputs())["u"].equal(model(_small_inputs())["u"])
-    for name in ("inplace", "negative_slope", "alpha", "approximate", "beta", "threshold"):
-        if hasattr(activation, name):
-            assert getattr(loaded.activation, name) == getattr(activation, name)
+    for name, value in activation_kwargs.items():
+        assert getattr(loaded.activation, name) == value
+
+
+@pytest.mark.parametrize("activation", [CustomActivation(), TanhSubclass()])
+def test_unsupported_activation_is_rejected_before_destination_changes(
+    tmp_path, activation
+):
+    df.device = "cpu"
+    path = tmp_path / "activation.pt"
+    path.write_bytes(b"previous artifact")
+    model = df.PINN(
+        input_vars=["x", "y"],
+        output_vars=["u"],
+        width=3,
+        length=1,
+        activation=activation,
+    )
+
+    with pytest.raises(df.ModelPersistenceError):
+        model.save(path)
+
+    assert path.read_bytes() == b"previous artifact"
+
+
+def test_artifact_activation_identifier_cannot_direct_an_import(tmp_path):
+    df.device = "cpu"
+    path = tmp_path / "activation.pt"
+    df.PINN(input_vars=["x", "y"], output_vars=["u"], width=3, length=1).save(path)
+    artifact = torch.load(path, map_location="cpu", weights_only=True)
+    artifact["model"]["config"]["activation"] = {
+        "type": "torch.nn.ReLU",
+        "kwargs": {},
+    }
+    torch.save(artifact, path)
+
+    with pytest.raises(df.ModelPersistenceError):
+        df.load_model(path, device="cpu")
 
 
 def test_dtype_and_default_device_are_not_global_load_settings(tmp_path):
