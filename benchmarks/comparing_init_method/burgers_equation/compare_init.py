@@ -1,95 +1,205 @@
-#!/usr/bin/env python3
-"""
-Compare DeepFlow Burgers-equation performance with Kaiming-uniform (DeepFlow's
-current default) and Glorot-normal (the alternative).
+"""Shared-harness Burgers initialization benchmark."""
 
-This is a standalone, benchmark-specific comparison. It uses the explicit
-Latin-hypercube sampling protocol in ``common_config.py`` and is not an exact
-reproduction of the reference notebook.
-"""
+from __future__ import annotations
 
+import argparse
+import math
 import sys
 from pathlib import Path
 
-from torch import pi, sin
 
-_BENCHMARK_DIR = Path(__file__).resolve().parents[1]
-if str(_BENCHMARK_DIR) not in sys.path:
-    sys.path.insert(0, str(_BENCHMARK_DIR))
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parents[2]
+PROJECT_SRC = PROJECT_ROOT / "src"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+if str(PROJECT_SRC) not in sys.path:
+    sys.path.insert(0, str(PROJECT_SRC))
 
-from benchmark_utils import (  # noqa: E402
-    add_project_src,
-    print_summary,
-    run_comparison,
-    save_field_plot,
-)
-
-add_project_src(__file__)
 import deepflow as df  # noqa: E402
-from common_config import (  # noqa: E402
-    BOUNDARY_POINTS,
-    BENCHMARK_METADATA,
-    DEPTH,
-    EPOCHS,
-    EVAL_GRID,
-    INTERIOR_POINTS,
-    LR,
-    NU,
-    SEED,
-    WIDTH,
-    X_RANGE,
-    Y_RANGE,
+from benchmarks.shared_harness import (  # noqa: E402
+    BenchmarkConfig,
+    build_burgers_domain,
+    collect_metrics,
+    evaluate_area,
+    plot_results,
+    save_model,
+    train_one,
+    write_markdown_report,
 )
 
 
-def build_domain():
-    area = df.geometry.rectangle(list(X_RANGE), list(Y_RANGE))
-    line_ic = df.geometry.line_horizontal(y=Y_RANGE[0], range_x=list(X_RANGE))
-    line_bc1 = df.geometry.line_vertical(x=X_RANGE[0], range_y=list(Y_RANGE))
-    line_bc2 = df.geometry.line_vertical(x=X_RANGE[1], range_y=list(Y_RANGE))
-    domain = df.domain(area.area_list, line_ic, line_bc1, line_bc2)
+NU = 0.01 / math.pi
+RESULTS_DIR = SCRIPT_DIR / "results"
+REPORT_PATH = RESULTS_DIR / "REPORT.md"
+INITIALIZATIONS = ("Kaiming-uniform", "Glorot-normal")
+WEIGHT_INITS = {
+    "Kaiming-uniform": "kaiming",
+    "Glorot-normal": "glorot",
+}
 
-    domain.area_list[0].define_pde(df.pde.BurgersEquation1D(nu=NU))
-    domain.bound_list[0].define_bc({"u": ["x", lambda x: -sin(pi * x)]})
-    domain.bound_list[1].define_bc({"u": 0})
-    domain.bound_list[2].define_bc({"u": 0})
+DEFAULT_CONFIG = BenchmarkConfig(
+    width=16,
+    depth=4,
+    learning_rate=0.004,
+    epochs_adam=4000,
+    epochs_lbfgs=0,
+    seed=69,
+    boundary_points=[1000, 500, 500],
+    interior_points=[4000],
+    eval_grid=[500, 250],
+    sampling="lhs",
+)
 
-    domain.sampling_lhs(BOUNDARY_POINTS, INTERIOR_POINTS)
-    return domain
+SMOKE_CONFIG = BenchmarkConfig(
+    width=8,
+    depth=2,
+    learning_rate=0.004,
+    epochs_adam=2,
+    epochs_lbfgs=0,
+    seed=69,
+    boundary_points=[8, 4, 4],
+    interior_points=[16],
+    eval_grid=[8, 8],
+    sampling="lhs",
+)
 
 
-def main():
-    results = run_comparison(
-        df,
-        build_domain,
-        seed=SEED,
+def build_domain(config: BenchmarkConfig = DEFAULT_CONFIG):
+    """Build one paired Burgers domain through the shared domain builder."""
+    df.manual_seed(config.seed)
+    return build_burgers_domain(
+        nu=NU,
+        boundary_points=list(config.boundary_points),
+        interior_points=list(config.interior_points),
+        sampling=config.sampling,
+    )
+
+
+def build_model(initialization: str, config: BenchmarkConfig = DEFAULT_CONFIG):
+    """Construct the PINN variant for one initialization arm."""
+    try:
+        weight_init = WEIGHT_INITS[initialization]
+    except KeyError as exc:
+        raise ValueError(f"Unknown initialization: {initialization!r}") from exc
+    return df.PINN(
         input_vars=["x", "y"],
         output_vars=["u"],
-        width=WIDTH,
-        depth=DEPTH,
-        learning_rate=LR,
-        epochs=EPOCHS,
-        eval_grid=EVAL_GRID,
-        residual_keys={"max_pde_residual": "pde_residual"},
-        field_names=["u"],
+        width=config.width,
+        length=config.depth,
+        weight_init=weight_init,
     )
-    print_summary(
-        results,
-        [
-            ("final_total", "Final total loss"),
-            ("final_bc", "Final BC loss"),
-            ("final_pde", "Final PDE loss"),
-            ("max_pde_residual", "Max |PDE residual|"),
-            ("time", "Train time (s)"),
-        ],
-        metadata=BENCHMARK_METADATA,
+
+
+def run_variant(
+    initialization: str,
+    config: BenchmarkConfig,
+    output_dir: Path,
+) -> dict:
+    """Train, evaluate, persist, and report one initialization arm."""
+    domain = build_domain(config)
+    model, training_info = train_one(
+        domain,
+        lambda: build_model(initialization, config),
+        config,
     )
-    save_field_plot(
-        results,
-        "u",
-        Path(__file__).parent / "results" / "init_u_field.png",
-        "u-field figure",
+    evaluator = evaluate_area(domain, model, list(config.eval_grid))
+    metrics = {
+        **training_info,
+        **collect_metrics(evaluator, model),
+        "initialization": initialization,
+        "weight_init": WEIGHT_INITS[initialization],
+        "trainable_parameters": sum(
+            parameter.numel() for parameter in model.parameters()
+        ),
+    }
+    model_path = save_model(
+        model,
+        Path(output_dir) / f"burgers_{WEIGHT_INITS[initialization]}",
     )
+    artifacts = [model_path]
+    artifacts.extend(
+        plot_results(
+            evaluator,
+            output_dir,
+            prefix=f"burgers_{WEIGHT_INITS[initialization]}",
+        )
+    )
+    return {
+        "initialization": initialization,
+        "model": model,
+        "domain": domain,
+        "evaluator": evaluator,
+        "metrics": metrics,
+        "artifacts": artifacts,
+    }
+
+
+def run_suite(
+    config: BenchmarkConfig = DEFAULT_CONFIG,
+    output_dir: Path = RESULTS_DIR,
+) -> dict:
+    """Run both initialization arms through the shared harness."""
+    output_dir = Path(output_dir)
+    results = {
+        initialization: run_variant(initialization, config, output_dir)
+        for initialization in INITIALIZATIONS
+    }
+
+    report_metrics = {
+        "initializations": ", ".join(INITIALIZATIONS),
+        "nu": NU,
+    }
+    artifacts = []
+    for initialization, result in results.items():
+        report_metrics.update(
+            {
+                f"{WEIGHT_INITS[initialization]}_{key}": value
+                for key, value in result["metrics"].items()
+            }
+        )
+        artifacts.extend(result["artifacts"])
+    report = write_markdown_report(
+        output_dir / REPORT_PATH.name,
+        "Burgers initialization benchmark",
+        config,
+        report_metrics,
+        artifacts,
+    )
+    return {"variants": results, "report": report, "artifacts": artifacts}
+
+
+def _parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="Run the small CPU-friendly suite.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=RESULTS_DIR,
+        help="Directory for native models, plots, and the report.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = _parse_args(argv)
+    config = SMOKE_CONFIG if args.smoke else DEFAULT_CONFIG
+    result = run_suite(config, args.output_dir)
+    print("\nBurgers initialization comparison")
+    for initialization, values in result["variants"].items():
+        metrics = values["metrics"]
+        print(
+            f"{initialization:16s} total loss="
+            f"{metrics['final_total_loss']:.6e}, "
+            f"PDE residual="
+            f"{metrics.get('mean_abs_pde_residual', float('nan')):.6e}"
+        )
+    print(f"Report: {result['report']}")
+    return result
 
 
 if __name__ == "__main__":
