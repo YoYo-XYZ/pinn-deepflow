@@ -1,12 +1,4 @@
-# Repository Guidelines
-
-## Project Structure & Module Organization
-
-DeepFlow is a Python package using a `src` layout. Core APIs and implementations live in `src/deepflow/` (`geometry.py`, `domain.py`, `pde.py`, `nn.py`, `physicsinformed.py`, and related utilities). Regression and unit tests are in `tests/`; runnable scientific examples are grouped under `examples/`, while comparative experiments and benchmark scripts are under `EXPERIMENTS/` and `benchmarks/`. User documentation and the MkDocs site are in `docs/`; images and other site assets are in `static/`.
-
-The intended and correct usage of the DeepFlow API is demonstrated in `examples/`.
-
-## Coding Style & Naming Conventions
+## Coding Style
 
 ### 1. Simplicity First
 
