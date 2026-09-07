@@ -16,6 +16,18 @@ class TanhSubclass(nn.Tanh):
     pass
 
 
+class FNNSubclass(df.FNN):
+    pass
+
+
+class PINNSubclass(df.PINN):
+    pass
+
+
+class RFFPINNSubclass(df.RFFPINN):
+    pass
+
+
 @pytest.fixture(autouse=True)
 def restore_deepflow_configuration():
     original_device = df.device
@@ -322,6 +334,133 @@ def test_unsupported_model_behavior_is_rejected_before_writing(tmp_path):
     assert path.read_bytes() == b"previous"
 
 
+def test_unsupported_weight_initialization_value_is_rejected_before_writing(tmp_path):
+    path = tmp_path / "model.pt"
+    path.write_bytes(b"previous")
+    model = df.PINN(input_vars=["x"], output_vars=["u"], width=3, length=1)
+    model.weight_init = "orthogonal"
+
+    with pytest.raises(df.ModelPersistenceError, match="initialization"):
+        model.save(path)
+
+    assert path.read_bytes() == b"previous"
+
+
+def test_save_preserves_model_and_torch_state(tmp_path):
+    df.device = "cpu"
+    df.dtype = torch.float64
+    model = df.PINN(
+        input_vars=["x", "y"], output_vars=["u"], width=3, length=1
+    )
+    model.eval()
+    expected_state = _state_copy(model)
+    expected_history = {key: list(value) for key, value in model.loss_history.items()}
+    expected_dtype = next(model.parameters()).dtype
+    expected_device = next(model.parameters()).device
+    random_state = torch.get_rng_state()
+
+    model.save(tmp_path / "model.pt")
+
+    assert model.training is False
+    assert model.loss_history == expected_history
+    assert next(model.parameters()).dtype == expected_dtype
+    assert next(model.parameters()).device == expected_device
+    assert torch.equal(torch.get_rng_state(), random_state)
+    for key, value in expected_state.items():
+        assert torch.equal(model.state_dict()[key], value)
+
+
+@pytest.mark.parametrize(
+    ("model_class", "model_kwargs"),
+    [
+        (FNNSubclass, {"hidden_layer": [3]}),
+        (PINNSubclass, {"width": 3, "length": 1}),
+        (RFFPINNSubclass, {"width": 3, "length": 1, "embed_dim": 4}),
+    ],
+)
+def test_supported_model_subclasses_are_rejected_before_writing(
+    tmp_path, model_class, model_kwargs
+):
+    path = tmp_path / "model.pt"
+    path.write_bytes(b"previous")
+    model = model_class(input_vars=["x"], output_vars=["u"], **model_kwargs)
+
+    with pytest.raises(df.ModelPersistenceError, match="custom model subclasses"):
+        model.save(path)
+
+    assert path.read_bytes() == b"previous"
+
+
+def test_rff_configuration_drift_is_rejected_before_writing(tmp_path):
+    path = tmp_path / "model.pt"
+    path.write_bytes(b"previous")
+    model = df.RFFPINN(
+        input_vars=["x", "y"],
+        output_vars=["u"],
+        width=3,
+        length=1,
+        embed_dim=4,
+        alpha=2.0,
+    )
+    model.alpha = 3.0
+
+    with pytest.raises(df.ModelPersistenceError, match="architecture"):
+        model.save(path)
+
+    assert path.read_bytes() == b"previous"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda model: model.net.register_parameter(
+            "extra", nn.Parameter(torch.zeros(1))
+        ),
+        lambda model: setattr(
+            model.net[0],
+            "weight",
+            nn.Parameter(torch.zeros((4, 2))),
+        ),
+    ],
+)
+def test_state_structure_drift_is_rejected_before_writing(tmp_path, mutate):
+    path = tmp_path / "model.pt"
+    path.write_bytes(b"previous")
+    model = df.PINN(
+        input_vars=["x", "y"], output_vars=["u"], width=3, length=1
+    )
+    mutate(model)
+
+    with pytest.raises(df.ModelPersistenceError, match="state"):
+        model.save(path)
+
+    assert path.read_bytes() == b"previous"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda artifact: artifact["state_dict"].pop("net.0.weight"),
+        lambda artifact: artifact["state_dict"].__setitem__(
+            "extra", torch.zeros(1)
+        ),
+        lambda artifact: artifact["state_dict"].__setitem__(
+            "net.0.weight", torch.zeros((4, 2))
+        ),
+    ],
+)
+def test_state_structure_mismatch_fails_strictly(tmp_path, mutate):
+    df.device = "cpu"
+    path = tmp_path / "model.pt"
+    df.PINN(input_vars=["x", "y"], output_vars=["u"], width=3, length=1).save(path)
+    artifact = torch.load(path, weights_only=True)
+    mutate(artifact)
+    torch.save(artifact, path)
+
+    with pytest.raises(df.ModelPersistenceError, match="Strict state restoration"):
+        df.load_model(path, device="cpu")
+
+
 def test_restricted_loader_uses_cpu_and_weights_only(tmp_path, monkeypatch):
     df.device = "cpu"
     model = df.PINN(input_vars=["x", "y"], output_vars=["u"], width=3, length=1)
@@ -347,7 +486,7 @@ def test_version_mismatch_emits_one_warning_and_still_loads(tmp_path):
     path = tmp_path / "model.pt"
     model.save(path)
     artifact = torch.load(path, weights_only=True)
-    artifact["versions"] = {"deepflow": "0.0.0", "torch": "0.0.0"}
+    artifact["versions"] = {"deepflow": "old-deepflow", "torch": "old-torch"}
     torch.save(artifact, path)
 
     with warnings.catch_warnings(record=True) as recorded:
@@ -356,7 +495,43 @@ def test_version_mismatch_emits_one_warning_and_still_loads(tmp_path):
 
     assert isinstance(loaded, df.PINN)
     assert len(recorded) == 1
-    assert "0.0.0" in str(recorded[0].message)
+    assert "old-deepflow" in str(recorded[0].message)
+    assert "old-torch" in str(recorded[0].message)
+
+
+def test_restricted_load_does_not_retry_or_use_pickle(tmp_path, monkeypatch):
+    df.device = "cpu"
+    path = tmp_path / "model.pt"
+    df.PINN(input_vars=["x", "y"], output_vars=["u"], width=3, length=1).save(path)
+
+    calls = []
+
+    def fail_load(*args, **kwargs):
+        calls.append(kwargs)
+        raise RuntimeError("restricted load failed")
+
+    monkeypatch.setattr(torch, "load", fail_load)
+    with pytest.raises(df.ModelPersistenceError, match="deserialize"):
+        df.load_model(path, device="cpu")
+
+    assert calls == [{"map_location": "cpu", "weights_only": True}]
+
+
+def test_invalid_load_device_preserves_global_and_torch_state(tmp_path):
+    df.device = "cpu"
+    df.dtype = torch.float64
+    path = tmp_path / "model.pt"
+    df.PINN(input_vars=["x", "y"], output_vars=["u"], width=3, length=1).save(path)
+    random_state = torch.get_rng_state()
+    default_dtype = torch.get_default_dtype()
+
+    with pytest.raises(df.ModelPersistenceError, match="place"):
+        df.load_model(path, device="not-a-device")
+
+    assert df.device == "cpu"
+    assert df.dtype == torch.float64
+    assert torch.get_default_dtype() == default_dtype
+    assert torch.equal(torch.get_rng_state(), random_state)
 
 
 @pytest.mark.parametrize("mutation", [
