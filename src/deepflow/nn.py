@@ -526,8 +526,10 @@ class NN(ABC, nn.Module):
         retain their dynamically defined constraint functions.
 
         Pickle loading is intended for trusted files because deserialization
-        can execute Python code. Use ``save`` for the restricted `.pt` format
-        when the model fits its supported data-only representation.
+        can execute Python code. It is the trusted-file-only fallback for
+        hard constraints and other Python behavior; use ``save`` for the
+        restricted `.pt` format when the model fits its supported data-only
+        representation.
 
         Args:
             file_name: Output path. The ``.pkl`` suffix is added when absent.
@@ -564,7 +566,9 @@ def load_from_pickle(file_name: str) -> NN:
     The loader also accepts legacy files produced with the standard pickle
     module.
 
-    Pickle files must be trusted because loading can execute Python code.
+    Pickle is the trusted-file-only fallback for hard constraints and other
+    Python behavior. Pickle files must be trusted because loading can execute
+    Python code.
 
     Args:
         file_name: Pickle path. The ``.pkl`` suffix is added when absent.

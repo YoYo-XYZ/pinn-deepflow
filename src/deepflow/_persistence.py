@@ -16,7 +16,7 @@ from typing import Any, Mapping
 import torch
 from torch import nn
 
-from .nn import FNN, NN, PINN, RFFPINN
+from .nn import FNN, NN, PINN, RFFPINN, _JointRFFEmbedding
 from .utility import get_device
 
 
@@ -209,7 +209,8 @@ def _weight_init_config(value: Any) -> str | None:
     if type(value) is not str or value.lower() not in _WEIGHT_INIT_NAMES:
         _raise(
             "Restricted .pt persistence supports only the built-in weight "
-            "initialization aliases or None."
+            "initialization aliases or None; use the trusted pickle interface "
+            "for other initialization behavior."
         )
     return value
 
@@ -218,7 +219,10 @@ def _common_model_config(model: NN) -> dict[str, Any]:
     input_vars = _require_string_list(model.input_keys, "input variables")
     output_vars = _require_string_list(model.output_keys, "output variables")
     if model.input_num != len(input_vars) or model.output_num != len(output_vars):
-        _raise("The model's declared input/output dimensions do not match its names")
+        _raise(
+            "The model's declared input/output dimensions do not match its names; "
+            "use the trusted pickle interface instead."
+        )
 
     return {
         "input_vars": input_vars,
@@ -293,7 +297,8 @@ def _model_spec(model: NN) -> tuple[str, dict[str, Any]]:
         if hidden_layer != [width for _ in range(length)]:
             _raise(
                 "A PINN's declared width and length do not match its "
-                "reconstructible architecture."
+                "reconstructible architecture; use the trusted pickle interface "
+                "instead."
             )
         config = {
             **common,
@@ -310,7 +315,8 @@ def _model_spec(model: NN) -> tuple[str, dict[str, Any]]:
     if hidden_layer != [width for _ in range(length)]:
         _raise(
             "An RFFPINN's declared width and length do not match its "
-            "reconstructible architecture."
+            "reconstructible architecture; use the trusted pickle interface "
+            "instead."
         )
     embed_dim = _require_int(model.embed_dim, "embed_dim", minimum=1)
     if embed_dim % 2:
@@ -426,37 +432,55 @@ def _dtype_for_state(state: Mapping[str, torch.Tensor]) -> tuple[torch.dtype, st
         _raise("All floating state tensors must use one supported DeepFlow dtype")
     dtype = next(iter(floating_dtypes))
     if dtype not in _DTYPE_NAMES:
-        _raise(f"Unsupported model dtype for restricted persistence: {dtype}")
+        _raise(
+            "Unsupported model dtype for restricted persistence: "
+            f"{dtype}; use the trusted pickle interface instead."
+        )
     return dtype, _DTYPE_NAMES[dtype]
 
 
-def _module_signature(model: nn.Module) -> list[tuple[str, type[nn.Module]]]:
-    return [(name, type(module)) for name, module in model.named_modules()]
+def _module_configuration(module: nn.Module) -> tuple[Any, ...] | None:
+    if type(module) is nn.Linear:
+        return (
+            "linear",
+            module.in_features,
+            module.out_features,
+            module.bias is not None,
+        )
+    if type(module) in _ACTIVATION_NAMES:
+        return ("activation", _activation_config(module))
+    if type(module) is _JointRFFEmbedding:
+        return (
+            "rff_embedding",
+            module.input_dim,
+            module.embed_dim,
+            module.alpha,
+        )
+    return None
 
 
-def _activation_signature(model: nn.Module) -> list[tuple[str, dict[str, Any]]]:
-    result = []
-    for name, module in model.named_modules():
-        if type(module) in _ACTIVATION_NAMES:
-            result.append((name, _activation_config(module)))
-    return result
+def _module_signature(
+    model: nn.Module,
+) -> list[tuple[str, type[nn.Module], tuple[Any, ...] | None]]:
+    return [
+        (name, type(module), _module_configuration(module))
+        for name, module in model.named_modules()
+    ]
 
 
 def _compare_model_structure(model: NN, expected: NN) -> None:
     if _module_signature(model) != _module_signature(expected):
         _raise(
-            "The model network topology or module types changed after construction; "
-            "the restricted artifact cannot be reconstructed."
-        )
-    if _activation_signature(model) != _activation_signature(expected):
-        _raise(
-            "The model activation configuration does not match its reconstructible "
-            "network."
+            "The model network topology or architecture/module configuration "
+            "changed after construction; "
+            "the restricted artifact cannot be reconstructed; use the trusted "
+            "pickle interface instead."
         )
     if getattr(model, "layer_list", None) != getattr(expected, "layer_list", None):
         _raise(
             "The model's declared architecture does not match its network; "
-            "the restricted artifact cannot be reconstructed."
+            "the restricted artifact cannot be reconstructed; use the trusted "
+            "pickle interface instead."
         )
 
 
@@ -465,7 +489,9 @@ def _compare_state_structure(
     expected_state: Mapping[str, torch.Tensor],
     *,
     require_cpu: bool = False,
+    include_pickle_hint: bool = False,
 ) -> None:
+    hint = " Use the trusted pickle interface instead." if include_pickle_hint else ""
     state_keys = set(state.keys())
     expected_keys = set(expected_state.keys())
     missing = sorted(expected_keys - state_keys)
@@ -473,24 +499,27 @@ def _compare_state_structure(
     if missing or unexpected:
         _raise(
             "Strict state restoration failed: "
-            f"missing={missing}, unexpected={unexpected}"
+            f"missing={missing}, unexpected={unexpected}.{hint}"
         )
     for key in expected_state:
         value = state[key]
         expected_value = expected_state[key]
         if type(value) is not torch.Tensor:
-            _raise(f"Invalid state_dict entry {key!r}: expected a tensor")
+            _raise(
+                f"Invalid state_dict entry {key!r}: expected a tensor.{hint}"
+            )
         if require_cpu and value.device.type != "cpu":
             _raise(f"Invalid state_dict entry {key!r}: expected a CPU tensor")
         if tuple(value.shape) != tuple(expected_value.shape):
             _raise(
                 f"Strict state restoration failed for {key!r}: "
-                f"expected shape {tuple(expected_value.shape)}, got {tuple(value.shape)}"
+                f"expected shape {tuple(expected_value.shape)}, "
+                f"got {tuple(value.shape)}.{hint}"
             )
         if value.dtype != expected_value.dtype:
             _raise(
                 f"Strict state restoration failed for {key!r}: "
-                f"expected dtype {expected_value.dtype}, got {value.dtype}"
+                f"expected dtype {expected_value.dtype}, got {value.dtype}.{hint}"
             )
 
 
@@ -592,7 +621,7 @@ def _artifact_for_model(model: NN) -> dict[str, Any]:
     dtype, _ = _dtype_for_state(state)
     expected.to(dtype=dtype)
     expected_state = expected.state_dict()
-    _compare_state_structure(state, expected_state)
+    _compare_state_structure(state, expected_state, include_pickle_hint=True)
     _, dtype_name = _dtype_for_state(state)
     history = _copy_loss_history(
         model.loss_history,
@@ -744,16 +773,17 @@ def load_model(file_name: Any, *, device: Any = None) -> NN:
             model.to(dtype=dtype)
             _compare_state_structure(state, model.state_dict(), require_cpu=True)
             model.load_state_dict(state, strict=True)
+            model.loss_history = {key: list(values) for key, values in history.items()}
+            model.eval()
     except ModelPersistenceError:
         raise
     except Exception as exc:
         _raise("Could not strictly reconstruct the restricted DeepFlow model", exc)
 
-    model.loss_history = {key: list(values) for key, values in history.items()}
-    model.eval()
     try:
-        target_device = torch.device(get_device() if device is None else device)
-        model.to(target_device)
+        with _preserve_torch_state():
+            target_device = torch.device(get_device() if device is None else device)
+            model.to(target_device)
     except Exception as exc:
         target = get_device() if device is None else device
         _raise(f"Could not place the loaded model on device {target!r}", exc)
