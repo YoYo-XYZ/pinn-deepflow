@@ -517,34 +517,54 @@ def _preserve_torch_state():
         torch.set_default_dtype(default_dtype)
 
 
-def _construct_model(model_type: str, config: Mapping[str, Any]) -> NN:
-    activation = _activation_from_config(config["activation"])
-    common = {
+def _constructor_common(config: Mapping[str, Any]) -> dict[str, Any]:
+    return {
         "input_vars": list(config["input_vars"]),
         "output_vars": list(config["output_vars"]),
-        "activation": activation,
+        "activation": _activation_from_config(config["activation"]),
         "weight_init": config["weight_init"],
     }
+
+
+def _fnn_codec(config: Mapping[str, Any]) -> FNN:
+    return FNN(hidden_layer=list(config["hidden_layer"]), **_constructor_common(config))
+
+
+def _pinn_codec(config: Mapping[str, Any]) -> PINN:
+    return PINN(
+        width=config["width"],
+        length=config["length"],
+        **_constructor_common(config),
+    )
+
+
+def _rffpinn_codec(config: Mapping[str, Any]) -> RFFPINN:
+    return RFFPINN(
+        width=config["width"],
+        length=config["length"],
+        embed_dim=config["embed_dim"],
+        alpha=config["alpha"],
+        **_constructor_common(config),
+    )
+
+
+_MODEL_CODECS = MappingProxyType(
+    {
+        "FNN": _fnn_codec,
+        "PINN": _pinn_codec,
+        "RFFPINN": _rffpinn_codec,
+    }
+)
+
+
+def _construct_model(model_type: str, config: Mapping[str, Any]) -> NN:
+    codec = _MODEL_CODECS.get(model_type)
+    if codec is None:
+        _raise(f"Unsupported model identifier: {model_type!r}")
     try:
-        if model_type == "FNN":
-            return FNN(hidden_layer=list(config["hidden_layer"]), **common)
-        if model_type == "PINN":
-            return PINN(
-                width=config["width"],
-                length=config["length"],
-                **common,
-            )
-        if model_type == "RFFPINN":
-            return RFFPINN(
-                width=config["width"],
-                length=config["length"],
-                embed_dim=config["embed_dim"],
-                alpha=config["alpha"],
-                **common,
-            )
+        return codec(config)
     except Exception as exc:
         _raise(f"Could not reconstruct saved {model_type} model", exc)
-    _raise(f"Unsupported model identifier: {model_type!r}")
 
 
 def _artifact_for_model(model: NN) -> dict[str, Any]:

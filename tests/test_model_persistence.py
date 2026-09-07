@@ -75,15 +75,22 @@ def test_pinn_pt_round_trip_through_public_interfaces(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("model_class", "model_kwargs"),
+    ("model_class", "model_kwargs", "model_identifier"),
     [
-        (df.FNN, {"hidden_layer": [4, 3]}),
-        (df.PINN, {"width": 4, "length": 2}),
-        (df.RFFPINN, {"width": 4, "length": 2, "embed_dim": 8, "alpha": 2.0}),
+        (df.FNN, {"hidden_layer": [4, 3]}, "FNN"),
+        (df.PINN, {"width": 4, "length": 2}, "PINN"),
+        (
+            df.RFFPINN,
+            {"width": 4, "length": 2, "embed_dim": 8, "alpha": 2.0},
+            "RFFPINN",
+        ),
     ],
 )
-def test_supported_model_types_round_trip(tmp_path, model_class, model_kwargs):
+def test_supported_model_types_round_trip(
+    tmp_path, model_class, model_kwargs, model_identifier
+):
     df.device = "cpu"
+    df.dtype = torch.float64
     model = model_class(
         input_vars=["x", "y"],
         output_vars=["u"],
@@ -92,25 +99,35 @@ def test_supported_model_types_round_trip(tmp_path, model_class, model_kwargs):
     model.loss_history["total_loss"] = [3.0]
     model.loss_history["bc_loss"] = [1.0]
     model.loss_history["pde_loss"] = [2.0]
-    expected = model(_small_inputs())
+    model.train()
+    expected = model(_small_inputs(torch.float64))
 
     path = tmp_path / f"{model_class.__name__}.pt"
     model.save(path)
-    loaded = df.load_model(path, device="cpu")
+    loaded = df.load_model(path)
+    artifact = torch.load(path, map_location="cpu", weights_only=True)
 
     assert type(loaded) is model_class
+    assert artifact["model"]["type"] == model_identifier
     assert loaded.input_keys == model.input_keys
     assert loaded.output_keys == model.output_keys
     assert loaded.hidden_layer == model.hidden_layer
     assert loaded.loss_history == model.loss_history
-    assert all(
-        torch.equal(loaded_state, model_state)
-        for loaded_state, model_state in zip(
-            loaded.state_dict().values(), model.state_dict().values()
-        )
-    )
-    actual = loaded(_small_inputs())
+    assert loaded.training is False
+    assert all(parameter.dtype == torch.float64 for parameter in loaded.parameters())
+    loaded_state = loaded.state_dict()
+    expected_state = model.state_dict()
+    assert set(loaded_state) == set(expected_state)
+    for key, expected_value in expected_state.items():
+        actual_value = loaded_state[key]
+        assert actual_value.device.type == "cpu"
+        assert actual_value.dtype == expected_value.dtype
+        assert torch.equal(actual_value, expected_value)
+    actual = loaded(_small_inputs(torch.float64))
     assert all(torch.equal(actual[key], expected[key]) for key in expected)
+    if isinstance(model, df.PINN):
+        assert loaded.width == model.width
+        assert loaded.length == model.length
     if isinstance(model, df.RFFPINN):
         assert loaded.embed_dim == model.embed_dim
         assert loaded.alpha == model.alpha
