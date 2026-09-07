@@ -104,7 +104,7 @@ def test_supported_model_types_round_trip(
 
     path = tmp_path / f"{model_class.__name__}.pt"
     model.save(path)
-    loaded = df.load_model(path, device="cpu")
+    loaded = df.load_model(path)
     artifact = torch.load(path, map_location="cpu", weights_only=True)
 
     assert type(loaded) is model_class
@@ -115,12 +115,14 @@ def test_supported_model_types_round_trip(
     assert loaded.loss_history == model.loss_history
     assert loaded.training is False
     assert all(parameter.dtype == torch.float64 for parameter in loaded.parameters())
-    assert all(
-        torch.equal(loaded_state, model_state)
-        for loaded_state, model_state in zip(
-            loaded.state_dict().values(), model.state_dict().values()
-        )
-    )
+    loaded_state = loaded.state_dict()
+    expected_state = model.state_dict()
+    assert set(loaded_state) == set(expected_state)
+    for key, expected_value in expected_state.items():
+        actual_value = loaded_state[key]
+        assert actual_value.device.type == "cpu"
+        assert actual_value.dtype == expected_value.dtype
+        assert torch.equal(actual_value, expected_value)
     actual = loaded(_small_inputs(torch.float64))
     assert all(torch.equal(actual[key], expected[key]) for key in expected)
     if isinstance(model, df.PINN):
