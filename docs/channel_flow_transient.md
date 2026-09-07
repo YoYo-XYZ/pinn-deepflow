@@ -130,8 +130,8 @@ domain.show_coordinates()
 Save (and reload) the trained model:
 
 ```python
-model2.save_as_pickle("model.pkl")
-model2 = df.load_from_pickle("model.pkl")
+model2.save("model.pt")
+model2 = df.load_model("model.pt")
 ```
 
 ## 5. Visualize the solution

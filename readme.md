@@ -70,7 +70,7 @@ pip install -e .
 ## Requirements
 
 - Python >= 3.10
-- PyTorch >= 1.7.0
+- PyTorch >= 1.13.0
 - NumPy >= 1.19.0
 - Matplotlib >= 3.3.0
 - SymPy >= 1.5.0

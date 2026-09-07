@@ -17,6 +17,7 @@ except ImportError as exc:
     if exc.name != "pennylane":
         raise
 from .evaluation import *
+from ._persistence import ModelPersistenceError, load_model
 from .utility import (
     get_device,
     get_dtype,
