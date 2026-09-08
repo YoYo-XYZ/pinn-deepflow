@@ -41,8 +41,9 @@ domain.show_setup()
 ## 2. Define the physics
 
 Attach the Burgers PDE to the area and the boundary/initial conditions to the
-lines. DeepFlow uses hard boundary conditions, so `define_bc` both constrains
-the network and generates the training data:
+lines. Numeric and function-valued conditions are soft by default. Constant
+conditions can be made hard with `df.hard_constraint(...)`; domain loss
+evaluation configures those constraints automatically:
 
 ```python
 from torch import sin, pi

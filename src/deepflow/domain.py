@@ -75,6 +75,7 @@ class ProblemDomain():
         self.bound_list = bound_list
         self.area_list = area_list
         self.sampling_option = None
+        self._hard_constraints_model = None
         
         for g in self.bound_list + self.area_list:
             if isinstance(g, CustomData):
@@ -95,7 +96,19 @@ class ProblemDomain():
         """
         from .evaluation import GroupEvaluator
 
+        self._configure_hard_constraints(model)
         return GroupEvaluator(model, self)
+
+    def _configure_hard_constraints(self, model) -> None:
+        """Apply this domain's hard constraints to a model once."""
+        apply_constraints = getattr(model, "apply_hard_constraints", None)
+        if apply_constraints is None:
+            return
+        if self._hard_constraints_model is model:
+            return
+
+        apply_constraints(self.bound_list + self.area_list)
+        self._hard_constraints_model = model
 
     def solve_fem(
         self,
@@ -500,6 +513,7 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         Assumes all geometries within the same physics-type group share the same
         ``inputs_tensor_dict`` keys.
         """
+        self._configure_hard_constraints(model)
         loss_dict = {"pde_loss": 0.0, "bc_loss": 0.0, "ic_loss": 0.0}
 
         # Group geometries by physics_type, preserving insertion order.
