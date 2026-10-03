@@ -44,6 +44,52 @@ def test_equal_aspect_subplot_forwards_effective_height(monkeypatch):
     ]
 
 
+def test_equal_aspect_subplot_leaves_default_height_adaptive(monkeypatch):
+    calls = []
+
+    def capture_subplot(self, *args, **kwargs):
+        calls.append((args, kwargs))
+        return None, None
+
+    monkeypatch.setattr(Visualizer, "_create_subplot", capture_subplot)
+
+    Visualizer({})._create_equal_aspect_subplot(
+        np.array([0.0, 1.0]),
+        np.array([0.0, 10.0]),
+    )
+
+    assert calls == [
+        ((), {"ref_width": pytest.approx(0.6)})
+    ]
+
+
+def test_plot_color_leaves_default_height_adaptive():
+    figure, _ = Visualizer(_field_data()).plot_color("u", return_ax=True)
+
+    assert figure._refheight is None
+
+
+def test_equal_aspect_subplot_honors_configured_height_limit(monkeypatch):
+    calls = []
+
+    def capture_subplot(self, *args, **kwargs):
+        calls.append((args, kwargs))
+        return None, None
+
+    monkeypatch.setattr(Visualizer, "_create_subplot", capture_subplot)
+    visualizer = Visualizer({})
+    visualizer.refheight_max_default = 4
+
+    visualizer._create_equal_aspect_subplot(
+        np.array([0.0, 1.0]),
+        np.array([0.0, 10.0]),
+    )
+
+    assert calls == [
+        ((), {"ref_width": pytest.approx(0.4), "ref_height": 4})
+    ]
+
+
 def test_plot_contour_renders_a_valid_2d_field():
     figure, axis = Visualizer(_field_data()).plot_contour("u", return_ax=True)
 

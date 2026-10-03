@@ -55,10 +55,10 @@ class Visualizer:
             refwidth_eff = min(max_width, max_height / (y_range / x_range))
         except Exception:
             return self._create_subplot(ref_width, ref_height)
-        return self._create_subplot(
-            ref_width=refwidth_eff,
-            ref_height=max_height,
-        )
+        subplot_kwargs = {"ref_width": refwidth_eff}
+        if ref_height is not None or self.refheight_max_default is not None:
+            subplot_kwargs["ref_height"] = max_height
+        return self._create_subplot(**subplot_kwargs)
 
     def plot_color(self, color_axis: str, x_axis: str = 'x', y_axis: str = 'y', cmap='viridis', s: Union[int, float] = 2, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
         """
