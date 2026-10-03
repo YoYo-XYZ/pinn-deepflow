@@ -32,18 +32,68 @@ class HardConstraint:
         self.constant = constant
 
     @staticmethod
-    def define_zero_func(bound):
-        """Create a function that vanishes on a boundary.
+    def define_zero_func(geometry):
+        """Create a differentiable factor that vanishes on a geometry.
 
         Args:
-            bound: Boundary whose parameterization defines the zero set.
+            geometry: Boundary or initial-condition area defining the zero set.
 
         Returns:
             Callable accepting a coordinate mapping and returning the signed
             distance-like constraint factor.
         """
+
+        # Import lazily to avoid the geometry/physics/NN import cycle.
+        from .geometry import Area, Bound
+
+        if isinstance(geometry, Area):
+            if geometry.physics_type != "IC":
+                raise ValueError(
+                    "Hard constraints on areas are supported only for initial conditions."
+                )
+            if geometry.range_t is None:
+                raise ValueError(
+                    "Area initial hard constraints require an initial time via define_time()."
+                )
+
+            initial_time = (
+                geometry.range_t[0]
+                if isinstance(geometry.range_t, (tuple, list))
+                else geometry.range_t
+            )
+
+            def zero_func(coords):
+                time = coords.get(2)
+                if time is None:
+                    raise ValueError(
+                        "Area initial hard constraints require model input 't'."
+                    )
+                return time - initial_time
+
+            return zero_func
+
+        if not isinstance(geometry, Bound):
+            raise ValueError(
+                "Hard constraints require a Bound or an initial-condition Area."
+            )
+
+        if geometry.ax == 2 or getattr(geometry, "parameterized", False):
+            raise ValueError(
+                "Hard constraints are not supported for parameterized curves; "
+                "use a soft condition instead."
+            )
+        if len(geometry.axes_sec) != 1:
+            raise ValueError("Hard constraints require a one-dimensional boundary.")
+
         def zero_func(coords):
-            return coords[bound.axes_sec[0]] - bound.funcs[bound.ax][0](coords[bound.ax])
+            reference = coords.get(geometry.ax)
+            dependent = coords.get(geometry.axes_sec[0])
+            if reference is None or dependent is None:
+                raise ValueError(
+                    "Hard boundary constraints require x and y model inputs."
+                )
+            return dependent - geometry.funcs[geometry.ax][0](reference)
+
         return zero_func
 
     def __str__(self):
@@ -194,7 +244,11 @@ class NN(ABC, nn.Module):
             
             # Apply hard constraints if they exist for this variable
             if self.hard_constraints and key in self.hard_constraints:
-                coords = {0: inputs_dict.get("x"), 1: inputs_dict.get("y")}
+                coords = {
+                    0: inputs_dict.get("x"),
+                    1: inputs_dict.get("y"),
+                    2: inputs_dict.get("t"),
+                }
                 constraint_mod = self.hard_constraints[key](coords)
                 val = constraint_mod * val + self.hard_constants[key]
                 
@@ -203,37 +257,44 @@ class NN(ABC, nn.Module):
         return output_dict
 
     def apply_hard_constraints(self, bound_list: list):
-        """Configure output constraints from a list of boundary objects.
+        """Configure output constraints from geometry objects.
 
         Args:
-            bound_list: Boundaries whose condition dictionaries may contain
-                ``HardConstraint`` values.
+            bound_list: Boundaries or areas whose condition dictionaries may
+                contain ``HardConstraint`` values.
 
         Raises:
-            ValueError: If boundaries impose different constants for the same
-                output field.
+            ValueError: If geometries impose different constants for the same
+                output field or use an unsupported geometry.
         """
         self.hard_constraints = {}
         self.hard_constants = {}
         
         for key in self.output_keys:
-            # Filter bounds relevant to this output key that are HardConstraints
-            relevant_bounds = [b for b in bound_list if isinstance(b.condition_dict.get(key), HardConstraint)]
+            relevant = []
+            for geometry in bound_list:
+                conditions = getattr(geometry, "condition_dict", None) or {}
+                condition = conditions.get(key)
+                if isinstance(condition, HardConstraint):
+                    relevant.append((geometry, condition))
 
-            if relevant_bounds:
+            if relevant:
                 # Check if the constants of relevant bounds are all the same
-                constants_list = [b.condition_dict[key].constant for b in relevant_bounds]
+                constants_list = [condition.constant for _, condition in relevant]
                 if not all(c == constants_list[0] for c in constants_list):
                     raise ValueError(f"Conflicting hard constraint constants for output '{key}'. All must be the same.")
                 
                 # Take constant from the first bound
-                self.hard_constants[key] = relevant_bounds[0].condition_dict[key].constant
+                self.hard_constants[key] = constants_list[0]
 
-                # Create closure for the constraint functiont(key)
-                def constraint_func(coords, bounds = relevant_bounds):
-                    result = 1.0
-                    for bound in bounds:
-                        zero_func = HardConstraint.define_zero_func(bound)
+                zero_funcs = [
+                    HardConstraint.define_zero_func(geometry)
+                    for geometry, _ in relevant
+                ]
+
+                def constraint_func(coords, zero_funcs=zero_funcs):
+                    result = zero_funcs[0](coords)
+                    for zero_func in zero_funcs[1:]:
                         result *= zero_func(coords)
                     return result
 

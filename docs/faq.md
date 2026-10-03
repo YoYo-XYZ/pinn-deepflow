@@ -70,14 +70,22 @@ def do_in_adam(epoch, model):
 
 ## What is the difference between hard and soft boundary conditions?
 
-DeepFlow's `define_bc` implements **hard boundary conditions**: the network
-output is constructed to satisfy the BC exactly by construction, so the BC
-term can be dropped from the loss. This is why `calc_loss_simple` returns
-clean physics-only training data. The IC (for transient problems) is handled
-the same way via `define_ic`. Consequences: no BC-vs-PDE loss weighting to
-tune, but not every condition can be enforced exactly — derivative
-conditions and certain custom conditions fall back to soft treatment (a
-residual term).
+Conditions are soft by default. To request a constant hard condition, wrap its
+value with `df.hard_constraint(...)`:
+
+```python
+domain.bound_list[0].define_bc({"u": df.hard_constraint(0.0)})
+```
+
+When using a domain loss function, DeepFlow configures supported hard
+constraints automatically. Straight graph-like boundaries and area-based
+initial conditions are supported; area initial conditions require a `t` model
+input and a time range. Arbitrary parametric curves currently remain soft.
+
+Hard constraints are represented in the model output, so their residual is
+zero when active. If a hard constraint is used directly without a domain loss,
+it remains in the residual rather than being silently discarded. Derivative,
+function-valued, and unsupported geometry conditions use soft treatment.
 
 ## Can I define a custom PDE?
 
