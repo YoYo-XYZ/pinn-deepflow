@@ -1,4 +1,4 @@
-# DeepFlow: Physics-Informed Neural Networks for Fluid Dynamics
+# DeepFlow: Physics-informed neural networks for fluid dynamics
 
 [![PyPI version](https://badge.fury.io/py/deepflow.svg)](https://badge.fury.io/py/deepflow)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/deepflow)
@@ -14,13 +14,18 @@ PINN-based simulations accessible and straightforward.
 
 ## Getting started
 
-- [**Quick Start**](quickstart.md) — solve steady channel flow in under 20 lines of code
-- [**Installation**](install.md) — pip, the `[cfd]` extra, and GPU setup
-- [**Examples**](examples.md) — a gallery of 6 worked cases, from Burgers' equation to transient channel flow
-- [**API reference**](reference.md) — full documentation of the `deepflow` package
+- [**Installation**](getting-started/install.md) — pip, the `[cfd]` extra, and GPU setup
+- [**Quick start**](getting-started/quickstart.md) — solve steady channel flow in under 20 lines of code
+- [**Model persistence**](guides/persistence.md) — save and load trained models
+- [**FAQ**](guides/faq.md) — training, sampling, and troubleshooting
+- [**Examples**](examples/index.md) — a gallery of 6 worked cases, from Burgers' equation to transient channel flow
+- [**API reference**](reference/index.md) — full documentation of the `deepflow` package
+- [**Contributing**](project/contributing.md) — development setup and contribution workflow
+- [**Changelog**](project/changelog.md) — release history
+- [**Citing DeepFlow**](project/cite.md) — citation details and background reading
 - [**GitHub repository**](https://github.com/YoYo-XYZ/pinn-deepflow) — source, long-form README, and issue tracker
 
-## Key Features
+## Key features
 
 ![promo](static/promo.png)
 
@@ -31,7 +36,7 @@ PINN-based simulations accessible and straightforward.
 - 🔢 **FP64 Precision**: Switch to double precision for improved PINN accuracy/stability.
 - **Flexible Domain Definition**: Easily define complex 2D geometries.
 
-## Current Implementations
+## Current implementations
 
 - **Supported problems**: solving **forward** partial differential equations (PDEs)
     - transient & steady 2D incompressible Navier-Stokes equations, 2D Fourier Heat equation, Burgers' equation

@@ -37,7 +37,7 @@ pip install -e .
 ```
 
 An editable install keeps the package in sync with the `src/` checkout — the
-right choice for development (see [Contributing](contributing.md)).
+right choice for development (see [Contributing](../project/contributing.md)).
 
 ## GPU / CUDA
 

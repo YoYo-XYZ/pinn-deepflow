@@ -1,4 +1,4 @@
-# Model Persistence
+# Model persistence
 
 DeepFlow's restricted PyTorch artifact is the default format for exact `FNN`,
 `PINN`, and `RFFPINN` models. Save through the model method and load through

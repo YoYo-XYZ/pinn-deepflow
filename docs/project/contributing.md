@@ -19,7 +19,15 @@ examples/              Runnable notebooks; one folder per example
 tests/                 Unit and regression tests (pytest)
 benchmarks/            Comparative benchmark scripts
 EXPERIMENTS/           Comparative experiments and reports
-docs/                  MkDocs site source
+docs/                  MkDocs site source and internal documentation
+  getting-started/     Installation and quickstart
+  guides/              Model persistence and FAQ
+  examples/            Worked example pages
+  reference/           Generated API reference directives
+  project/             Contributing, changelog, and citation
+  static/              Documentation images, videos, and notebooks
+  agents/              Internal agent instructions
+  adr/                 Architecture decisions
 static/                Images used by the GitHub README
 ```
 
@@ -96,4 +104,4 @@ build, so build locally before opening the PR.
 ## Release process
 
 Releases are tagged on `dev` (e.g. `v0.1.3`) and the changelog in
-[`docs/changelog.md`](changelog.md) is updated by hand per release.
+[`docs/project/changelog.md`](changelog.md) is updated by hand per release.

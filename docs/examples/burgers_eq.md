@@ -1,4 +1,4 @@
-# Solving the 1D Burgers Equation
+# Solving the 1D Burgers equation
 
 This example solves the one-dimensional Burgers equation in its steady 2D
 embedding — the equation DeepFlow models as `BurgersEquation1D`. It is a good
@@ -36,7 +36,7 @@ domain = df.domain(area.area_list, line_ic, line_bc1, line_bc2)
 domain.show_setup()
 ```
 
-![Domain setup](static/examples/burgers/domain_setup.png)
+![Domain setup](../static/examples/burgers/domain_setup.png)
 
 ## 2. Define the physics
 
@@ -64,7 +64,7 @@ domain.sampling_lhs([2000, 1000, 1000], [4000])
 domain.show_coordinates(display_physics=True)
 ```
 
-![Sampled coordinates](static/examples/burgers/sampling_coordinates.png)
+![Sampled coordinates](../static/examples/burgers/sampling_coordinates.png)
 
 ## 4. Train the model
 
@@ -104,7 +104,7 @@ set around the shock:
 domain.show_coordinates(display_physics=False)
 ```
 
-![R3-densified coordinates](static/examples/burgers/resampled_coordinates.png)
+![R3-densified coordinates](../static/examples/burgers/resampled_coordinates.png)
 
 ## 5. Visualize the solution
 
@@ -121,10 +121,10 @@ _ = prediction.plot('pde_residual')
 _ = prediction.plot_loss_curve(log_scale=True)
 ```
 
-![Velocity field](static/examples/burgers/velocity_field.png)
-![PDE residual (colormap)](static/examples/burgers/pde_residual_colormap.png)
-![PDE residual (profile)](static/examples/burgers/pde_residual_profile.png)
-![Loss curve](static/examples/burgers/loss_curve.png)
+![Velocity field](../static/examples/burgers/velocity_field.png)
+![PDE residual (colormap)](../static/examples/burgers/pde_residual_colormap.png)
+![PDE residual (profile)](../static/examples/burgers/pde_residual_profile.png)
+![Loss curve](../static/examples/burgers/loss_curve.png)
 
 The shock front is clearly visible as a thin band of high PDE residual. A
 1D slice at `y = 0.75` shows the steep front directly:
@@ -136,7 +136,7 @@ prediction.sampling_line(500)
 _ = prediction.plot(y_axis='u')
 ```
 
-![u at y = 0.75](static/examples/burgers/u_at_y0.75.png)
+![u at y = 0.75](../static/examples/burgers/u_at_y0.75.png)
 
 ## 6. Optional: FEM reference comparison
 

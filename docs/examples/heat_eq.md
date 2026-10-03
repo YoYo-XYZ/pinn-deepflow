@@ -1,4 +1,4 @@
-# Solving the 2D Unsteady Heat Equation
+# Solving the 2D unsteady heat equation
 
 This example solves the transient 2D Fourier heat equation on a square with a
 hot top boundary. It introduces DeepFlow's time handling: geometries are given
@@ -32,7 +32,7 @@ domain = df.domain(rectangle, rectangle1.area_list)
 domain.show_setup()
 ```
 
-![Domain setup](static/examples/heat/domain_setup.png)
+![Domain setup](../static/examples/heat/domain_setup.png)
 
 ## 2. Define the physics
 
@@ -51,13 +51,13 @@ for g in domain:
 domain.show_setup()
 ```
 
-![Physics setup](static/examples/heat/physics_setup.png)
+![Physics setup](../static/examples/heat/physics_setup.png)
 
 !!! note
     `define_time` without an explicit `expo_scaling` argument emits the
     warning `expo_scaling has not yet defined. False is set as default.` —
     that is expected behavior; pass `expo_scaling=False` to silence it (see
-    the [FAQ](faq.md)).
+    the [FAQ](../guides/faq.md)).
 
 ## 3. Sample training data
 
@@ -66,7 +66,7 @@ domain.sampling_lhs([1000, 1000, 2000, 1000], [2000, 2000])
 domain.show_coordinates(display_physics=True)
 ```
 
-![Sampled coordinates](static/examples/heat/sampling_coordinates.png)
+![Sampled coordinates](../static/examples/heat/sampling_coordinates.png)
 
 ## 4. Train the model
 
@@ -130,8 +130,8 @@ _.savefig('heat_eq_u.png', dpi=200)
 _ = prediction.plot_loss_curve(log_scale=True, keys=['total_loss'])
 ```
 
-![Temperature field at t = 0.5](static/examples/heat/temperature_field.png)
-![Loss curve](static/examples/heat/loss_curve.png)
+![Temperature field at t = 0.5](../static/examples/heat/temperature_field.png)
+![Loss curve](../static/examples/heat/loss_curve.png)
 
 Animate the solution over time:
 
@@ -148,7 +148,7 @@ prediction.plot_animate(
 ).save('heat_equation.mp4', dpi=200)
 ```
 
-<video controls src="static/examples/heat/heat_equation.mp4" width="100%"></video>
+<video controls src="../../static/examples/heat/heat_equation.mp4" width="100%"></video>
 
 ## 6. Optional: FEM reference comparison
 

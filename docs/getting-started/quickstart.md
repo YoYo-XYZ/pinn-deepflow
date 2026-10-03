@@ -1,8 +1,8 @@
-# Quick Start
+# Quick start
 
 This example demonstrates how to simulate Steady channel flow **under 20 lines of code!** We recommend using a Python notebook (`.ipynb`) for interactive experience.
 
-## 1. Define the Geometry and Physics
+## 1. Define the geometry and physics
 
 ```python
 import deepflow as df
@@ -13,7 +13,7 @@ domain = df.domain(rectangle)
 
 domain.show_setup() # Display the domain setup
 ```
-![alt text](static/quickstart/setup_show.png)
+![Channel geometry and boundaries](../static/quickstart/setup_show.png)
 ```python
 # Define Boundary Conditions
 domain.bound_list[0].define_bc({'u': 1, 'v': 0})  # Inflow: u=1
@@ -26,15 +26,15 @@ domain.area_list[0].define_pde(df.pde.NavierStokes(U=0.0001, L=1, mu=0.001, rho=
 
 domain.show_setup() # Display the domain setup
 ```
-![alt text](static/quickstart/cond_show.png)
+![Channel boundary conditions and Navier-Stokes physics](../static/quickstart/cond_show.png)
 
 ```python
 # Sample points: [Left, Bottom, Right, Top], [Interior]
 domain.sampling_random([200, 400, 200, 400], [5000])
 domain.show_coordinates(display_physics=True)
 ```
-![alt text](static/quickstart/coord_show.png)
-# 2. Create and Train the model
+![Sampled boundary and interior coordinates](../static/quickstart/coord_show.png)
+## 2. Create and train the model
 
 
 ```python
@@ -49,7 +49,7 @@ model1, model1_best = model0.train_adam(
     epochs=2000,)
 ```
 
-# 3. Visualize Results
+## 3. Visualize results
 ```python
 # Evaluate the best model
 prediction = domain.area_list[0].evaluate(model1_best)
@@ -61,10 +61,10 @@ _ = prediction.plot_color('u', cmap='jet')
 # Plot Training Loss
 _ =prediction.plot_loss_curve()
 ```
-![alt text](static/quickstart/flow_field.png)
-![alt text](static/quickstart/loss_curve.png)
+![Predicted channel velocity field](../static/quickstart/flow_field.png)
+![Training loss curve](../static/quickstart/loss_curve.png)
 
-# 4. Optional: Train in FP64 (Double Precision)
+## 4. Optional: Train in FP64 (double precision)
 
 Recent work on PINNs reports that double precision can improve convergence and
 accuracy. Enable FP64 globally before building the geometry or model:

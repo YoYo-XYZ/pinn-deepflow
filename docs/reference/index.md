@@ -1,4 +1,4 @@
-# API Reference
+# API reference
 
 This reference is generated from the public Google-style docstrings in the
 DeepFlow source code. Private implementation helpers are intentionally omitted.
@@ -21,7 +21,7 @@ DeepFlow source code. Private implementation helpers are intentionally omitted.
         - curve
         - point
 
-## Domains and Losses
+## Domains and losses
 
 ::: deepflow.domain
     options:
@@ -31,7 +31,7 @@ DeepFlow source code. Private implementation helpers are intentionally omitted.
         - calc_loss_simple
         - calc_loss_weighted
 
-## Physics Attachments
+## Physics attachments
 
 ::: deepflow.physicsinformed
     options:
@@ -55,7 +55,7 @@ DeepFlow source code. Private implementation helpers are intentionally omitted.
         - WaveEquation
         - BurgersEquation1D
 
-## Neural Networks
+## Neural networks
 
 ::: deepflow.nn
     options:
@@ -76,7 +76,7 @@ DeepFlow source code. Private implementation helpers are intentionally omitted.
         - save
         - save_as_pickle
 
-## Model Persistence
+## Model persistence
 
 ::: deepflow._persistence
     options:
@@ -116,14 +116,14 @@ DeepFlow source code. Private implementation helpers are intentionally omitted.
         - to_require_grad
         - torch_to_numpy
 
-## FEM Backend
+## FEM backend
 
 ::: deepflow.fem
     options:
       members:
         - solve_fem
 
-## Reference Solutions
+## Reference solutions
 
 ::: deepflow.reference
     options:
@@ -134,7 +134,7 @@ DeepFlow source code. Private implementation helpers are intentionally omitted.
         - ReferenceSolver
         - UnsupportedReferencePDE
 
-## Quantum Models (Experimental)
+## Quantum models (experimental)
 
 QPINN and QCPINN remain experimental in DeepFlow 0.1.3 and are not part of
 the stable API support commitment. They require PennyLane separately and are

@@ -1,4 +1,4 @@
-# Solving the Backward-Facing Step Flow (Steady)
+# Solving the backward-facing step flow (steady)
 
 This example solves steady flow over a backward-facing step — a standard
 benchmark for separated flows. After the step, the flow detaches and forms a
@@ -36,7 +36,7 @@ domain = df.domain(rectangle)
 domain.show_setup()
 ```
 
-![Domain setup](static/examples/bfs/domain_setup.png)
+![Domain setup](../static/examples/bfs/domain_setup.png)
 
 ## 2. Define the physics
 
@@ -51,7 +51,7 @@ domain.area_list[0].define_pde(df.NavierStokes(U=0.0001, L=1, mu=0.001, rho=1000
 domain.show_setup()
 ```
 
-![Physics setup](static/examples/bfs/physics_setup.png)
+![Physics setup](../static/examples/bfs/physics_setup.png)
 
 ## 3. Sample training data
 
@@ -60,7 +60,7 @@ domain.sampling_lhs(bound_sampling_res=[1000, 1000, 1000, 1000, 1000, 1000], are
 domain.show_coordinates(display_physics=False)
 ```
 
-![Sampled coordinates](static/examples/bfs/sampling_coordinates.png)
+![Sampled coordinates](../static/examples/bfs/sampling_coordinates.png)
 
 ## 4. Train the model
 
@@ -95,7 +95,7 @@ model2, model2_best = model1_best.train_lbfgs(
 domain.show_coordinates()
 ```
 
-![R3-densified coordinates](static/examples/bfs/resampled_coordinates.png)
+![R3-densified coordinates](../static/examples/bfs/resampled_coordinates.png)
 
 Save (and reload) the trained model:
 
@@ -123,12 +123,12 @@ _ = area_eval.plot_streamline('u', 'v', cmap='jet')
 _ = area_eval.plot_color('pde_residual', s=2, cmap='viridis')
 ```
 
-![Velocity magnitude](static/examples/bfs/velocity_magnitude.png)
-![u field](static/examples/bfs/u_field.png)
-![v field](static/examples/bfs/v_field.png)
-![Pressure field](static/examples/bfs/pressure_field.png)
-![Streamlines](static/examples/bfs/streamlines.png)
-![PDE residual](static/examples/bfs/pde_residual.png)
+![Velocity magnitude](../static/examples/bfs/velocity_magnitude.png)
+![u field](../static/examples/bfs/u_field.png)
+![v field](../static/examples/bfs/v_field.png)
+![Pressure field](../static/examples/bfs/pressure_field.png)
+![Streamlines](../static/examples/bfs/streamlines.png)
+![PDE residual](../static/examples/bfs/pde_residual.png)
 
 The streamlines reveal the recirculation zone behind the step — the hallmark
 of this benchmark. Residuals concentrate at the step corner and along the
@@ -138,7 +138,7 @@ reattaching shear layer.
 _ = area_eval.plot_loss_curve(log_scale=True)
 ```
 
-![Loss curve](static/examples/bfs/loss_curve.png)
+![Loss curve](../static/examples/bfs/loss_curve.png)
 
 ### Export data
 

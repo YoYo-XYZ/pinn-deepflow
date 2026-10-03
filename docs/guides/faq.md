@@ -110,7 +110,7 @@ pip install "deepflow[cfd]"
 The NGSolve/Netgen backend solves DeepFlow's built-in PDEs on unstructured
 meshes and returns a `ReferenceGroupEvaluator` with per-geometry fields
 (`u_ref`, `v_ref`, ...). See the FEM comparison section at the end of every
-[example page](examples.md).
+[example page](../examples/index.md).
 
 ## Why does `define_time` warn about `expo_scaling`?
 

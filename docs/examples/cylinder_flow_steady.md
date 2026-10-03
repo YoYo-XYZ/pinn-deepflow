@@ -1,4 +1,4 @@
-# Solving Steady Flow around a Cylinder
+# Solving steady flow around a cylinder
 
 This example solves steady incompressible flow around a circular cylinder in a
 channel — a classic benchmark for flow solvers, here following the setup of
@@ -38,7 +38,7 @@ domain = df.domain(area, circle.bound_list)
 domain.show_setup()
 ```
 
-![Domain setup](static/examples/cylinder/domain_setup.png)
+![Domain setup](../static/examples/cylinder/domain_setup.png)
 
 ## 2. Define the physics
 
@@ -53,7 +53,7 @@ domain.area_list[0].define_pde(df.NavierStokes(U=1, L=1, mu=0.02, rho=1))
 domain.show_setup()
 ```
 
-![Physics setup](static/examples/cylinder/physics_setup.png)
+![Physics setup](../static/examples/cylinder/physics_setup.png)
 
 ## 3. Sample training data
 
@@ -62,7 +62,7 @@ domain.sampling_lhs(bound_sampling_res=[1000, 1000, 1000, 1000, 1000, 1000], are
 domain.show_coordinates(display_physics=False)
 ```
 
-![Sampled coordinates](static/examples/cylinder/sampling_coordinates.png)
+![Sampled coordinates](../static/examples/cylinder/sampling_coordinates.png)
 
 ## 4. Train the model
 
@@ -96,7 +96,7 @@ model2, model2_best = model1_best.train_lbfgs(
 domain.show_coordinates()
 ```
 
-![R3-densified coordinates](static/examples/cylinder/resampled_coordinates.png)
+![R3-densified coordinates](../static/examples/cylinder/resampled_coordinates.png)
 
 Save (and reload) the trained model:
 
@@ -119,11 +119,11 @@ _ = area_eval.plot_streamline('u', 'v', cmap='jet')
 _ = area_eval.plot('pde_residual')
 ```
 
-![u field](static/examples/cylinder/u_field.png)
-![v field](static/examples/cylinder/v_field.png)
-![Pressure field](static/examples/cylinder/pressure_field.png)
-![Streamlines](static/examples/cylinder/streamlines.png)
-![PDE residual](static/examples/cylinder/pde_residual.png)
+![u field](../static/examples/cylinder/u_field.png)
+![v field](../static/examples/cylinder/v_field.png)
+![Pressure field](../static/examples/cylinder/pressure_field.png)
+![Streamlines](../static/examples/cylinder/streamlines.png)
+![PDE residual](../static/examples/cylinder/pde_residual.png)
 
 The streamlines show the steady recirculation zone behind the cylinder. The
 residual plot concentrates error near the cylinder and the inlet corners.
@@ -139,8 +139,8 @@ _ = bound_visual.plot_color('u', cmap='rainbow')
 _ = bound_visual.plot(x_axis='y', y_axis='u')
 ```
 
-![Outlet u (colormap)](static/examples/cylinder/outlet_u_colormap.png)
-![Outlet u profile](static/examples/cylinder/outlet_u_profile.png)
+![Outlet u (colormap)](../static/examples/cylinder/outlet_u_colormap.png)
+![Outlet u profile](../static/examples/cylinder/outlet_u_profile.png)
 
 Training loss:
 
@@ -148,7 +148,7 @@ Training loss:
 _ = bound_visual.plot_loss_curve(log_scale=True)
 ```
 
-![Loss curve](static/examples/cylinder/loss_curve.png)
+![Loss curve](../static/examples/cylinder/loss_curve.png)
 
 ### Export data
 

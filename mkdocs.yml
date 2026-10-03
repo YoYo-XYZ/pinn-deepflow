@@ -43,23 +43,26 @@ markdown_extensions:
   - attr_list
   - md_in_html
 
-nav:                           # Your menu structure – edit as you add pages
+nav:
   - Home: index.md
-  - Quick Start: quickstart.md
-  - Installation: install.md
-  - Model Persistence: persistence.md
+  - Getting started:
+    - Installation: getting-started/install.md
+    - Quick start: getting-started/quickstart.md
+  - Guides:
+    - Model persistence: guides/persistence.md
+    - FAQ: guides/faq.md
   - Examples:
-    - Overview: examples.md
+    - Overview: examples/index.md
     - Steady problems:
-      - Burgers' Equation: burgers_eq.md
-      - Lid-driven Cavity Flow: cavity_flow_steady.md
-      - Flow around a Cylinder: cylinder_flow_steady.md
-      - Backward-facing Step: BFS_flow_steady.md
+      - Burgers' equation: examples/burgers_eq.md
+      - Lid-driven cavity flow: examples/cavity_flow_steady.md
+      - Flow around a cylinder: examples/cylinder_flow_steady.md
+      - Backward-facing step: examples/BFS_flow_steady.md
     - Transient problems:
-      - Transient Channel Flow: channel_flow_transient.md
-      - 2D Heat Equation: heat_eq.md
-  - API: reference.md
-  - FAQ: faq.md
-  - Contributing: contributing.md
-  - Changelog: changelog.md
-  - Cite: cite.md
+      - Transient channel flow: examples/channel_flow_transient.md
+      - 2D heat equation: examples/heat_eq.md
+  - API reference: reference/index.md
+  - Project:
+    - Contributing: project/contributing.md
+    - Changelog: project/changelog.md
+    - Cite: project/cite.md

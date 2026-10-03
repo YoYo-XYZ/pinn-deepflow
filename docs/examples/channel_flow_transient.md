@@ -1,4 +1,4 @@
-# Solving the Transient Channel Flow
+# Solving the transient channel flow
 
 This example solves the start-up of incompressible flow in a channel: the
 fluid is initially at rest and accelerates under a parabolic inflow until a
@@ -37,7 +37,7 @@ domain = df.domain(rectangle_pde, rectange_ic.area_list)
 domain.show_setup()
 ```
 
-![Domain setup](static/examples/channel/domain_setup.png)
+![Domain setup](../static/examples/channel/domain_setup.png)
 
 ## 2. Define the physics
 
@@ -55,13 +55,13 @@ for geom in domain:
 domain.show_setup()
 ```
 
-![Physics setup](static/examples/channel/physics_setup.png)
+![Physics setup](../static/examples/channel/physics_setup.png)
 
 !!! note
     `define_time` without an explicit `expo_scaling` argument emits the
     warning `expo_scaling has not yet defined. False is set as default.` —
     that is expected; pass `expo_scaling=False` to silence it (see the
-    [FAQ](faq.md)).
+    [FAQ](../guides/faq.md)).
 
 ## 3. Sample training data
 
@@ -70,7 +70,7 @@ domain.sampling_lhs(bound_sampling_res=[1000, 1000, 1000, 1000], area_sampling_r
 domain.show_coordinates(display_physics=False)
 ```
 
-![Sampled coordinates](static/examples/channel/sampling_coordinates.png)
+![Sampled coordinates](../static/examples/channel/sampling_coordinates.png)
 
 ## 4. Train the model
 
@@ -125,7 +125,7 @@ model2, model2_best = model1_best.train_lbfgs(
 domain.show_coordinates()
 ```
 
-![R3-densified coordinates](static/examples/channel/resampled_coordinates.png)
+![R3-densified coordinates](../static/examples/channel/resampled_coordinates.png)
 
 Save (and reload) the trained model:
 
@@ -156,12 +156,12 @@ _ = area_eval.plot_streamline('u', 'v', cmap='jet')
 _ = area_eval.plot_color('pde_residual', s=2, cmap='viridis')
 ```
 
-![Velocity magnitude at t = 10](static/examples/channel/velocity_magnitude.png)
-![u field at t = 10](static/examples/channel/u_field.png)
-![v field at t = 10](static/examples/channel/v_field.png)
-![Pressure field at t = 10](static/examples/channel/pressure_field.png)
-![Streamlines at t = 10](static/examples/channel/streamlines.png)
-![PDE residual at t = 10](static/examples/channel/pde_residual.png)
+![Velocity magnitude at t = 10](../static/examples/channel/velocity_magnitude.png)
+![u field at t = 10](../static/examples/channel/u_field.png)
+![v field at t = 10](../static/examples/channel/v_field.png)
+![Pressure field at t = 10](../static/examples/channel/pressure_field.png)
+![Streamlines at t = 10](../static/examples/channel/streamlines.png)
+![PDE residual at t = 10](../static/examples/channel/pde_residual.png)
 
 Animate the `u` field from rest to quasi-steady state:
 
@@ -178,7 +178,7 @@ anim = area_eval.plot_animate(
 anim.save("animation.gif")
 ```
 
-![Start-up animation](static/examples/channel/animation.gif)
+![Start-up animation](../static/examples/channel/animation.gif)
 
 Training loss:
 
@@ -186,7 +186,7 @@ Training loss:
 _ = area_eval.plot_loss_curve(log_scale=True)
 ```
 
-![Loss curve](static/examples/channel/loss_curve.png)
+![Loss curve](../static/examples/channel/loss_curve.png)
 
 ### Export data
 

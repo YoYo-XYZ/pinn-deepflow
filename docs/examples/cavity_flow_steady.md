@@ -1,4 +1,4 @@
-# Solving the Lid-Driven Cavity Flow (Steady)
+# Solving the lid-driven cavity flow (steady)
 
 This example solves the classic lid-driven cavity benchmark — a square cavity
 whose top wall slides at constant velocity. It is a standard validation case
@@ -36,7 +36,7 @@ domain = df.domain(rectangle, point)
 domain.show_setup()
 ```
 
-![Domain setup](static/examples/cavity/domain_setup.png)
+![Domain setup](../static/examples/cavity/domain_setup.png)
 
 ## 2. Define the physics
 
@@ -50,7 +50,7 @@ domain.area_list[0].define_pde(df.NavierStokes(U=0.0001, L=1, mu=0.001, rho=1000
 domain.show_setup()
 ```
 
-![Physics setup](static/examples/cavity/physics_setup.png)
+![Physics setup](../static/examples/cavity/physics_setup.png)
 
 ## 3. Sample training data
 
@@ -61,7 +61,7 @@ domain.sampling_lhs(bound_sampling_res=[1000, 1000, 1000, 1000, 10], area_sampli
 domain.show_coordinates(display_physics=False)
 ```
 
-![Sampled coordinates](static/examples/cavity/sampling_coordinates.png)
+![Sampled coordinates](../static/examples/cavity/sampling_coordinates.png)
 
 ## 4. Train the model
 
@@ -101,7 +101,7 @@ points:
 domain.show_coordinates()
 ```
 
-![R3-densified coordinates](static/examples/cavity/resampled_coordinates.png)
+![R3-densified coordinates](../static/examples/cavity/resampled_coordinates.png)
 
 Save (and reload) the trained model:
 
@@ -131,11 +131,11 @@ _ = area_eval.plot_color('p', s=1.5, cmap='rainbow')
 _ = area_eval.plot_streamline('u', 'v', cmap='jet')
 ```
 
-![Velocity magnitude](static/examples/cavity/velocity_magnitude.png)
-![u field](static/examples/cavity/u_field.png)
-![v field](static/examples/cavity/v_field.png)
-![Pressure field](static/examples/cavity/pressure_field.png)
-![Streamlines](static/examples/cavity/streamlines.png)
+![Velocity magnitude](../static/examples/cavity/velocity_magnitude.png)
+![u field](../static/examples/cavity/u_field.png)
+![v field](../static/examples/cavity/v_field.png)
+![Pressure field](../static/examples/cavity/pressure_field.png)
+![Streamlines](../static/examples/cavity/streamlines.png)
 
 The streamlines show the primary clockwise vortex; the pressure field is
 pinned by the corner point condition. Plot the training loss:
@@ -144,7 +144,7 @@ pinned by the corner point condition. Plot the training loss:
 _ = area_eval.plot_loss_curve(log_scale=True)
 ```
 
-![Loss curve](static/examples/cavity/loss_curve.png)
+![Loss curve](../static/examples/cavity/loss_curve.png)
 
 ### Export data
 
