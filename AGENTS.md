@@ -1,23 +1,18 @@
-## Coding Style
+# DeepFlow
 
-### 1. Simplicity First
+DeepFlow is a user-freindly Python library for solving PDEs with PyTorch physics-informed neural networks, focused on fluid dynamics. Its notebook-oriented workflow follows a CFD solver: define geometry and physics, sample points, train, then evaluate and plot.
 
+## Codebase Practice
+
+1. Because examples/ are written and maintained by the author, treat each of examples/ as the source of truth on how Deepflow's should be used.
+
+2. Do not write .md files unless explicitly asked
+
+
+## Coding Principles
+
+1. Simplicity First
 Minimum code that solves the problem. No speculative features, no single-use abstractions, no unrequested config. If 200 lines could be 50, rewrite to prioritize maintainability.
 
-### 2. Surgical Changes
-
+2. Surgical Changes
 Touch only what you must. Don't improve adjacent code or refactor unrelated things. Match existing style. Remove only the dead code your changes create.
-
-## Agent skills
-
-### Issue tracker
-
-Issues live in GitHub Issues (YoYo-XYZ/pinn-deepflow). See `docs/agents/issue-tracker.md`. Use github cli if available.
-
-### Triage labels
-
-Using default five canonical triage labels. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context layout (root `CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.
