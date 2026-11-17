@@ -1,4 +1,4 @@
-## Coding Style
+## Coding Principle
 
 ### 1. Simplicity First
 
