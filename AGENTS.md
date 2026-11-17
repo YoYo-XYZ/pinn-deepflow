@@ -8,6 +8,8 @@ DeepFlow is a user-freindly Python library for solving PDEs with PyTorch physics
 
 2. Do not write .md files unless explicitly asked
 
+3. Do not add `#` comments in source code or internal docstrings; keep user-facing API documentation concise.
+
 
 ## Coding Principles
 
