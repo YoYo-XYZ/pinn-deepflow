@@ -9,16 +9,11 @@ import torch
 
 
 class ReferenceSolution:
-    """A solved field collection backed by NGSolve grid functions.
+    """Solved FEM fields supporting point queries and export.
 
-    ``ReferenceSolution`` deliberately keeps the FEM objects alive.  Queries
-    therefore evaluate the same fields that were produced by the solver,
-    rather than interpolating a second sampled representation.
-
-    Attributes:
-        metadata: JSON-compatible solver metadata.
-        fields: Names of fields available to ``evaluate``.
-        times: Stored transient snapshot times, if any.
+    Queries use the retained FEM objects. ``metadata`` holds solver details,
+    ``fields`` lists available names, and ``times`` stores transient snapshot
+    times.
     """
 
     def __init__(
@@ -33,21 +28,20 @@ class ReferenceSolution:
         field_evaluator: Optional[Callable[[object, np.ndarray, np.ndarray], np.ndarray]] = None,
         time_from_y: bool = False,
     ):
-        """Initialize a solved steady or transient field collection.
+        """Create a steady or transient solution.
 
         Args:
-            area: PDE area used to validate query points.
-            mesh: FEM mesh retained by the field evaluator.
-            fields: Steady field objects keyed by field name.
+            area: PDE area for query validation.
+            mesh: Retained FEM mesh.
+            fields: Steady fields by name.
             snapshots: Transient field mappings ordered by ``times``.
-            times: Strictly increasing transient snapshot times.
-            metadata: Solver metadata retained for inspection and export.
-            field_evaluator: Optional callable overriding point evaluation.
-            time_from_y: Whether the supplied y coordinate represents time.
+            times: Strictly increasing snapshot times.
+            metadata: Solver details for inspection and export.
+            field_evaluator: Optional point-evaluation callable.
+            time_from_y: Use y coordinates as time.
 
-        Raises:
-            ValueError: If fields/snapshots or transient times are incomplete
-                or inconsistent.
+        Missing or inconsistent fields, snapshots, or times raise
+        ``ValueError``.
         """
         if snapshots is not None and times is None:
             raise ValueError("Transient snapshots require corresponding times.")
@@ -118,12 +112,6 @@ class ReferenceSolution:
 
     @staticmethod
     def _evaluate_ngsolve_field(mesh, field, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        """Evaluate a scalar NGSolve field point by point.
-
-        NGSolve's point evaluator accepts one coordinate in 1-D and two in
-        2-D.  The solver supplies a custom evaluator for the Burgers backend;
-        this default handles all 2-D FEM fields.
-        """
         values = np.empty(x.size, dtype=float)
         for index, (x_value, y_value) in enumerate(zip(x.flat, y.flat)):
             value = field(mesh(float(x_value), float(y_value)))
@@ -227,29 +215,19 @@ class ReferenceSolution:
         }
 
     def evaluate(self, x, y, t=None, fields=None) -> Dict[str, np.ndarray]:
-        """Evaluate selected fields at broadcastable point coordinates.
-
-        For transient solutions, values are linearly interpolated between the
-        stored solver snapshots. A transient query must provide ``t`` unless
-        ``time_from_y`` is enabled, in which case ``y`` supplies time. Steady
-        fields ignore a supplied time coordinate.
+        """Return a dict of field arrays with the broadcast query shape.
 
         Args:
-            x: x coordinates, broadcastable with ``y`` and optional ``t``.
-            y: y coordinates, broadcastable with ``x`` and optional ``t``.
-            t: Optional time coordinates for transient solutions, unless
-                ``time_from_y`` is enabled.
-            fields: Optional field name or iterable of field names. ``None``
-                selects every declared field.
+            x: x coordinates, broadcastable with ``y`` and ``t``.
+            y: y coordinates, broadcastable with ``x`` and ``t``.
+            t: Required for transient queries unless ``time_from_y`` uses
+                ``y``.
+            fields: Field name or iterable; ``None`` selects all fields.
 
-        Returns:
-            Dictionary mapping selected field names to NumPy arrays matching
-            the broadcast query shape.
-
-        Raises:
-            KeyError: If a requested field is unknown.
-            ValueError: If points lie outside the PDE area, required transient
-                time is missing, or times are outside the stored interval.
+        Transient values interpolate linearly between snapshots. Steady fields
+        ignore ``t``. Unknown fields raise ``KeyError``. Points outside the
+        area, missing time, or times outside the stored interval raise
+        ``ValueError``.
         """
         x_input = np.asarray(x, dtype=float)
         y_input = np.asarray(y, dtype=float)
@@ -367,17 +345,9 @@ class ReferenceSolution:
         return values
 
     def export_npz(self, path, x, y, t=None, fields=None) -> None:
-        """Export queried values and metadata to a compressed ``.npz`` file.
+        """Export queried fields and metadata to compressed ``path`` as ``.npz``.
 
-        Args:
-            path: Output path.
-            x: x coordinates accepted by ``evaluate``.
-            y: y coordinates accepted by ``evaluate``.
-            t: Optional transient time coordinates.
-            fields: Optional field name or iterable of field names.
-
-        Returns:
-            None.
+        ``x``, ``y``, ``t``, and ``fields`` follow ``evaluate``.
         """
         values = self.evaluate(x, y, t=t, fields=fields)
         if t is None:

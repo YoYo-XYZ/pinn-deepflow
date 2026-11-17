@@ -7,15 +7,10 @@ from typing import Dict, Tuple, Optional
 from .utility import calc_grad, calc_grads
 
 class PDE(ABC):
-    """Base class for physics-informed differential equations.
+    """Base class for PDE residuals and losses.
 
-    Subclasses populate ``residual_fields`` in ``compute_residuals``.
-    Residual and loss helpers then reduce those fields over the sample points.
-
-    Attributes:
-        var: Derived variables and residuals exposed during evaluation.
-        residual_fields: Tuple of per-equation residual tensors after a
-            residual computation.
+    Subclasses set ``residual_fields`` in ``compute_residuals``. ``var``
+    exposes derived fields during evaluation.
     """
     def __init__(self):
         self.var = {}
@@ -23,14 +18,11 @@ class PDE(ABC):
 
     @abstractmethod
     def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, ...]:
-        """Compute and store equation residuals for model outputs.
+        """Compute and store one residual tensor per equation; return them as a
+        tuple.
 
-        Args:
-            inputs_dict: Mapping containing coordinate tensors and predicted
-                field tensors required by the PDE.
-
-        Returns:
-            Tuple of residual tensors, one for each equation.
+        ``inputs_dict`` contains the PDE's coordinate and predicted-field
+        tensors.
         """
         pass
 
@@ -55,12 +47,7 @@ class PDE(ABC):
         return torch.mean(torch.stack(self.residual_fields, dim=0).pow(2).sum(dim=0))
 
 class CustomPDE(PDE):
-    """Wrap a user-supplied residual function as a ``PDE``.
-
-    Args:
-        func: Callable accepting an input dictionary and returning a tuple of
-            residual tensors.
-    """
+    """Wrap ``func(inputs_dict)`` returning a tuple of residual tensors."""
 
     def __init__(self, func):
         """Initialize a custom residual wrapper."""
@@ -73,15 +60,13 @@ class CustomPDE(PDE):
         return self.residual_fields
 
 class NavierStokes(PDE):
-    """
-    Incompressible Navier-Stokes equations (2D).
-    Handles both Steady and Unsteady states automatically based on input 't'.
+    """2D incompressible Navier-Stokes equations; include ``t`` for unsteady flow.
 
     Args:
         mu: Dynamic viscosity.
         rho: Fluid density.
-        U: Reference velocity used for nondimensionalization.
-        L: Reference length used for nondimensionalization.
+        U: Reference velocity.
+        L: Reference length.
     """
     def __init__(self, mu: float, rho: float, U: float = 1.0, L: float = 1.0):
         """Initialize the nondimensionalized Navier-Stokes model."""
@@ -92,7 +77,6 @@ class NavierStokes(PDE):
         self.rho = rho
         self.Re = (rho * U * L) / mu
         
-        # Scaling factors
         self.scale_map = {
             'x': self.L, 'y': self.L,
             'u': self.U, 'v': self.U,
@@ -101,20 +85,15 @@ class NavierStokes(PDE):
         }
 
     def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, ...]:
-        """Compute continuity and momentum residuals.
+        """Return ``(continuity, x_momentum, y_momentum)`` residual tensors.
 
-        Args:
-            inputs_dict: Must contain ``x``, ``y``, ``u``, ``v``, and ``p``;
-                include ``t`` for an unsteady problem.
-
-        Returns:
-            Tuple ``(continuity, x_momentum, y_momentum)``.
+        ``inputs_dict`` requires ``x``, ``y``, ``u``, ``v``, ``p``, and
+        optional ``t``.
         """
         x, y = inputs_dict['x'], inputs_dict['y']
         u, v, p = inputs_dict['u'], inputs_dict['v'], inputs_dict['p']
         t = inputs_dict.get('t', None)
 
-        # First derivatives
         if t is None:
             u_t, v_t = 0.0, 0.0
             u_x, u_y = calc_grads(u, (x, y))
@@ -125,19 +104,15 @@ class NavierStokes(PDE):
             v_x, v_y, v_t = calc_grads(v, (x, y, t))
             p_x, p_y = calc_grads(p, (x, y))
 
-        # Second derivatives
         u_xx = calc_grad(u_x, x)
         u_yy = calc_grad(u_y, y)
         v_xx = calc_grad(v_x, x)
         v_yy = calc_grad(v_y, y)
 
-        # 1. Continuity Equation (Mass Conservation)
         continuity_residual = (u_x + v_y)
 
-        # 2. X-Momentum Equation
         x_momentum_residual = (u_t + (u * u_x) + (v * u_y)) + p_x - ((u_xx + u_yy) / self.Re)
 
-        # 3. Y-Momentum Equation
         y_momentum_residual = (v_t + (u * v_x) + (v * v_y)) + p_y - ((v_xx + v_yy) / self.Re)
 
         self.residual_fields = (continuity_residual, x_momentum_residual, y_momentum_residual)
@@ -148,14 +123,8 @@ class NavierStokes(PDE):
         return self.residual_fields
 
     def nondimensionalize_inputs(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        """Scale recognized physical inputs to nondimensional form.
-
-        Args:
-            inputs: Mapping of coordinate and field names to tensors.
-
-        Returns:
-            A new mapping with known quantities divided by their reference
-            scales; unknown entries are copied unchanged.
+        """Return inputs divided by their reference scales; copy unknown entries
+        unchanged.
         """
         new_inputs = {}
         for key, val in inputs.items():
@@ -167,20 +136,16 @@ class NavierStokes(PDE):
 
 
 class StreamFunctionNavierStokes(PDE):
-    """
-    Steady incompressible Navier-Stokes equations using ``psi`` and ``p``.
+    """Steady 2D Navier-Stokes using ``psi`` and ``p``.
 
-    The velocity is derived from the stream function using
-    ``u = dpsi/dy`` and ``v = -dpsi/dx``.  Continuity is therefore satisfied
-    identically, and the PDE contributes only the two momentum residuals.
-    This formulation currently supports steady problems with ``x`` and ``y``
-    coordinates only.
+    ``u = dpsi/dy`` and ``v = -dpsi/dx`` satisfy continuity, leaving two
+    momentum residuals. Transient coordinates are unsupported.
 
     Args:
         mu: Dynamic viscosity.
         rho: Fluid density.
-        U: Reference velocity used for nondimensionalization.
-        L: Reference length used for nondimensionalization.
+        U: Reference velocity.
+        L: Reference length.
     """
     def __init__(self, mu: float, rho: float, U: float = 1.0, L: float = 1.0):
         """Initialize the steady stream-function formulation."""
@@ -199,16 +164,10 @@ class StreamFunctionNavierStokes(PDE):
         }
 
     def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, ...]:
-        """Compute the two momentum residuals from ``psi`` and ``p``.
+        """Return ``(x_momentum, y_momentum)`` residual tensors.
 
-        Args:
-            inputs_dict: Must contain ``x``, ``y``, ``psi``, and ``p``.
-
-        Returns:
-            Tuple ``(x_momentum, y_momentum)``.
-
-        Raises:
-            ValueError: If transient coordinate ``t`` is supplied.
+        ``inputs_dict`` requires ``x``, ``y``, ``psi``, and ``p``. Supplying
+        ``t`` raises ``ValueError``.
         """
         if 't' in inputs_dict:
             raise ValueError(
@@ -219,9 +178,6 @@ class StreamFunctionNavierStokes(PDE):
         x, y = inputs_dict['x'], inputs_dict['y']
         psi, p = inputs_dict['psi'], inputs_dict['p']
 
-        # Keep x and y as the differentiation inputs.  They are the original
-        # coordinate leaves used by the model, which is required for the
-        # higher-order derivatives below.
         psi_x, psi_y = calc_grads(psi, (x, y))
         u = psi_y
         v = -psi_x
@@ -252,26 +208,15 @@ class StreamFunctionNavierStokes(PDE):
         return self.residual_fields
 
     def nondimensionalize_inputs(self, inputs: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        """Scale recognized stream-function inputs to nondimensional form.
-
-        Args:
-            inputs: Mapping of coordinate and field names to tensors.
-
-        Returns:
-            A new mapping with known quantities divided by their reference
-            scales.
-        """
+        """Return inputs divided by their reference scales."""
         return {
             key: val / self.scale_map[key] if key in self.scale_map else val
             for key, val in inputs.items()
         }
 
 class HeatEquation(PDE):
-    """
-    2D Heat Equation: u_t = alpha * (u_xx + u_yy)
-
-    Args:
-        alpha: Thermal diffusivity.
+    """2D heat equation ``u_t = alpha * (u_xx + u_yy)`` with thermal diffusivity
+    ``alpha``.
     """
     def __init__(self, alpha: float):
         """Initialize the heat-equation residual model."""
@@ -279,105 +224,68 @@ class HeatEquation(PDE):
         self.alpha = alpha
 
     def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor]:
-        """Compute the heat-equation residual.
-
-        Args:
-            inputs_dict: Mapping containing ``x``, ``y``, ``t``, and ``u``.
-
-        Returns:
-            A one-element tuple containing ``u_t - alpha * (u_xx + u_yy)``.
+        """Return ``(u_t - alpha * (u_xx + u_yy),)`` from ``x``, ``y``, ``t``, and
+        ``u``.
         """
         x = inputs_dict['x']
         y = inputs_dict['y']
         t = inputs_dict['t']
         u = inputs_dict['u']
 
-        # First derivatives
         u_x, u_y, u_t = calc_grads(u, (x, y, t))
 
-        # Second derivatives
         u_xx = calc_grad(u_x, x)
         u_yy = calc_grad(u_y, y)
 
-        # Residual
         heat_residual = u_t - self.alpha * (u_xx + u_yy)
 
         self.residual_fields = (heat_residual,)
         return self.residual_fields
     
 class WaveEquation(PDE):
-    """
-    2D Wave Equation: u_tt = c^2 * (u_xx + u_yy)
-
-    Args:
-        c: Wave propagation speed.
-    """
+    """2D wave equation ``u_tt = c**2 * (u_xx + u_yy)`` with wave speed ``c``."""
     def __init__(self, c: float):
         """Initialize the wave-equation residual model."""
         super().__init__()
         self.c = c
 
     def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor]:
-        """Compute the wave-equation residual.
-
-        Args:
-            inputs_dict: Mapping containing ``x``, ``y``, ``t``, and ``u``.
-
-        Returns:
-            A one-element tuple containing ``u_tt - c**2 * (u_xx + u_yy)``.
+        """Return ``(u_tt - c**2 * (u_xx + u_yy),)`` from ``x``, ``y``, ``t``, and
+        ``u``.
         """
         x = inputs_dict['x']
         y = inputs_dict['y']
         t = inputs_dict['t']
         u = inputs_dict['u']
 
-        # First derivatives
         u_x, u_y, u_t = calc_grads(u, (x, y, t))
 
-        # Second derivatives
         u_xx = calc_grad(u_x, x)
         u_yy = calc_grad(u_y, y)
         u_tt = calc_grad(u_t, t)
 
-        # Residual
         wave_residual = u_tt - self.c**2 * (u_xx + u_yy)
 
         self.residual_fields = (wave_residual,)
         return self.residual_fields
 
 class BurgersEquation1D(PDE):
-    """
-    Steady 2D Burgers equation in the x-y domain:
-    u_y + u * u_x = nu * u_xx.
-
-    Args:
-        nu: Viscosity coefficient.
-    """
+    """Steady Burgers equation ``u_y + u * u_x = nu * u_xx`` with viscosity ``nu``."""
     def __init__(self, nu: float):
         """Initialize the steady Burgers residual model."""
         super().__init__()
         self.nu = nu
 
     def compute_residuals(self, inputs_dict: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor]:
-        """Compute the steady Burgers residual.
-
-        Args:
-            inputs_dict: Mapping containing ``x``, ``y``, and ``u``.
-
-        Returns:
-            A one-element tuple containing ``u_y + u * u_x - nu * u_xx``.
-        """
+        """Return ``(u_y + u * u_x - nu * u_xx,)`` from ``x``, ``y``, and ``u``."""
         x = inputs_dict['x']
         y = inputs_dict['y']
         u = inputs_dict['u']
 
-        # First derivatives
         u_x, u_y = calc_grads(u, (x, y))
 
-        # Second derivative
         u_xx = calc_grad(u_x, x)
 
-        # Residual
         burgers_residual = u_y + u * u_x - self.nu * u_xx
 
         self.residual_fields = (burgers_residual,)

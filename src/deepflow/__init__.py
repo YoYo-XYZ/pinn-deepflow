@@ -27,7 +27,6 @@ from .utility import (
 
 
 class _DeepFlowModule(types.ModuleType):
-    """Module wrapper that exposes writable global configuration properties."""
 
     @property
     def device(self):
@@ -50,7 +49,6 @@ sys.modules[__name__].__class__ = _DeepFlowModule
 
 
 def __getattr__(name):
-    """Load optional reference-solver symbols without importing NGSolve."""
     if name in {"ReferenceSolver", "ReferenceSolution"}:
         from .reference import ReferenceSolver, ReferenceSolution
 

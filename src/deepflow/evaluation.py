@@ -6,66 +6,51 @@ import torch
 import numpy as np
 import ultraplot as plt
 
-# Explicit imports are better for open source
 from .nn import PINN 
 from .geometry import Area, Bound, CustomData
 from .visualization import Visualizer
 
 
 class Evaluator(Visualizer):
-    """Evaluate a PINN on one geometry and prepare plotting data.
+    """Evaluate a PINN on a geometry for plotting.
 
     Args:
-        pinns_model: PINN model used to calculate predictions and residuals.
-        geometry: Sampled ``Area``, ``Bound``, or ``CustomData``
-            object.
+        pinns_model: Prediction and residual model.
+        geometry: Sampled ``Area``, ``Bound``, or ``CustomData``.
 
-    Attributes:
-        data_dict: Materialized NumPy fields, coordinates, residuals, and loss
-            history.
-
-    Notes:
-        Sampling and time changes replace ``data_dict``. Reassign any custom
-        fields after refreshing the evaluator.
+    ``data_dict`` holds NumPy fields, coordinates, residuals, and loss history.
+    Resampling or changing time replaces it; reassign custom fields afterward.
     """
 
     def __init__(self, pinns_model: PINN, geometry: Area|Bound|CustomData) -> None:
-        """
-        Initialize an evaluator for a model and geometry.
-
-        Args:
-            pinns_model: The physics-informed neural network model.
-            geometry: The geometric domain or custom data to evaluate.
-        """
+        """Create an evaluator for a PINN model and geometry."""
         self.model = pinns_model 
         self.geometry = geometry
 
-        # Initialize internal state
         self.data_dict: Dict[str, Any] = {}
         self.is_postprocessed = False
         
         if isinstance(geometry, CustomData):
             self.postprocess()
         
-        # If geometry already has coordinates (i.e. has been sampled), we can attempt postprocess
         if hasattr(self.geometry, "X") and getattr(self.geometry, "X") is not None:
             self.postprocess()
 
     def sampling_line(self, n_points: int, scheme: str = 'uniform') -> None:
-        """Sample a boundary and refresh evaluated fields.
+        """Resample the boundary and refresh fields.
 
         Args:
-            n_points: Number of boundary points.
+            n_points: Boundary point count.
             scheme: ``"uniform"``, ``"random"``, or ``"lhs"``.
         """
         self.geometry.sampling_line(n_points, scheme)
         self.postprocess()
 
     def sampling_area(self, res_list: List[int], scheme: str = 'uniform') -> None:
-        """Sample an area and refresh evaluated fields.
+        """Resample the area and refresh fields.
 
         Args:
-            res_list: Area resolution as a scalar or ``[nx, ny]`` pair.
+            res_list: Scalar resolution or ``[nx, ny]``.
             scheme: ``"uniform"``, ``"random"``, or ``"lhs"``.
         """
         self.geometry.sampling_area(res_list, scheme)
@@ -77,12 +62,12 @@ class Evaluator(Visualizer):
         sampling_scheme: str = "uniform",
         expo_scaling: Optional[bool] = None,
     ) -> None:
-        """Define time coordinates and refresh evaluated fields.
+        """Set time coordinates and refresh fields.
 
         Args:
-            range_t: Time interval or fixed time value.
+            range_t: Interval or fixed time.
             sampling_scheme: Time sampling scheme.
-            expo_scaling: Whether to apply exponential time scaling.
+            expo_scaling: Apply exponential time scaling.
         """
         self.geometry.define_time(
             range_t,
@@ -91,52 +76,39 @@ class Evaluator(Visualizer):
         )
         self.postprocess()
     def postprocess(self) -> None:
-        """
-        Recompute predictions, residuals, and coordinates.
-
-        Returns:
-            None. ``data_dict`` is replaced with NumPy-compatible values.
+        """Replace ``data_dict`` with refreshed NumPy predictions, residuals, and
+        coordinates.
         """
         self.geometry.process_coordinates()
 
         self._create_data_dict()
         self.is_postprocessed = True
         
-        # Initialize the parent Visualizer with the processed data
         super().__init__(self.data_dict)
 
     def _create_data_dict(self) -> Dict[str, Any]:
-        """Internal method to build the dictionary of fields."""
-        # Ensure model is in eval mode to disable dropout/batchnorm updates
         self.model.eval()
 
-        # 1. Base model outputs
         data_dict = self.geometry.process_model(self.model)
 
-        # 2. Physics Residuals
         if self.geometry.physics_type == 'PDE':
-            # Use .update() for dictionary merging (compatible with older python)
             data_dict[f"{self.geometry.physics_type}".lower() + "_residual"] = self.geometry.calc_residual_field(self.model)
             data_dict.update(self.geometry.PDE.var)
         
         elif self.geometry.physics_type in ['BC', 'IC']:
             data_dict[f"{self.geometry.physics_type}".lower() + "_residual"] = self.geometry.calc_residual_field(self.model)
-        # 4. Coordinates
         data_dict['x'] = self.geometry.X
         data_dict['y'] = self.geometry.Y
         if self.geometry.range_t:
             data_dict['t'] = self.geometry.T
 
-        # 5. Training History
         data_dict.update(self.model.loss_history)
 
-        # 6. Normalize to NumPy
         self.data_dict = self._convert_to_numpy(data_dict)
 
         return self.data_dict
 
     def _convert_to_numpy(self, data: Dict[str, Any]) -> Dict[str, np.ndarray]:
-        """Helper to safely convert dictionary values to NumPy arrays."""
         clean_dict = {}
         for key, value in data.items():
             try:
@@ -147,7 +119,6 @@ class Evaluator(Visualizer):
                 elif isinstance(value, np.ndarray):
                     clean_dict[key] = value
                 else:
-                    # Fallback for scalars or other types
                     clean_dict[key] = np.array(value)
             except Exception as e:
                 print(f"Warning: Could not convert key '{key}' to numpy. Error: {e}")
@@ -164,23 +135,19 @@ class Evaluator(Visualizer):
         return f"Available data keys: {tuple(self.data_dict.keys())}"
     
     def plot_animate(self, color_axis:str, x_axis: str = 'x', y_axis: str = 'y', cmap = 'viridis', range_t=None, dt=None, frame_interval = 10, plot_type: str = 'scatter', s = 6, color_range:list=None) -> Any:
-        """
-        Create and display an animation over time for a field.
+        """Display a time animation and return the Matplotlib animation object.
 
         Args:
             color_axis: Field to animate.
             x_axis: x-coordinate field.
             y_axis: y-coordinate field.
-            cmap: Matplotlib colormap name.
-            range_t: Two-element animation time interval.
-            dt: Time increment between frames.
-            frame_interval: Delay between frames in milliseconds.
+            cmap: Colormap name.
+            range_t: ``[start, end]`` time interval.
+            dt: Time step per frame.
+            frame_interval: Frame delay in milliseconds.
             plot_type: ``"scatter"``, ``"tripcolor"``, or ``"contourf"``.
             s: Scatter marker size.
-            color_range: Optional ``[min, max]`` color limits.
-
-        Returns:
-            The created Matplotlib animation object.
+            color_range: ``[min, max]`` color limits.
         """
         import matplotlib.animation as animation
 
@@ -189,7 +156,6 @@ class Evaluator(Visualizer):
         )
         ax.format(grid=False)
 
-        # Prepare data to animate
         color_list = []
         time_list = list(np.arange(range_t[0], range_t[1], dt))
         for t in time_list:
@@ -201,7 +167,6 @@ class Evaluator(Visualizer):
             max_val = np.max([np.max(c) for c in color_list])
             min_val = np.min([np.min(c) for c in color_list])
 
-        # Initialize figure
         if plot_type == 'scatter':
             plot = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], c=color_list[0], cmap=cmap, vmin=min_val, vmax=max_val, marker='s', s = s)
         elif plot_type == 'tripcolor':
@@ -214,7 +179,6 @@ class Evaluator(Visualizer):
         ax.set_ylabel(y_axis)
         ax.set_aspect('equal')
         
-        # Add colorbar
         ax.colorbar(plot, ax=ax)
         
         def animate(frame):
@@ -228,16 +192,14 @@ class Evaluator(Visualizer):
 
 
 class ReferenceEvaluator(Evaluator):
-    """Evaluate a solved ``ReferenceSolution`` on one geometry.
+    """Query a ``ReferenceSolution`` at a geometry's coordinates.
 
-    Reference evaluators deliberately do not calculate PINN residuals or copy
-    model training history.  They retain the FEM solution and re-query it
-    whenever the geometry is sampled again or its time coordinates change.
+    Resampling or changing time refreshes FEM fields. PINN residuals and
+    training history are excluded.
 
     Args:
-        reference_solution: Solved ``ReferenceSolution`` queried by this
-            evaluator.
-        geometry: Geometry whose coordinates are used for FEM queries.
+        reference_solution: Solved FEM fields.
+        geometry: Query geometry.
     """
 
     def __init__(self, reference_solution, geometry: Area | Bound | CustomData) -> None:
@@ -267,12 +229,6 @@ class ReferenceEvaluator(Evaluator):
         )
 
     def _prepare_coordinates(self) -> None:
-        """Process only when the public coordinates changed.
-
-        ``PhysicsAttach.process_coordinates`` regenerates time samples when a
-        ``range_t`` is present.  Avoiding an unconditional call preserves
-        existing time coordinates when ``solve_fem`` is asked to reuse them.
-        """
         if getattr(self.geometry, "X", None) is None or getattr(
             self.geometry, "Y", None
         ) is None:
@@ -314,7 +270,6 @@ class ReferenceEvaluator(Evaluator):
         return None
 
     def _process_coordinates_preserving_time(self) -> None:
-        """Process coordinates without replacing already aligned time data."""
         existing_time = self._time_values()
         existing_shape = (
             None
@@ -351,12 +306,8 @@ class ReferenceEvaluator(Evaluator):
         sampling_scheme: str = "uniform",
         expo_scaling: Optional[bool] = None,
     ) -> None:
-        """Update time coordinates and re-query the FEM fields.
-
-        Args:
-            range_t: Time interval or fixed time value.
-            sampling_scheme: Time sampling scheme.
-            expo_scaling: Whether to apply exponential time scaling.
+        """Set time coordinates and refresh FEM fields; see
+        ``Evaluator.define_time``.
         """
         self.geometry.define_time(
             range_t,
@@ -422,11 +373,9 @@ class ReferenceEvaluator(Evaluator):
 
 
 class ReferenceGroupEvaluator:
-    """FEM results organized into geometry-specific reference evaluators.
+    """FEM evaluators grouped in ``area_list`` and ``bound_list``.
 
-    Access fields and plots through ``area_list`` and ``bound_list``.
-    The solved FEM solution is available as ``reference_solution`` for
-    arbitrary point queries and export.
+    Use ``reference_solution`` for arbitrary point queries and export.
     """
 
     def __init__(self, reference_solution, domain) -> None:

@@ -4,15 +4,15 @@ on:
   push:
     branches: [dev]    
     paths:
-      - 'docs/**'             # Only trigger when docs change
-      - 'src/**'              # API reference is generated from source
+      - 'docs/**'
+      - 'src/**'
       - 'mkdocs.yml'
       - 'requirements-docs.txt'
       - '.github/workflows/deploy-docs.yml'
-  workflow_dispatch:          # Allow manual redeploy
+  workflow_dispatch:
 
 permissions:
-  contents: write             # Needed to push to gh-pages branch
+  contents: write
 
 jobs:
   deploy:
@@ -21,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0        # Helps with git plugins if use any later
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,5 +42,3 @@ jobs:
 
       - name: Build and deploy
         run: mkdocs gh-deploy --force --clean --strict
-        # --force overwrites old gh-pages safely
-        # --clean removes old files not present in new build

@@ -17,19 +17,10 @@ if TYPE_CHECKING:
 
 
 def domain(*geometries):
-    """Build a ``ProblemDomain`` from geometry objects.
+    """Build a ``ProblemDomain`` from bounds, areas, or custom data.
 
-    Args:
-        *geometries: Individual ``Bound``, ``Area``, or
-            ``CustomData`` objects, or homogeneous lists of bounds or
-            areas.
-
-    Returns:
-        A problem domain containing separate boundary and area lists.
-
-    Raises:
-        TypeError: If an argument is not a supported geometry or a list mixes
-            geometry types.
+    Lists must contain only bounds or only areas. Unsupported inputs raise
+    ``TypeError``.
     """
     bound_list = []
     area_list = []
@@ -54,20 +45,14 @@ def domain(*geometries):
 
 
 class ProblemDomain():
-    """Collect geometries and coordinate the PINN workflow.
+    """Group boundaries and areas for sampling, training, and evaluation.
 
     Args:
-        bound_list: Boundary geometries, including area boundaries.
-        area_list: Areas or custom-data geometries.
+        bound_list: Boundaries, including area boundaries.
+        area_list: Areas or custom data.
 
-    Attributes:
-        bound_list: Boundaries in domain order.
-        area_list: Areas in domain order.
-        sampling_option: Name of the most recent sampling strategy.
-
-    Notes:
-        Domain sampling methods update geometry coordinates in place.
-        Evaluate each geometry with ``geometry.evaluate(model)``.
+    Sampling updates coordinates in place. Use ``geometry.evaluate(model)`` for
+    results; ``sampling_option`` records the last sampling strategy.
     """
 
     def __init__(self, bound_list:list[Bound], area_list:list[Area]):
@@ -88,25 +73,19 @@ class ProblemDomain():
         tolerance=1e-8,
         max_iterations=200,
     ) -> "ReferenceGroupEvaluator":
-        """Solve the domain with the optional NGSolve FEM backend.
+        """Solve with optional NGSolve FEM and return a
+        ``ReferenceGroupEvaluator``.
 
         Args:
-            mesh_size: Target FEM mesh size. If ``None``, infer it from the
-                PDE area extent.
-            boundary_resolution: Number of samples used to construct boundary
-                curves for the mesh.
-            time_step: Time spacing for transient reference snapshots.
-            tolerance: Nonlinear or iterative solver convergence tolerance.
-            max_iterations: Maximum number of solver iterations.
+            mesh_size: Target mesh size; ``None`` infers it from the area.
+            boundary_resolution: Samples per mesh boundary.
+            time_step: Transient snapshot spacing.
+            tolerance: Solver convergence tolerance.
+            max_iterations: Solver iteration limit.
 
-        Returns:
-            A ``ReferenceGroupEvaluator`` whose children query the solved FEM
-            fields. The underlying ``ReferenceSolution`` is available
-            as ``.reference_solution``.
-
-        Raises:
-            ImportError: If the optional NGSolve backend is unavailable.
-            ValueError: If the domain or solver configuration is invalid.
+        Access the solution through ``.reference_solution``. Missing NGSolve
+        raises ``ImportError``; invalid domains or settings raise
+        ``ValueError``.
         """
         from .fem import solve_fem as _solve_fem
 
@@ -124,14 +103,11 @@ class ProblemDomain():
 number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list)]}"""
 
     def sampling_uniform(self, bound_sampling_res:list=[], area_sampling_res:list=[]):
-        """Sample boundaries and areas on uniform grids.
+        """Replace geometry coordinates with uniform-grid samples.
 
         Args:
-            bound_sampling_res: Resolution for each entry in ``bound_list``.
-            area_sampling_res: Resolution for each entry in ``area_list``.
-
-        Returns:
-            None. Geometry coordinates are replaced in place.
+            bound_sampling_res: Resolution per boundary.
+            area_sampling_res: Resolution per area.
         """
         self.sampling_option = 'uniform'
         for i, res in enumerate(bound_sampling_res):
@@ -142,14 +118,11 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             self.area_list[i].process_coordinates()
 
     def sampling_random(self, bound_sampling_res:list=[], area_sampling_res:list=[]):
-        """Sample boundaries and areas with uniform random points.
+        """Replace geometry coordinates with uniform random samples.
 
         Args:
-            bound_sampling_res: Number of points for each boundary.
-            area_sampling_res: Number of candidate points for each area.
-
-        Returns:
-            None. Geometry coordinates are replaced in place.
+            bound_sampling_res: Point count per boundary.
+            area_sampling_res: Candidate count per area.
         """
         self.sampling_option = 'random'
         for i, res in enumerate(bound_sampling_res):
@@ -160,14 +133,11 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             self.area_list[i].process_coordinates()
 
     def sampling_lhs(self, bound_sampling_res:list=[], area_sampling_res:list=[]):
-        """Sample boundaries and areas with Latin Hypercube Sampling.
+        """Replace geometry coordinates with Latin Hypercube samples.
 
         Args:
-            bound_sampling_res: Number of points for each boundary.
-            area_sampling_res: Number of candidate points for each area.
-
-        Returns:
-            None. Geometry coordinates are replaced in place.
+            bound_sampling_res: Point count per boundary.
+            area_sampling_res: Candidate count per area.
         """
         self.sampling_option = 'lhs'
         for i, res in enumerate(bound_sampling_res):
@@ -178,29 +148,21 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             self.area_list[i].process_coordinates()
 
     def sampling_RAR(self, bound_top_k_list:list=None, area_top_k_list:list=None, bound_candidates_num_list:list=None, area_candidates_num_list:list=None):
-        """Add residual-adaptive points to the existing training samples.
+        """Append high-residual points to existing samples. Compute residuals
+        first.
 
         Args:
-            bound_top_k_list: Number of high-residual points to retain per
-                boundary.
-            area_top_k_list: Number of high-residual points to retain per area.
-            bound_candidates_num_list: Candidate counts per boundary.
-            area_candidates_num_list: Candidate counts per area.
-
-        Returns:
-            None. Selected points are appended to geometry coordinates.
-
-        Notes:
-            Residual fields must have been computed before calling this method.
+            bound_top_k_list: Points to retain per boundary.
+            area_top_k_list: Points to retain per area.
+            bound_candidates_num_list: Candidates per boundary.
+            area_candidates_num_list: Candidates per area.
         """
         self.sampling_option = self.sampling_option + ' + RAR'
         if bound_top_k_list:
             for i, bound in enumerate(self.bound_list):
                 bound.save_coordinates()
-                # Sample new candidates
                 bound.sampling_line(bound_candidates_num_list[i], scheme='lhs')
                 bound.process_coordinates()
-                # Add RAR point to saved points
                 bound.get_residual_based_points_topk(top_k=bound_top_k_list[i])
                 bound.apply_residual_based_points()
                 bound.clear_residual_based_points()
@@ -208,31 +170,22 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         if area_top_k_list:
             for i, area in enumerate(self.area_list):
                 area.save_coordinates()
-                # Sample new candidates
                 area.sampling_area(area_candidates_num_list[i], scheme='lhs')
                 area.process_coordinates()
-                # Add RAR point to saved points
                 area.get_residual_based_points_topk(top_k=area_top_k_list[i])
                 area.apply_residual_based_points()
                 area.process_coordinates()
                 area.clear_residual_based_points()
 
     def sampling_R3(self, bound_sampling_res:list=None, area_sampling_res:list=None):
-        """
-        R3 residual-based resampling with a **fixed total budget** (paper version).
+        """Resample with a fixed point budget per geometry.
 
-        For each geometry, points whose residual exceeds the mean are kept,
-        and the remaining budget is filled with fresh random samples. If the
-        threshold set is larger than the budget, the highest-residual points
-        are retained instead. The total number of points per geometry therefore
-        stays equal to the requested resolution over time.
+        Keep points above the mean residual and fill with random samples. If
+        too many qualify, keep the highest-residual points up to the budget.
 
         Args:
-            bound_sampling_res: Fixed total point budget per boundary.
-            area_sampling_res: Fixed total point budget per area.
-
-        Returns:
-            None. Geometry coordinates are resampled in place.
+            bound_sampling_res: Point budget per boundary.
+            area_sampling_res: Point budget per area.
         """
         self.sampling_option = self.sampling_option + ' + R3'
 
@@ -258,85 +211,64 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 resample_geometry(
                     self.bound_list[i], res, self.bound_list[i].sampling_line
                 )
-                # Add RAR point to saved points
         if area_sampling_res:
             for i, res in enumerate(area_sampling_res):
                 resample_geometry(
                     self.area_list[i], res, self.area_list[i].sampling_area
                 )
-                # Add RAR point to saved points
 
     def sampling_R3_(self, bound_sampling_res:list=None, area_sampling_res:list=None):
-        """
-        R3 residual-based resampling with an **accumulating budget**.
+        """Add fresh random samples to points above the mean residual.
 
-        For each geometry, points whose residual exceeds the mean are kept and
-        *added* on top of a fresh random sample of size ``res``. The total number
-        of points therefore grows over time. This matches the historical
-        deepflow behaviour prior to the paper-correct ``sampling_R3`` change.
+        Point counts may grow on each call.
 
         Args:
-            bound_sampling_res: Number of fresh candidate points per boundary.
-            area_sampling_res: Number of fresh candidate points per area.
-
-        Returns:
-            None. Geometry point counts may grow after each call.
+            bound_sampling_res: Fresh candidates per boundary.
+            area_sampling_res: Fresh candidates per area.
         """
         self.sampling_option = self.sampling_option + ' + R3'
         
         if bound_sampling_res:
             for i, res in enumerate(bound_sampling_res):
-                # Sample new candidates
                 self.bound_list[i].get_residual_based_points_threshold()
                 self.bound_list[i].sampling_line(res, scheme='random')
                 self.bound_list[i].apply_residual_based_points()
                 self.bound_list[i].process_coordinates()
-                # Add RAR point to saved points
         if area_sampling_res:
             for i, res in enumerate(area_sampling_res):
-                # Sample new candidates
                 self.area_list[i].get_residual_based_points_threshold()
                 self.area_list[i].sampling_area(res, scheme='random')
                 self.area_list[i].apply_residual_based_points()
                 self.area_list[i].process_coordinates()
-                # Add RAR point to saved points
 
     def sampling_accumulate(self, bound_sampling_res:list=None, area_sampling_res:list=None):
-        ### EXPERIMENTAL
-        """Accumulate residual-based points across repeated sampling calls.
+        """Grow the training set by retaining residual-based points across calls.
 
         Args:
-            bound_sampling_res: Number of fresh points per boundary.
-            area_sampling_res: Number of fresh points per area.
+            bound_sampling_res: Fresh points per boundary.
+            area_sampling_res: Fresh points per area.
 
-        Returns:
-            None. This experimental method grows the training point set.
+        This method is experimental.
         """
         self.sampling_option = self.sampling_option + ' + R3'
         
         if bound_sampling_res:
             for i, res in enumerate(bound_sampling_res):
-                # Sample new candidates
                 self.bound_list[i].get_residual_based_points_threshold(maintain_points=True)
                 self.bound_list[i].sampling_line(res, scheme='random')
                 self.bound_list[i].apply_residual_based_points()
                 self.bound_list[i].process_coordinates()
-                # Add RAR point to saved points
         if area_sampling_res:
             for i, res in enumerate(area_sampling_res):
-                # Sample new candidates
                 self.area_list[i].get_residual_based_points_threshold(maintain_points=True)
                 self.area_list[i].sampling_area(res, scheme='random')
                 self.area_list[i].apply_residual_based_points()
                 self.area_list[i].process_coordinates()
-                # Add RAR point to saved points
     def clear_residual_points(self):
         """Discard residual-based point buffers from all geometries."""
         for geometry in self.bound_list + self.area_list:
             geometry.clear_residual_based_points()
-#------------------------------------------------------------------------------------------------
     def _format_condition_dict(self, obj, obj_type='Bound'):
-        """Helper function to format condition dictionary for display."""
 
         def func_to_latex(func_list):
             v = func_list
@@ -370,7 +302,6 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             bound.X = bound.saved_X.clone()
             bound.Y = bound.saved_Y.clone()
     
-#-------------------------------------------------------------------------------------------------
     def _plot_items(self, ax, items, name, get_xy, scatter_kw, text_kw, show_label=True):
         for i, obj in enumerate(items):
             x, y = get_xy(obj, i)
@@ -382,13 +313,12 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 lbl = f"{name} {i}\n{cond}" if cond else f"{name} {i}"
                 ax.text(obj.centers[0], obj.centers[1], lbl, ha='center', va='center', **text_kw)
     def show_coordinates(self, display_physics = False, xlim=None, ylim=None, display_resampling=False):
-        """Plot the currently sampled coordinates.
+        """Plot sampled coordinates.
 
         Args:
-            display_physics: Annotate geometries with attached BC, IC, or PDE
-                information.
-            xlim: Optional x-axis limits.
-            ylim: Optional y-axis limits.
+            display_physics: Annotate BC, IC, and PDE assignments.
+            xlim: x-axis limits.
+            ylim: y-axis limits.
             display_resampling: Show buffered residual-based points.
         """
         fig, ax = plt.subplots(refwidth=7)
@@ -420,13 +350,13 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         plt.show()
 
     def show_setup(self, bound_sampling_res:list=None, area_sampling_res:list=None, xlim=None, ylim=None):
-        """Plot the geometry setup and a temporary sampling preview.
+        """Plot geometry with temporary preview samples.
 
         Args:
-            bound_sampling_res: Optional preview resolution per boundary.
-            area_sampling_res: Optional preview resolution per area.
-            xlim: Optional x-axis limits.
-            ylim: Optional y-axis limits.
+            bound_sampling_res: Preview resolution per boundary.
+            area_sampling_res: Preview resolution per area.
+            xlim: x-axis limits.
+            ylim: y-axis limits.
         """
         fig, ax = plt.subplots(refwidth=7, grid = False)
         
@@ -459,7 +389,6 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         if ylim: ax.set_ylim(ylim)
         plt.show()
 
-#-------------------------------------------------------------------------------------------------
     def __getitem__(self, key):
         return
     
@@ -468,25 +397,8 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             yield geometry
 
     def _batched_loss(self, model) -> dict:
-        """
-        Compute per-physics-type losses with **one forward pass per physics type**.
-
-        Geometries sharing the same ``physics_type`` (BC, IC, or PDE) have their
-        input coordinates concatenated into a single batch, the model is called
-        once for that batch, and the outputs are sliced back to each geometry for
-        per-geometry residual computation (via ``_compute_residual_field``).
-
-        This reduces the number of forward passes from *N_geometries* to
-        *N_physics_types* (e.g. 5 → 2 for steady channel flow: 1 BC pass + 1
-        PDE pass).
-
-        Assumes all geometries within the same physics-type group share the same
-        ``inputs_tensor_dict`` keys.
-        """
         loss_dict = {"pde_loss": 0.0, "bc_loss": 0.0, "ic_loss": 0.0}
 
-        # Group geometries by physics_type, preserving insertion order.
-        # Cache the grouping since geometry structure is fixed during training.
         if not hasattr(self, '_groups_cache'):
             groups: dict[str, list] = {}
             for geometry in self:
@@ -495,24 +407,14 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         groups = self._groups_cache
 
         for physics_type, geometries in groups.items():
-            # Concatenate inputs across all geometries in this group
             input_keys = list(geometries[0].inputs_tensor_dict.keys())
             batched_inputs = {
                 k: torch.cat([g.inputs_tensor_dict[k] for g in geometries])
                 for k in input_keys
             }
 
-            # Single forward pass for the entire physics-type group
             batched_outputs = model(batched_inputs)
 
-            # Slice outputs back to each geometry and compute per-geometry loss.
-            # Use the original leaf tensors (inputs_tensor_dict) as model_inputs
-            # so that torch.autograd.grad can compute higher-order derivatives
-            # (PDE residuals need 2nd derivatives). Slices of torch.cat are
-            # non-leaf intermediates which autograd cannot differentiate through
-            # for higher-order grads, but the original leaf tensors remain in
-            # the graph (leaf → cat → model → output_slice), so
-            # grad(output_slice, leaf_input) works correctly.
             start = 0
             for g in geometries:
                 end = start + len(g.X_)
@@ -527,14 +429,8 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         return loss_dict
 
 def calc_loss_simple(domain: ProblemDomain) -> callable:
-    """Create an unweighted PINN loss function for a domain.
-
-    Args:
-        domain: Domain whose boundary, initial, and PDE residuals are evaluated.
-
-    Returns:
-        Callable accepting a model and returning a dictionary containing
-        ``bc_loss``, ``ic_loss``, ``pde_loss``, and ``total_loss``.
+    """Return ``loss(model)`` with ``bc_loss``, ``ic_loss``, ``pde_loss``, and
+    their unweighted sum, ``total_loss``, for ``domain``.
     """
     def calc_loss_function(model):
         loss_dict = domain._batched_loss(model)
@@ -544,16 +440,13 @@ def calc_loss_simple(domain: ProblemDomain) -> callable:
     return calc_loss_function
 
 def calc_loss_weighted(domain: ProblemDomain, bc_weights = 1, ic_weights = 1, pde_weights = 1) -> callable:
-    """Create a weighted PINN loss function for a domain.
+    """Return ``loss(model)`` for ``domain`` with a weighted ``total_loss``.
 
     Args:
-        domain: Domain whose residuals are evaluated.
-        bc_weights: Weight applied to boundary-condition loss.
-        ic_weights: Weight applied to initial-condition loss.
-        pde_weights: Weight applied to PDE loss.
-
-    Returns:
-        Callable accepting a model and returning the weighted loss dictionary.
+        domain: Domain to evaluate.
+        bc_weights: Boundary-loss weight.
+        ic_weights: Initial-condition-loss weight.
+        pde_weights: PDE-loss weight.
     """
     weight = {"pde_loss": pde_weights, "bc_loss": bc_weights, "ic_loss": ic_weights}
     def calc_loss_function(model):

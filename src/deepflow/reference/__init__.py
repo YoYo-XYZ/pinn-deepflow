@@ -1,8 +1,4 @@
-"""Optional NGSolve reference solutions for DeepFlow problems.
-
-The module itself is dependency-light.  NGSolve is imported only when
-``ReferenceSolver.solve`` is called.
-"""
+"""Optional FEM reference solutions; NGSolve loads only on ``ReferenceSolver.solve``."""
 
 from .solution import ReferenceSolution
 from .solver import (

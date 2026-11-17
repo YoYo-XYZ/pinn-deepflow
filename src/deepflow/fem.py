@@ -15,23 +15,18 @@ def solve_fem(
     tolerance=1e-8,
     max_iterations=200,
 ) -> "ReferenceGroupEvaluator":
-    """Solve a domain with the optional NGSolve FEM backend.
+    """Solve with optional NGSolve FEM; return a ``ReferenceGroupEvaluator``.
 
     Args:
-        domain: Domain containing exactly one area with an attached PDE.
-        mesh_size: Target FEM mesh size, or ``None`` to infer it.
-        boundary_resolution: Number of samples used to construct mesh
-            boundary curves.
-        time_step: Time spacing for transient reference snapshots.
-        tolerance: Iterative solver convergence tolerance.
-        max_iterations: Maximum number of solver iterations.
+        domain: Domain with exactly one PDE area.
+        mesh_size: Target mesh size; ``None`` infers it from the area.
+        boundary_resolution: Samples per mesh boundary.
+        time_step: Transient snapshot spacing.
+        tolerance: Solver convergence tolerance.
+        max_iterations: Solver iteration limit.
 
-    Returns:
-        A ``deepflow.evaluation.ReferenceGroupEvaluator``.
-
-    Raises:
-        ImportError: If NGSolve/Netgen is not installed.
-        ValueError: If the domain or solver configuration is invalid.
+    Missing NGSolve/Netgen raises ``ImportError``. Invalid input raises
+    ``ValueError``.
     """
     from .evaluation import ReferenceGroupEvaluator
     from .reference import ReferenceSolver
