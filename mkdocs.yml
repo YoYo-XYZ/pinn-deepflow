@@ -1,15 +1,15 @@
-site_name: DeepFlow   # Change to your project name
+site_name: DeepFlow
 site_url: https://yoyo-xyz.github.io/pinn-deepflow/
 repo_url: https://github.com/YoYo-XYZ/pinn-deepflow
 repo_name: GitHub
-edit_uri: edit/dev/docs/    # Lets people click "Edit on GitHub"
+edit_uri: edit/dev/docs/
 
 theme:
-  name: material             # The beautiful theme
+  name: material
   features:
-    - content.code.copy      # Copy button on code blocks
-    - content.action.edit    # Edit this page on GitHub
-    - navigation.tabs        # Top tabs if you want
+    - content.code.copy
+    - content.action.edit
+    - navigation.tabs
     - navigation.sections
     - search.suggest
     - search.highlight
@@ -37,13 +37,13 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
-  - pymdownx.arithmatex:     # Math support: $$ equation $$
+  - pymdownx.arithmatex:
       generic: true
-  - admonition               # Callouts: !!! note "Title"
+  - admonition
   - attr_list
   - md_in_html
 
-nav:                           # Your menu structure – edit as you add pages
+nav:
   - Home: index.md
   - Quick Start: quickstart.md
   - Installation: install.md

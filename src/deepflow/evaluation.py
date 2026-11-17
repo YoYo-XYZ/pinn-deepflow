@@ -6,7 +6,6 @@ import torch
 import numpy as np
 import ultraplot as plt
 
-# Explicit imports are better for open source
 from .nn import PINN 
 from .geometry import Area, Bound, CustomData
 from .visualization import Visualizer
@@ -40,14 +39,12 @@ class Evaluator(Visualizer):
         self.model = pinns_model 
         self.geometry = geometry
 
-        # Initialize internal state
         self.data_dict: Dict[str, Any] = {}
         self.is_postprocessed = False
         
         if isinstance(geometry, CustomData):
             self.postprocess()
         
-        # If geometry already has coordinates (i.e. has been sampled), we can attempt postprocess
         if hasattr(self.geometry, "X") and getattr(self.geometry, "X") is not None:
             self.postprocess()
 
@@ -102,41 +99,31 @@ class Evaluator(Visualizer):
         self._create_data_dict()
         self.is_postprocessed = True
         
-        # Initialize the parent Visualizer with the processed data
         super().__init__(self.data_dict)
 
     def _create_data_dict(self) -> Dict[str, Any]:
-        """Internal method to build the dictionary of fields."""
-        # Ensure model is in eval mode to disable dropout/batchnorm updates
         self.model.eval()
 
-        # 1. Base model outputs
         data_dict = self.geometry.process_model(self.model)
 
-        # 2. Physics Residuals
         if self.geometry.physics_type == 'PDE':
-            # Use .update() for dictionary merging (compatible with older python)
             data_dict[f"{self.geometry.physics_type}".lower() + "_residual"] = self.geometry.calc_residual_field(self.model)
             data_dict.update(self.geometry.PDE.var)
         
         elif self.geometry.physics_type in ['BC', 'IC']:
             data_dict[f"{self.geometry.physics_type}".lower() + "_residual"] = self.geometry.calc_residual_field(self.model)
-        # 4. Coordinates
         data_dict['x'] = self.geometry.X
         data_dict['y'] = self.geometry.Y
         if self.geometry.range_t:
             data_dict['t'] = self.geometry.T
 
-        # 5. Training History
         data_dict.update(self.model.loss_history)
 
-        # 6. Normalize to NumPy
         self.data_dict = self._convert_to_numpy(data_dict)
 
         return self.data_dict
 
     def _convert_to_numpy(self, data: Dict[str, Any]) -> Dict[str, np.ndarray]:
-        """Helper to safely convert dictionary values to NumPy arrays."""
         clean_dict = {}
         for key, value in data.items():
             try:
@@ -147,7 +134,6 @@ class Evaluator(Visualizer):
                 elif isinstance(value, np.ndarray):
                     clean_dict[key] = value
                 else:
-                    # Fallback for scalars or other types
                     clean_dict[key] = np.array(value)
             except Exception as e:
                 print(f"Warning: Could not convert key '{key}' to numpy. Error: {e}")
@@ -189,7 +175,6 @@ class Evaluator(Visualizer):
         )
         ax.format(grid=False)
 
-        # Prepare data to animate
         color_list = []
         time_list = list(np.arange(range_t[0], range_t[1], dt))
         for t in time_list:
@@ -201,7 +186,6 @@ class Evaluator(Visualizer):
             max_val = np.max([np.max(c) for c in color_list])
             min_val = np.min([np.min(c) for c in color_list])
 
-        # Initialize figure
         if plot_type == 'scatter':
             plot = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], c=color_list[0], cmap=cmap, vmin=min_val, vmax=max_val, marker='s', s = s)
         elif plot_type == 'tripcolor':
@@ -214,7 +198,6 @@ class Evaluator(Visualizer):
         ax.set_ylabel(y_axis)
         ax.set_aspect('equal')
         
-        # Add colorbar
         ax.colorbar(plot, ax=ax)
         
         def animate(frame):
@@ -267,12 +250,6 @@ class ReferenceEvaluator(Evaluator):
         )
 
     def _prepare_coordinates(self) -> None:
-        """Process only when the public coordinates changed.
-
-        ``PhysicsAttach.process_coordinates`` regenerates time samples when a
-        ``range_t`` is present.  Avoiding an unconditional call preserves
-        existing time coordinates when ``solve_fem`` is asked to reuse them.
-        """
         if getattr(self.geometry, "X", None) is None or getattr(
             self.geometry, "Y", None
         ) is None:
@@ -314,7 +291,6 @@ class ReferenceEvaluator(Evaluator):
         return None
 
     def _process_coordinates_preserving_time(self) -> None:
-        """Process coordinates without replacing already aligned time data."""
         existing_time = self._time_values()
         existing_shape = (
             None

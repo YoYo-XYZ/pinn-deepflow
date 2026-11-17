@@ -92,7 +92,6 @@ class NavierStokes(PDE):
         self.rho = rho
         self.Re = (rho * U * L) / mu
         
-        # Scaling factors
         self.scale_map = {
             'x': self.L, 'y': self.L,
             'u': self.U, 'v': self.U,
@@ -114,7 +113,6 @@ class NavierStokes(PDE):
         u, v, p = inputs_dict['u'], inputs_dict['v'], inputs_dict['p']
         t = inputs_dict.get('t', None)
 
-        # First derivatives
         if t is None:
             u_t, v_t = 0.0, 0.0
             u_x, u_y = calc_grads(u, (x, y))
@@ -125,19 +123,15 @@ class NavierStokes(PDE):
             v_x, v_y, v_t = calc_grads(v, (x, y, t))
             p_x, p_y = calc_grads(p, (x, y))
 
-        # Second derivatives
         u_xx = calc_grad(u_x, x)
         u_yy = calc_grad(u_y, y)
         v_xx = calc_grad(v_x, x)
         v_yy = calc_grad(v_y, y)
 
-        # 1. Continuity Equation (Mass Conservation)
         continuity_residual = (u_x + v_y)
 
-        # 2. X-Momentum Equation
         x_momentum_residual = (u_t + (u * u_x) + (v * u_y)) + p_x - ((u_xx + u_yy) / self.Re)
 
-        # 3. Y-Momentum Equation
         y_momentum_residual = (v_t + (u * v_x) + (v * v_y)) + p_y - ((v_xx + v_yy) / self.Re)
 
         self.residual_fields = (continuity_residual, x_momentum_residual, y_momentum_residual)
@@ -219,9 +213,6 @@ class StreamFunctionNavierStokes(PDE):
         x, y = inputs_dict['x'], inputs_dict['y']
         psi, p = inputs_dict['psi'], inputs_dict['p']
 
-        # Keep x and y as the differentiation inputs.  They are the original
-        # coordinate leaves used by the model, which is required for the
-        # higher-order derivatives below.
         psi_x, psi_y = calc_grads(psi, (x, y))
         u = psi_y
         v = -psi_x
@@ -292,14 +283,11 @@ class HeatEquation(PDE):
         t = inputs_dict['t']
         u = inputs_dict['u']
 
-        # First derivatives
         u_x, u_y, u_t = calc_grads(u, (x, y, t))
 
-        # Second derivatives
         u_xx = calc_grad(u_x, x)
         u_yy = calc_grad(u_y, y)
 
-        # Residual
         heat_residual = u_t - self.alpha * (u_xx + u_yy)
 
         self.residual_fields = (heat_residual,)
@@ -331,15 +319,12 @@ class WaveEquation(PDE):
         t = inputs_dict['t']
         u = inputs_dict['u']
 
-        # First derivatives
         u_x, u_y, u_t = calc_grads(u, (x, y, t))
 
-        # Second derivatives
         u_xx = calc_grad(u_x, x)
         u_yy = calc_grad(u_y, y)
         u_tt = calc_grad(u_t, t)
 
-        # Residual
         wave_residual = u_tt - self.c**2 * (u_xx + u_yy)
 
         self.residual_fields = (wave_residual,)
@@ -371,13 +356,10 @@ class BurgersEquation1D(PDE):
         y = inputs_dict['y']
         u = inputs_dict['u']
 
-        # First derivatives
         u_x, u_y = calc_grads(u, (x, y))
 
-        # Second derivative
         u_xx = calc_grad(u_x, x)
 
-        # Residual
         burgers_residual = u_y + u * u_x - self.nu * u_xx
 
         self.residual_fields = (burgers_residual,)

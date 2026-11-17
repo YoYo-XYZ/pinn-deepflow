@@ -8,7 +8,6 @@ from .utility import *
 from .utility import _next_seed, get_dtype
 from .physicsinformed import PhysicsAttach
 
-# Constants for numerical stability
 EPS = 1e-6
 LARGE_SLOPE = 1e5
 
@@ -49,8 +48,6 @@ class CustomData(PhysicsAttach):
         self._postprocess()
 
     def _postprocess(self):
-        """Calculates lengths and centers after definition."""
-        # Preliminary sampling to determine bounds of dependent axes
         self.lengths = {}
         self.centers = {}
         
@@ -90,13 +87,12 @@ class Bound(PhysicsAttach):
         self.coords: Dict[int, torch.Tensor] = {}
         self.parameterized = False
         
-        # Determine axis index
         if ref_axis == 'x':
             self.ax = 0
         elif ref_axis == 'y':
             self.ax = 1
         else:
-            self.ax = 2  # Parametric 't'
+            self.ax = 2
 
         self.axes_sec = list(self.axes)
         if self.ax in self.axes_sec:
@@ -132,8 +128,6 @@ class Bound(PhysicsAttach):
         self._postprocess()
 
     def _postprocess(self):
-        """Calculates lengths and centers after definition."""
-        # Preliminary sampling to determine bounds of dependent axes
         self.sampling_line(10000, scheme='uniform')
         self.lengths = {}
         self.centers = {}
@@ -172,7 +166,6 @@ class Bound(PhysicsAttach):
             self.coords[ax] = torch.linspace(self.ranges[ax][0], self.ranges[ax][1], n_points, dtype=get_dtype())
 
         if self.parameterized:
-            # Assuming funcs[2] contains [func_x(t), func_y(t)]
             self.coords[0] = self.funcs[2][0](self.coords[ax])
             self.coords[1] = self.funcs[2][1](self.coords[ax])
         else:
@@ -193,7 +186,6 @@ class Bound(PhysicsAttach):
         """
         reject_masks = []
         
-        # Check if within the reference axis range
         in_range_mask = (x[self.ax] > self.ranges[self.ax][0]) & (x[self.ax] < self.ranges[self.ax][1])
         reject_masks.append(in_range_mask)
         
@@ -285,19 +277,15 @@ class Area(PhysicsAttach):
         bound_list = self.bound_list
         def is_inrange(x, range_x):
             return range_x[0] < x < range_x[1]
-        #brute force checking
         ax = 0
         for i, bound in enumerate(bound_list):
             if bound.ax == ax:
                 x = bound.centers[ax]
-                # assign reject_above based on sorted y-values at x_center
                 y_dict = {}
                 for j, bound_opponent in enumerate(bound_list):
-                    # create sorted y_value dict
                     if is_inrange(x, bound_opponent.ranges[ax]):
                         y_dict[j] = bound_opponent.funcs[ax][0](x)
                     sorted_index =  [index for (index, y) in sorted(y_dict.items(), key=lambda item: item[1])]
-                    # assign reject_above based on sorted y-values
                     for jj, index in enumerate(sorted_index):
                         if jj % 2 == 0:
                             bound_list[index].reject_above = False
@@ -305,14 +293,11 @@ class Area(PhysicsAttach):
                             bound_list[index].reject_above = True
             else:
                 x = bound.centers[ax]+ 1e-4
-                # assign reject_above based on sorted y-values at x_center
                 y_dict = {}
                 for j, bound_opponent in enumerate(bound_list):
-                    # create sorted y_value dict
                     if is_inrange(x, bound_opponent.ranges[ax]):
                         y_dict[j] = bound_opponent.funcs[ax][0](x)
                     sorted_index =  [index for (index, y) in sorted(y_dict.items(), key=lambda item: item[1])]
-                    # assign reject_above based on sorted y-values
                     if sorted_index:
                         for jj, index in enumerate(sorted_index):
                             if round(y_dict[index],2) == round(bound.ranges[1][0],2):
@@ -382,7 +367,6 @@ class Area(PhysicsAttach):
             Tuple of sampled ``x`` and ``y`` tensors. Candidate points outside
             the area are removed.
         """
-        # Normalize n_points_square to nx, ny, and n_total before branching
         if isinstance(n_points_square, (list, tuple)):
             nx, ny = n_points_square[0], n_points_square[1]
             n_total = nx * ny
@@ -409,7 +393,6 @@ class Area(PhysicsAttach):
             X_range = torch.linspace(self.ranges[0][0], self.ranges[0][1], nx, dtype=get_dtype())
             Y_range = torch.linspace(self.ranges[1][0], self.ranges[1][1], ny, dtype=get_dtype())
             
-            # Padding to avoid hitting exact boundaries
             X_range[0] += EPS
             X_range[-1] -= EPS
             Y_range[0] += EPS
@@ -559,7 +542,6 @@ class Area(PhysicsAttach):
             X, Y = bound.sampling_line(1000)
             plt.plot(X.numpy(), Y.numpy(), color='red', linestyle='--')
             
-        # Sample interior to verify logic
         X, Y = self.sampling_area([100, 100], scheme='uniform')
         plt.scatter(X.numpy(), Y.numpy(), s=0.05, color='green', alpha=0.5)
         
@@ -571,7 +553,6 @@ class Area(PhysicsAttach):
         """Returns the list of Area objects in the domain."""
         return [self]
 
-# --- Factory Functions ---
 
 def circle(x: float, y: float, r: float) -> Area:
     """Create a circular area.
@@ -595,7 +576,6 @@ def circle(x: float, y: float, r: float) -> Area:
     def func_down(X_tensor):
         return -(r**2 - (X_tensor - x)**2)**0.5 + y
     
-    # Parametric definitions for plotting/sampling
     def func_n_x_up(n): return x + r * torch.cos(n)
     def func_n_y_up(n): return y + r * torch.sin(n)
     def func_n_x_down(n): return x + r * torch.cos(n + torch.pi)
@@ -636,7 +616,6 @@ def line_horizontal(y: float, range_x: List[float]) -> Bound:
 def line_vertical(x: float, range_y: List[float]) -> Bound:
     """Create a vertical boundary at a fixed x coordinate."""
     bound = Bound(range_y, lambda y: x * torch.ones_like(y), ref_axis='y')
-    # Using a large slope to approximate verticality for x-based lookups
     bound.define_func([x - EPS, x + EPS], 
                       lambda x_: LARGE_SLOPE * (x_ - x) + (range_y[0] + range_y[1]) / 2, 
                       ref_axis='x')
@@ -661,7 +640,6 @@ def line(pos1: List[float], pos2: List[float]) -> Bound:
     slope = (y2 - y1) / (x2 - x1)
     intercept = y1 - slope * x1
     
-    # Note: capturing slope/intercept in lambda default args to avoid late binding issues
     return Bound(sorted([x1, x2]), 
                  lambda x, m=slope, c=intercept: m * x + c, 
                  ref_axis='x')
@@ -691,7 +669,6 @@ def polygon(*pos: List[float]) -> Area:
 
     bound_list = []
     for i in range(len(pos)):
-        # Connect current point to the previous point
         bound_list.append(line(pos[i], pos[i-1]))
 
     ranges = {
@@ -709,7 +686,6 @@ def _polygon_contains(
     x: torch.Tensor,
     y: torch.Tensor,
 ) -> torch.Tensor:
-    """Vectorized even-odd containment test for a simple polygon."""
     vertices = vertices.to(dtype=x.dtype, device=x.device)
     x1 = vertices[:, 0]
     y1 = vertices[:, 1]

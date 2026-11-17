@@ -6,12 +6,10 @@ import torch
 from scipy.stats import qmc
 from typing import Tuple, List, Union, Generator, Optional
 
-# Module-level seed storage for reproducibility helpers
 _GLOBAL_SEED = None
-_RNG = None  # Advancing deterministic RNG for repeated sampling calls
+_RNG = None
 
 def _next_seed() -> Optional[int]:
-    """Return the next integer from the advancing module-level RNG, or None if not seeded."""
     global _RNG
     if _RNG is not None:
         return _RNG.randint(0, 2**32 - 1)
@@ -36,21 +34,18 @@ def latin_hypercube_sampling(n_samples: int, n_dimensions: int, lower_lim:list, 
     Returns:
         A tensor of shape ``(n_samples, n_dimensions)``.
     """
-    # Resolve seed: explicit > per-call advancing RNG > global fallback > None (non-deterministic)
     seed = seed if seed is not None else (_next_seed() if _RNG is not None else _GLOBAL_SEED)
     lhs = qmc.LatinHypercube(d=n_dimensions, strength=1, seed=seed)
     sample = lhs.random(n=n_samples)
     sample = qmc.scale(sample, lower_lim, upper_lim)
     return torch.tensor(sample, dtype=get_dtype())
 
-# Module-level device configuration (mirrored by dtype below)
 device = 'cpu' if not torch.cuda.is_available() else 'cuda'
 def get_device():
     """Return the configured PyTorch device name."""
     global device
     return device
 
-# Module-level floating-point dtype configuration
 _DEFAULT_DTYPE = torch.float32
 
 
@@ -105,7 +100,7 @@ def manual_seed(seed:int, deterministic:bool=False):
     torch.manual_seed(seed)
 
     if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)        # Multi-GPU coverage
+        torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
@@ -154,7 +149,6 @@ def calc_grads(y: torch.Tensor, x_list: Union[Tuple[torch.Tensor, ...], List[tor
         create_graph=True,
         allow_unused=True
     )
-    # Handle cases where gradient doesn't depend on input (return zeros)
     return tuple(g if g is not None else torch.zeros_like(x) for g, x in zip(grads, x_list))
 
 def to_require_grad(*tensors: torch.Tensor) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:

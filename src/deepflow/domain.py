@@ -197,10 +197,8 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         if bound_top_k_list:
             for i, bound in enumerate(self.bound_list):
                 bound.save_coordinates()
-                # Sample new candidates
                 bound.sampling_line(bound_candidates_num_list[i], scheme='lhs')
                 bound.process_coordinates()
-                # Add RAR point to saved points
                 bound.get_residual_based_points_topk(top_k=bound_top_k_list[i])
                 bound.apply_residual_based_points()
                 bound.clear_residual_based_points()
@@ -208,10 +206,8 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         if area_top_k_list:
             for i, area in enumerate(self.area_list):
                 area.save_coordinates()
-                # Sample new candidates
                 area.sampling_area(area_candidates_num_list[i], scheme='lhs')
                 area.process_coordinates()
-                # Add RAR point to saved points
                 area.get_residual_based_points_topk(top_k=area_top_k_list[i])
                 area.apply_residual_based_points()
                 area.process_coordinates()
@@ -258,13 +254,11 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
                 resample_geometry(
                     self.bound_list[i], res, self.bound_list[i].sampling_line
                 )
-                # Add RAR point to saved points
         if area_sampling_res:
             for i, res in enumerate(area_sampling_res):
                 resample_geometry(
                     self.area_list[i], res, self.area_list[i].sampling_area
                 )
-                # Add RAR point to saved points
 
     def sampling_R3_(self, bound_sampling_res:list=None, area_sampling_res:list=None):
         """
@@ -286,23 +280,18 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         
         if bound_sampling_res:
             for i, res in enumerate(bound_sampling_res):
-                # Sample new candidates
                 self.bound_list[i].get_residual_based_points_threshold()
                 self.bound_list[i].sampling_line(res, scheme='random')
                 self.bound_list[i].apply_residual_based_points()
                 self.bound_list[i].process_coordinates()
-                # Add RAR point to saved points
         if area_sampling_res:
             for i, res in enumerate(area_sampling_res):
-                # Sample new candidates
                 self.area_list[i].get_residual_based_points_threshold()
                 self.area_list[i].sampling_area(res, scheme='random')
                 self.area_list[i].apply_residual_based_points()
                 self.area_list[i].process_coordinates()
-                # Add RAR point to saved points
 
     def sampling_accumulate(self, bound_sampling_res:list=None, area_sampling_res:list=None):
-        ### EXPERIMENTAL
         """Accumulate residual-based points across repeated sampling calls.
 
         Args:
@@ -316,27 +305,21 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         
         if bound_sampling_res:
             for i, res in enumerate(bound_sampling_res):
-                # Sample new candidates
                 self.bound_list[i].get_residual_based_points_threshold(maintain_points=True)
                 self.bound_list[i].sampling_line(res, scheme='random')
                 self.bound_list[i].apply_residual_based_points()
                 self.bound_list[i].process_coordinates()
-                # Add RAR point to saved points
         if area_sampling_res:
             for i, res in enumerate(area_sampling_res):
-                # Sample new candidates
                 self.area_list[i].get_residual_based_points_threshold(maintain_points=True)
                 self.area_list[i].sampling_area(res, scheme='random')
                 self.area_list[i].apply_residual_based_points()
                 self.area_list[i].process_coordinates()
-                # Add RAR point to saved points
     def clear_residual_points(self):
         """Discard residual-based point buffers from all geometries."""
         for geometry in self.bound_list + self.area_list:
             geometry.clear_residual_based_points()
-#------------------------------------------------------------------------------------------------
     def _format_condition_dict(self, obj, obj_type='Bound'):
-        """Helper function to format condition dictionary for display."""
 
         def func_to_latex(func_list):
             v = func_list
@@ -370,7 +353,6 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             bound.X = bound.saved_X.clone()
             bound.Y = bound.saved_Y.clone()
     
-#-------------------------------------------------------------------------------------------------
     def _plot_items(self, ax, items, name, get_xy, scatter_kw, text_kw, show_label=True):
         for i, obj in enumerate(items):
             x, y = get_xy(obj, i)
@@ -459,7 +441,6 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         if ylim: ax.set_ylim(ylim)
         plt.show()
 
-#-------------------------------------------------------------------------------------------------
     def __getitem__(self, key):
         return
     
@@ -468,25 +449,8 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
             yield geometry
 
     def _batched_loss(self, model) -> dict:
-        """
-        Compute per-physics-type losses with **one forward pass per physics type**.
-
-        Geometries sharing the same ``physics_type`` (BC, IC, or PDE) have their
-        input coordinates concatenated into a single batch, the model is called
-        once for that batch, and the outputs are sliced back to each geometry for
-        per-geometry residual computation (via ``_compute_residual_field``).
-
-        This reduces the number of forward passes from *N_geometries* to
-        *N_physics_types* (e.g. 5 → 2 for steady channel flow: 1 BC pass + 1
-        PDE pass).
-
-        Assumes all geometries within the same physics-type group share the same
-        ``inputs_tensor_dict`` keys.
-        """
         loss_dict = {"pde_loss": 0.0, "bc_loss": 0.0, "ic_loss": 0.0}
 
-        # Group geometries by physics_type, preserving insertion order.
-        # Cache the grouping since geometry structure is fixed during training.
         if not hasattr(self, '_groups_cache'):
             groups: dict[str, list] = {}
             for geometry in self:
@@ -495,24 +459,14 @@ number of area : {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list
         groups = self._groups_cache
 
         for physics_type, geometries in groups.items():
-            # Concatenate inputs across all geometries in this group
             input_keys = list(geometries[0].inputs_tensor_dict.keys())
             batched_inputs = {
                 k: torch.cat([g.inputs_tensor_dict[k] for g in geometries])
                 for k in input_keys
             }
 
-            # Single forward pass for the entire physics-type group
             batched_outputs = model(batched_inputs)
 
-            # Slice outputs back to each geometry and compute per-geometry loss.
-            # Use the original leaf tensors (inputs_tensor_dict) as model_inputs
-            # so that torch.autograd.grad can compute higher-order derivatives
-            # (PDE residuals need 2nd derivatives). Slices of torch.cat are
-            # non-leaf intermediates which autograd cannot differentiate through
-            # for higher-order grads, but the original leaf tensors remain in
-            # the graph (leaf → cat → model → output_slice), so
-            # grad(output_slice, leaf_input) works correctly.
             start = 0
             for g in geometries:
                 end = start + len(g.X_)

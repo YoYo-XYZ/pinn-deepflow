@@ -23,7 +23,6 @@ class Visualizer:
     def __init__(self, data_dict: Dict[str, np.ndarray]):
         """Initialize a visualizer from evaluated data."""
         self.data_dict = data_dict
-        # Cache coordinates for convenience, if they exist
         self.X = data_dict.get('x')
         self.Y = data_dict.get('y')
 
@@ -79,10 +78,8 @@ class Visualizer:
             self.data_dict.get(x_axis), self.data_dict.get(y_axis)
         )
 
-        # Plot
         scatter = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], s=s, c=self.data_dict[color_axis], cmap=cmap, marker='s')
         
-        # Styling
         ax.format(title = color_axis, xlabel = x_axis, ylabel = y_axis, aspect = 'equal', grid = False)
         ax.set_xlim(self.data_dict[x_axis].min(), self.data_dict[x_axis].max())
         ax.set_ylim(self.data_dict[y_axis].min(), self.data_dict[y_axis].max())
@@ -92,7 +89,6 @@ class Visualizer:
             return fig, ax
         return fig
     
-    # Modern alias
     plot_scatter = plot_color
 
     def plot(self, z_axis: str = None, x_axis:str = 'x', y_axis:str = 'y', return_ax: bool = False, color = None) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
@@ -112,14 +108,12 @@ class Visualizer:
         """
         if z_axis is None:
             fig, ax = self._create_subplot()
-            # Line Plot
             ax.plot(self.data_dict[x_axis], self.data_dict[y_axis], color=self.color_default if color is None else color)
             ax.grid(True)
             ax.set_xlabel(x_axis)
             ax.set_ylabel(y_axis)
         else:
             fig, ax = plt.subplot(refwidth = self.refwidth_default, proj = '3d')
-            # 3D Scatter Plot
             scatter = ax.scatter(self.data_dict[x_axis], self.data_dict[y_axis], self.data_dict[z_axis], c=self.data_dict[z_axis], cmap=self.cmap_default if color is None else color, s=3)
             ax.set(xlabel=x_axis, ylabel=y_axis)
             ax.set_title(f'3D Scatter Plot of {z_axis}')
@@ -167,14 +161,12 @@ class Visualizer:
         """
         fig, ax = plt.subplots(refwidth=5, refheight=3)
 
-        # Plot
         for key in keys:
             if key in self.data_dict:
                 values = np.asarray(self.data_dict[key]).reshape(-1)
                 iterations = np.arange(values.size)[start:end]
                 ax.plot(iterations, values[start:end], label=key)
 
-        # Styling
         if log_scale:
             ax.set_yscale("log")
         ax.format(title = "Loss per Iteration", xlabel = "Iteration", ylabel = "Loss")
@@ -204,10 +196,8 @@ class Visualizer:
         )
         (C,), (X, Y) = self._interpolate(color_axis, x_key=x_axis, y_key=y_axis)
 
-        # Plot
         scatter = ax.contourf(X, Y, C, cmap=cmap, levels = levels)
         
-        # Styling
         ax.format(title = color_axis, xlabel = x_axis, ylabel = y_axis, aspect = 'equal', grid = False)
         ax.set_xlim(self.data_dict[x_axis].min(), self.data_dict[x_axis].max())
         ax.set_ylim(self.data_dict[y_axis].min(), self.data_dict[y_axis].max())
@@ -239,10 +229,8 @@ class Visualizer:
 
         (U, V), (X, Y) = self._interpolate(u, v, x_key=x_axis, y_key=y_axis, points=2000)
 
-        # Plot
         stream = ax.streamplot(X, Y, U, V, color = (U**2 + V**2)**0.5, cmap = cmap, levels = levels, broken_streamlines = False)
     
-        # Styling
         ax.format(title = f"Streamline of {u} and {v}", xlabel = x_axis, ylabel = y_axis, aspect = 'equal', grid = False)
         ax.set_xlim(self.data_dict[x_axis].min(), self.data_dict[x_axis].max())
         ax.set_ylim(self.data_dict[y_axis].min(), self.data_dict[y_axis].max())
@@ -253,9 +241,6 @@ class Visualizer:
         return fig
 
     def _interpolate(self, *keys, x_key='x', y_key='y', points=None):
-        """
-        Interpolate scattered fields onto a rectangular grid.
-        """
         x = np.asarray(self.data_dict[x_key]).reshape(-1)
         y = np.asarray(self.data_dict[y_key]).reshape(-1)
 

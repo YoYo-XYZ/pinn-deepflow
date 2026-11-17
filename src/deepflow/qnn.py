@@ -9,23 +9,8 @@ from torch import nn
 import pennylane as qml
 
 
-# ---------------------------------------------------------------------------
-# Module-level quantum circuits for QCPINN (must be at module scope for
-# pickling / deepcopy / multiprocessing compatibility).
-# ---------------------------------------------------------------------------
 
 def _qcpinn_circuit(inputs, weights):
-    """Published QCPINN cascade circuit.
-
-    This is the cascade ansatz from the QCPINN reference implementation:
-    X-angle embedding, RX and RZ rotations on every qubit, followed by a
-    trainable CRX ring.  The three rows of ``weights`` correspond to RX, RZ,
-    and CRX parameters respectively.
-
-    Number of qubits and layer count are inferred from the *runtime shapes* of the
-    tensors so that no closure over instance state is needed and the
-    function remains picklable.
-    """
     nqubits = inputs.shape[-1]
     n_layers = weights.shape[0]
 
@@ -44,13 +29,6 @@ def _qcpinn_circuit(inputs, weights):
 
 
 def _qcpinn_hea_circuit(inputs, weights):
-    """Pictured HEA circuit with fixed linear nearest-neighbor CNOTs.
-
-    Each layer applies trainable RX, RY, and RZ rotations to every qubit,
-    followed by CNOTs from qubit ``i`` to ``i + 1`` for ``i < nqubits - 1``.
-    The angle embedding is retained so this mode is a drop-in QCPINN
-    alternative; the HEA topology refers to the trainable ansatz block.
-    """
     nqubits = inputs.shape[-1]
     n_layers = weights.shape[0]
 
@@ -133,18 +111,15 @@ class QCPINN(NN):
     def _build_network(self):
         layers = []
 
-        # Pre-processing layers
         iter_layers = [self.input_num] + self.hidden_layer_pre + [self.nqubits]
         for i in range(len(iter_layers) - 1):
             layers.append(nn.Linear(iter_layers[i], iter_layers[i+1]))
             layers.append(self.activation)
         
         q_layer = self._qnn_setup()
-        # Quantum layers
         layers.append(q_layer)
         layers.append(self.activation)
         
-        # Post-processing layers
         iter_layers = [self.nqubits] + self.hidden_layer_post + [self.output_num]
         for i in range(len(iter_layers) - 1):
             layers.append(nn.Linear(iter_layers[i], iter_layers[i+1]))
@@ -269,13 +244,11 @@ class QPINN(NN):
     def _build_network(self):
         layers = []
 
-        # Pre-processing layers
         iter_layers = [self.input_num] + self.hidden_layer_pre + [self.nqubits]
         for i in range(len(iter_layers) - 1):
             layers.append(nn.Linear(iter_layers[i], iter_layers[i+1]))
             layers.append(self.activation)
         
-        # Quantum layers
         q_layer = qml.qnn.TorchLayer(
             self._qnn_layer(),
             weight_shapes={"weights": (self.q_depth, 3, self.nqubits)},
@@ -283,7 +256,6 @@ class QPINN(NN):
         layers.append(q_layer)
         layers.append(self.activation)
         
-        # Post-processing layers
         iter_layers = [self.nqubits] + self.hidden_layer_post + [self.output_num]
         for i in range(len(iter_layers) - 1):
             layers.append(nn.Linear(iter_layers[i], iter_layers[i+1]))

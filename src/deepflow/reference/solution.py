@@ -118,12 +118,6 @@ class ReferenceSolution:
 
     @staticmethod
     def _evaluate_ngsolve_field(mesh, field, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        """Evaluate a scalar NGSolve field point by point.
-
-        NGSolve's point evaluator accepts one coordinate in 1-D and two in
-        2-D.  The solver supplies a custom evaluator for the Burgers backend;
-        this default handles all 2-D FEM fields.
-        """
         values = np.empty(x.size, dtype=float)
         for index, (x_value, y_value) in enumerate(zip(x.flat, y.flat)):
             value = field(mesh(float(x_value), float(y_value)))

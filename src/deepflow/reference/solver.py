@@ -35,7 +35,6 @@ class UnsupportedReferencePDE(NotImplementedError):
 
 
 def _load_ngsolve():
-    """Import the optional backend only from the solve path."""
     try:
         import ngsolve
     except (ImportError, OSError) as exc:
@@ -161,12 +160,6 @@ def _is_point_like(bound: Bound, pde_area: Area) -> bool:
 
 
 def _boundary_label(bound: Bound, adapter: MeshGeometry):
-    """Return the mesh label for a boundary object, including aliases.
-
-    A standalone Bound can represent the same curve as an Area boundary while
-    being a different Python object.  Match those aliases by their sampled
-    point sets, but never match a boundary that lies in the area interior.
-    """
     label = adapter.labels_by_bound.get(id(bound))
     if label is not None:
         return label
@@ -238,7 +231,6 @@ def _field_labels(boundary_conditions: Mapping[str, Mapping[str, object]], field
 
 
 def _numeric_function_value(function, value):
-    """Evaluate a DeepFlow callable with Python, NumPy, or Torch scalars."""
     attempts = [value, np.asarray(value), np.asarray(value, dtype=float)]
     try:
         import torch
@@ -256,7 +248,7 @@ def _numeric_function_value(function, value):
             if result.size != 1:
                 raise ValueError("boundary callable must return a scalar")
             return float(result.reshape(-1)[0])
-        except Exception as exc:  # try the next scalar representation
+        except Exception as exc:
             error = exc
     raise ValueError("Could not evaluate boundary callable at a mesh point") from error
 
@@ -628,8 +620,6 @@ class ReferenceSolver:
             snapshots.append({"u": current})
             old = current
 
-        # Scalar implicit steps are solved directly.  The recorded change is
-        # a diagnostic of physical evolution, not a nonlinear convergence test.
         converged = True
         metadata = self._metadata(
             pde,
@@ -676,7 +666,6 @@ class ReferenceSolver:
         snapshots = [{"u": displacement}]
         residuals = []
 
-        # Compute a consistent initial acceleration from M*a + K*u = 0.
         mass = ngs.BilinearForm(fes)
         mass_trial = fes.TrialFunction()
         mass_test = fes.TestFunction()

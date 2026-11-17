@@ -27,7 +27,6 @@ class _Loop:
 
 @dataclass
 class MeshGeometry:
-    """Netgen geometry plus the labels used by the FEM solver."""
 
     geometry: object
     mesh: object
@@ -88,7 +87,6 @@ def _close(a: np.ndarray, b: np.ndarray, tolerance: float) -> bool:
 
 
 def _stitch(edges: Sequence[_Edge], tolerance: float) -> List[List[_Edge]]:
-    """Stitch unoriented sampled curves into closed loops."""
     remaining = list(range(len(edges)))
     loops: List[List[_Edge]] = []
 
@@ -115,8 +113,6 @@ def _stitch(edges: Sequence[_Edge], tolerance: float) -> List[List[_Edge]]:
                     "open or ambiguous Bound representation."
                 )
 
-            # The first match is deterministic.  Ambiguous branches are not
-            # silently joined: they usually indicate a disconnected union.
             if len(candidates) > 1:
                 unique_edges = {remaining[position] for position, _ in candidates}
                 if len(unique_edges) > 1:
@@ -192,7 +188,6 @@ def _representative_point(points: np.ndarray) -> np.ndarray:
 
 
 class NetgenGeometryAdapter:
-    """Build a Netgen mesh from one explicit DeepFlow ``Area``."""
 
     def __init__(self, boundary_resolution: int = 128):
         if not isinstance(boundary_resolution, int) or boundary_resolution < 4:
@@ -219,11 +214,8 @@ class NetgenGeometryAdapter:
             area = _signed_area(_loop_points(loop))
             if abs(area) <= tolerance * tolerance:
                 raise ReferenceGeometryError("A boundary loop has zero area.")
-            # Netgen uses the material on the left side of a positively
-            # oriented outer loop.  Holes therefore use the opposite winding.
             if (not hole and area < 0) or (hole and area > 0):
                 loop = _reverse_loop(loop)
-            # Replace the loop in-place so callers retain deterministic order.
             loops[loop_index] = loop
         return loops
 

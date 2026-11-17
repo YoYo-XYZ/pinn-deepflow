@@ -7,7 +7,6 @@ from copy import deepcopy
 import torch
 import torch.nn as nn
 
-# Assuming these modules exist in your package structure
 from .nn import HardConstraint
 from .pde import PDE
 from .utility import calc_grad, get_device, get_dtype, _next_seed
@@ -33,13 +32,11 @@ class PhysicsAttach:
         self.range_t: Optional[Union[Tuple[float, float], torch.Tensor]] = None
         self.is_converged: bool = False
         
-        # Internal state placeholders
         self.condition_dict: Optional[Dict] = None
         self.condition_num: int = 0
         self.t: Optional[torch.Tensor] = None
         self.PDE: Optional[PDE] = None
         
-        # Coordinate placeholders
         self.X: Optional[torch.Tensor] = None
         self.Y: Optional[torch.Tensor] = None
         self.X_: Optional[torch.Tensor] = None
@@ -49,24 +46,18 @@ class PhysicsAttach:
         self.Y_residual_container: list[torch.Tensor] = []
         self._amounts_before_add: int = 0
 
-        # Time
         self.expo_scaling = None
         self.scheme = None
         
-        # Data dictionaries
         self.inputs_tensor_dict: Dict[str, Optional[torch.Tensor]] = {}
         self.target_output_tensor_dict: Dict[str, torch.Tensor] = {}
         self.model_inputs: Dict = {}
         self.model_outputs: Dict = {}
         
-        # Loss tracking
         self.loss_field: Union[int, torch.Tensor] = 0
         self.loss_threshold: Optional[float] = None
         self.top_k_loss_threshold: Optional[float] = None
 
-    # --------------------------------------------------------------------------
-    # Condition Definitions
-    # --------------------------------------------------------------------------
 
     def define_bc(self, condition_dict: Dict[str, Any]) -> None:
         """
@@ -109,9 +100,6 @@ class PhysicsAttach:
         self.PDE = pde
         self.physics_type = "PDE"
 
-    # --------------------------------------------------------------------------
-    # Data Preparation & Coordinate Processing
-    # --------------------------------------------------------------------------
 
     def set_coordinates(self, x: torch.Tensor, y: torch.Tensor) -> None:
         """
@@ -140,7 +128,6 @@ class PhysicsAttach:
         Raises:
             ValueError: If no range is supplied and no previous range exists.
         """
-        # Handle args: Define or use existing range_t, scheme, expo_scaling
         if range_t is not None: self.range_t = range_t
         elif self.range_t is None:
             raise ValueError("Time range must be defined before sampling time coordinates.")
@@ -171,9 +158,7 @@ class PhysicsAttach:
         n_points = len(self.X)
         device = get_device()
 
-        # Generate time coordinates
         if self.physics_type == "IC":
-            # For IC, time is always zero
             self.t = self.range_t[0] * torch.ones_like(self.X, device=device)
         elif isinstance(self.range_t, (tuple, list)):
             if self.scheme == "uniform":
@@ -194,11 +179,6 @@ class PhysicsAttach:
             raise ValueError("Time range must be defined before sampling time coordinates.")
 
         self.T = self.t
-        # .detach() ensures T_ is always a fresh leaf tensor, even when
-        # self.t was previously given requires_grad in-place by an earlier
-        # process_coordinates call (which makes .to(device) return the same
-        # tensor).  Without .detach(), R3 resampling can produce a non-leaf
-        # T_ carrying a stale grad_fn, which breaks the next backward().
         self.T_ = self.t.to(device).detach().requires_grad_()
         self.inputs_tensor_dict['t'] = self.T_
 
@@ -222,26 +202,18 @@ class PhysicsAttach:
 
         device = get_device() if device is None else device
         
-        # .detach() ensures X_/Y_ are always fresh leaf tensors, even when
-        # self.X/self.Y were previously given requires_grad in-place by an
-        # earlier process_coordinates call (which makes .to(device) return
-        # the same tensor).  Without .detach(), R3 resampling can produce
-        # non-leaf X_/Y_ carrying a stale grad_fn from the previous graph,
-        # which breaks the next backward().
         self.X_ = self.X.to(device).detach().requires_grad_()
         self.Y_ = self.Y.to(device).detach().requires_grad_()
 
         self.inputs_tensor_dict['x'] = self.X_
         self.inputs_tensor_dict['y'] = self.Y_
 
-        # Pre-calculate target values for BC/IC
         if self.physics_type == "BC" or self.physics_type == "IC":
             self._prepare_target_outputs(device)
 
         return self.inputs_tensor_dict
 
     def _prepare_target_outputs(self, device: torch.device) -> None:
-        """Internal helper to prepare target tensors for BC/IC."""
         from .nn import HardConstraint
         target_output_tensor_dict = {}
 
@@ -249,10 +221,8 @@ class PhysicsAttach:
             if isinstance(condition, HardConstraint):continue
     
             if isinstance(condition, (float, int)):
-                # Constant condition
                 target_output_tensor_dict[key] = condition * torch.ones_like(self.X_, device=device)
             else:
-                # Function-based condition (tuple: (variable_key, function))
                 try:
                     variable_key, func = condition
                     input_var = self.inputs_tensor_dict[variable_key].detach().clone()
@@ -262,9 +232,6 @@ class PhysicsAttach:
         
         self.target_output_tensor_dict = target_output_tensor_dict
 
-    # --------------------------------------------------------------------------
-    # Model Execution & Loss Calculation
-    # --------------------------------------------------------------------------
 
     def calc_output(self) -> Dict[str, torch.Tensor]:
         """
@@ -286,7 +253,6 @@ class PhysicsAttach:
         
         for key in self.target_output_tensor_dict:
             if '_' in key:
-                # Example: key='u_x' -> compute grad(u, x)
                 var_name, grad_var = key.split('_')
                 if var_name not in prediction_dict:
                     raise KeyError(f"Model output missing variable '{var_name}' required for condition '{key}'.")
@@ -327,16 +293,7 @@ class PhysicsAttach:
         return self._compute_residual_field()
 
     def _compute_residual_field(self) -> Union[int, torch.Tensor]:
-        """
-        Compute the residual field from cached ``model_inputs`` / ``model_outputs``.
-
-        This is the residual-computation half of ``calc_residual_field``,
-        extracted so that callers which have already run the forward pass
-        (e.g. batched loss in ``ProblemDomain``) can skip the redundant
-        ``process_model`` call.
-        """
         if self.physics_type in ["BC", "IC"]:
-            # If all conditions are HardConstraints, the loss is structurally zero
             if all(isinstance(cond, HardConstraint) for cond in self.condition_dict.values()):
                 device = self.X_.device
                 n_points = self.X_.shape[0]
@@ -364,9 +321,6 @@ class PhysicsAttach:
         self.loss_threshold = loss
         self.top_k_loss_threshold = top_k_loss
 
-    # --------------------------------------------------------------------------
-    # Residual-Based Adaptive Sampling Related
-    # --------------------------------------------------------------------------
 
     def save_coordinates(self) -> Tuple[torch.Tensor, torch.Tensor]:
         """Save the current spatial coordinates for later restoration.
@@ -390,13 +344,10 @@ class PhysicsAttach:
             the residual-point buffers.
         """
         if isinstance(self.residual_field, (int, float)): 
-            # Loss field not calculated or zero
             return torch.tensor([]), torch.tensor([])
 
-        # Select top K points with highest error
         _, top_k_index = torch.topk(self.residual_field, top_k, dim=0)
         
-        # Flatten and move to CPU for indexing data
         top_k_index = top_k_index.flatten().cpu()
         
         X_residual = self.X[top_k_index]
@@ -422,12 +373,11 @@ class PhysicsAttach:
         if threshold is None: threshold = torch.mean(self.residual_field).item()
 
         if isinstance(self.residual_field, (int, float)): 
-            # Loss field not calculated or zero
             return torch.tensor([]), torch.tensor([])
         
         mask = (self.residual_field > threshold)
         if self.X_residual_container and maintain_points:
-            mask[:(self.residual_field.shape[0] - self._amounts_before_add)] = False  # Avoid adding previously added points
+            mask[:(self.residual_field.shape[0] - self._amounts_before_add)] = False
         mask = mask.cpu()
 
         X_residual = self.X[mask]
@@ -451,9 +401,6 @@ class PhysicsAttach:
         self.X_residual_container.clear()
         self.Y_residual_container.clear()
 
-    # --------------------------------------------------------------------------
-    # PDE Processing Helpers
-    # --------------------------------------------------------------------------
 
     def process_model(self, model: nn.Module) -> Dict[str, torch.Tensor]:
         """Run a model on the processed inputs and cache its outputs.
@@ -481,7 +428,7 @@ class PhysicsAttach:
         Returns:
             A ``deepflow.evaluation.Evaluator`` instance.
         """
-        from .evaluation import Evaluator # Import inside method to avoid circular dependency if Evaluation imports PhysicsAttach
+        from .evaluation import Evaluator
         return Evaluator(model, self)
     
 def function(input_key: str, function: Callable) -> List[Union[str, Callable]]:
