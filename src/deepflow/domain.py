@@ -66,8 +66,8 @@ class ProblemDomain():
         sampling_option: Name of the most recent sampling strategy.
 
     Notes:
-        Domain sampling methods update geometry coordinates in place. Call
-        ``evaluate`` only after every included geometry has coordinates.
+        Domain sampling methods update geometry coordinates in place.
+        Evaluate each geometry with ``geometry.evaluate(model)``.
     """
 
     def __init__(self, bound_list:list[Bound], area_list:list[Area]):
@@ -79,23 +79,6 @@ class ProblemDomain():
         for g in self.bound_list + self.area_list:
             if isinstance(g, CustomData):
                 g.process_coordinates()
-
-    def evaluate(self, model):
-        """Create evaluators for every unique sampled geometry.
-
-        Args:
-            model: PINN model used to compute predictions and residuals.
-
-        Returns:
-            A ``deepflow.evaluation.GroupEvaluator`` containing one child
-            evaluator per unique geometry.
-
-        Raises:
-            ValueError: If an included geometry has not been sampled.
-        """
-        from .evaluation import GroupEvaluator
-
-        return GroupEvaluator(model, self)
 
     def solve_fem(
         self,
