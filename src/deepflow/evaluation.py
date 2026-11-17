@@ -12,30 +12,18 @@ from .visualization import Visualizer
 
 
 class Evaluator(Visualizer):
-    """Evaluate a PINN on one geometry and prepare plotting data.
+    """Evaluate a PINN on a geometry for plotting.
 
     Args:
-        pinns_model: PINN model used to calculate predictions and residuals.
-        geometry: Sampled ``Area``, ``Bound``, or ``CustomData``
-            object.
+        pinns_model: Prediction and residual model.
+        geometry: Sampled ``Area``, ``Bound``, or ``CustomData``.
 
-    Attributes:
-        data_dict: Materialized NumPy fields, coordinates, residuals, and loss
-            history.
-
-    Notes:
-        Sampling and time changes replace ``data_dict``. Reassign any custom
-        fields after refreshing the evaluator.
+    ``data_dict`` holds NumPy fields, coordinates, residuals, and loss history.
+    Resampling or changing time replaces it; reassign custom fields afterward.
     """
 
     def __init__(self, pinns_model: PINN, geometry: Area|Bound|CustomData) -> None:
-        """
-        Initialize an evaluator for a model and geometry.
-
-        Args:
-            pinns_model: The physics-informed neural network model.
-            geometry: The geometric domain or custom data to evaluate.
-        """
+        """Create an evaluator for a PINN model and geometry."""
         self.model = pinns_model 
         self.geometry = geometry
 
@@ -49,20 +37,20 @@ class Evaluator(Visualizer):
             self.postprocess()
 
     def sampling_line(self, n_points: int, scheme: str = 'uniform') -> None:
-        """Sample a boundary and refresh evaluated fields.
+        """Resample the boundary and refresh fields.
 
         Args:
-            n_points: Number of boundary points.
+            n_points: Boundary point count.
             scheme: ``"uniform"``, ``"random"``, or ``"lhs"``.
         """
         self.geometry.sampling_line(n_points, scheme)
         self.postprocess()
 
     def sampling_area(self, res_list: List[int], scheme: str = 'uniform') -> None:
-        """Sample an area and refresh evaluated fields.
+        """Resample the area and refresh fields.
 
         Args:
-            res_list: Area resolution as a scalar or ``[nx, ny]`` pair.
+            res_list: Scalar resolution or ``[nx, ny]``.
             scheme: ``"uniform"``, ``"random"``, or ``"lhs"``.
         """
         self.geometry.sampling_area(res_list, scheme)
@@ -74,12 +62,12 @@ class Evaluator(Visualizer):
         sampling_scheme: str = "uniform",
         expo_scaling: Optional[bool] = None,
     ) -> None:
-        """Define time coordinates and refresh evaluated fields.
+        """Set time coordinates and refresh fields.
 
         Args:
-            range_t: Time interval or fixed time value.
+            range_t: Interval or fixed time.
             sampling_scheme: Time sampling scheme.
-            expo_scaling: Whether to apply exponential time scaling.
+            expo_scaling: Apply exponential time scaling.
         """
         self.geometry.define_time(
             range_t,
@@ -88,11 +76,8 @@ class Evaluator(Visualizer):
         )
         self.postprocess()
     def postprocess(self) -> None:
-        """
-        Recompute predictions, residuals, and coordinates.
-
-        Returns:
-            None. ``data_dict`` is replaced with NumPy-compatible values.
+        """Replace ``data_dict`` with refreshed NumPy predictions, residuals, and
+        coordinates.
         """
         self.geometry.process_coordinates()
 
@@ -150,23 +135,19 @@ class Evaluator(Visualizer):
         return f"Available data keys: {tuple(self.data_dict.keys())}"
     
     def plot_animate(self, color_axis:str, x_axis: str = 'x', y_axis: str = 'y', cmap = 'viridis', range_t=None, dt=None, frame_interval = 10, plot_type: str = 'scatter', s = 6, color_range:list=None) -> Any:
-        """
-        Create and display an animation over time for a field.
+        """Display a time animation and return the Matplotlib animation object.
 
         Args:
             color_axis: Field to animate.
             x_axis: x-coordinate field.
             y_axis: y-coordinate field.
-            cmap: Matplotlib colormap name.
-            range_t: Two-element animation time interval.
-            dt: Time increment between frames.
-            frame_interval: Delay between frames in milliseconds.
+            cmap: Colormap name.
+            range_t: ``[start, end]`` time interval.
+            dt: Time step per frame.
+            frame_interval: Frame delay in milliseconds.
             plot_type: ``"scatter"``, ``"tripcolor"``, or ``"contourf"``.
             s: Scatter marker size.
-            color_range: Optional ``[min, max]`` color limits.
-
-        Returns:
-            The created Matplotlib animation object.
+            color_range: ``[min, max]`` color limits.
         """
         import matplotlib.animation as animation
 
@@ -211,16 +192,14 @@ class Evaluator(Visualizer):
 
 
 class ReferenceEvaluator(Evaluator):
-    """Evaluate a solved ``ReferenceSolution`` on one geometry.
+    """Query a ``ReferenceSolution`` at a geometry's coordinates.
 
-    Reference evaluators deliberately do not calculate PINN residuals or copy
-    model training history.  They retain the FEM solution and re-query it
-    whenever the geometry is sampled again or its time coordinates change.
+    Resampling or changing time refreshes FEM fields. PINN residuals and
+    training history are excluded.
 
     Args:
-        reference_solution: Solved ``ReferenceSolution`` queried by this
-            evaluator.
-        geometry: Geometry whose coordinates are used for FEM queries.
+        reference_solution: Solved FEM fields.
+        geometry: Query geometry.
     """
 
     def __init__(self, reference_solution, geometry: Area | Bound | CustomData) -> None:
@@ -327,12 +306,8 @@ class ReferenceEvaluator(Evaluator):
         sampling_scheme: str = "uniform",
         expo_scaling: Optional[bool] = None,
     ) -> None:
-        """Update time coordinates and re-query the FEM fields.
-
-        Args:
-            range_t: Time interval or fixed time value.
-            sampling_scheme: Time sampling scheme.
-            expo_scaling: Whether to apply exponential time scaling.
+        """Set time coordinates and refresh FEM fields; see
+        ``Evaluator.define_time``.
         """
         self.geometry.define_time(
             range_t,
@@ -398,11 +373,9 @@ class ReferenceEvaluator(Evaluator):
 
 
 class ReferenceGroupEvaluator:
-    """FEM results organized into geometry-specific reference evaluators.
+    """FEM evaluators grouped in ``area_list`` and ``bound_list``.
 
-    Access fields and plots through ``area_list`` and ``bound_list``.
-    The solved FEM solution is available as ``reference_solution`` for
-    arbitrary point queries and export.
+    Use ``reference_solution`` for arbitrary point queries and export.
     """
 
     def __init__(self, reference_solution, domain) -> None:

@@ -51,18 +51,18 @@ _QCPINN_LAYER_TYPES = {
 }
 
 class QCPINN(NN):
-    """Quantum-circuit PINN with a configurable trainable circuit block.
+    """PINN combining classical layers and a trainable quantum circuit.
 
     Args:
-        input_vars: Names of coordinate inputs.
-        output_vars: Names of predicted fields.
-        nqubits: Number of qubits in the circuit.
-        q_layer_type: Circuit topology: ``"cascade"`` or ``"hea"``.
-        q_layer_iterations: Number of repeated quantum layers.
-        hidden_layer_pre: Classical layer widths before the quantum layer.
-        hidden_layer_post: Classical layer widths after the quantum layer.
-        activation: PyTorch activation module for classical layers.
-        weight_init: Weight initialization scheme inherited from ``NN``.
+        input_vars: Coordinate names.
+        output_vars: Field names.
+        nqubits: Qubit count.
+        q_layer_type: ``"cascade"`` or ``"hea"``.
+        q_layer_iterations: Quantum-layer repetitions.
+        hidden_layer_pre: Classical widths before the circuit.
+        hidden_layer_post: Classical widths after the circuit.
+        activation: Classical-layer activation module.
+        weight_init: Initialization scheme; see ``NN``.
     """
 
     def __init__(
@@ -129,23 +129,20 @@ class QCPINN(NN):
         self._init_weights()
 
 class QPINN(NN):
-    """Quantum PINN with configurable feature map and ansatz layers.
+    """PINN with a configurable quantum feature map and ansatz.
 
     Args:
-        input_vars: Names of coordinate inputs.
-        output_vars: Names of predicted fields.
-        nqubits: Number of qubits in the circuit.
-        q_depth: Number of trainable quantum layers.
-        feature_map: Feature map: ``"simple"``, ``"product"``, or
-            ``"chebyshev"``.
-        ansatz: Trainable circuit block: ``"simple"``, ``"hea"``, or
-            ``"cascade"``.
-        cost_func: Measurement block. Only ``"simple"`` is currently
-            supported.
-        hidden_layer_pre: Classical layer widths before the quantum layer.
-        hidden_layer_post: Classical layer widths after the quantum layer.
-        activation: PyTorch activation module for classical layers.
-        weight_init: Weight initialization scheme inherited from ``NN``.
+        input_vars: Coordinate names.
+        output_vars: Field names.
+        nqubits: Qubit count.
+        q_depth: Trainable quantum-layer count.
+        feature_map: ``"simple"``, ``"product"``, or ``"chebyshev"``.
+        ansatz: ``"simple"``, ``"hea"``, or ``"cascade"``.
+        cost_func: Only ``"simple"`` is supported.
+        hidden_layer_pre: Classical widths before the circuit.
+        hidden_layer_post: Classical widths after the circuit.
+        activation: Classical-layer activation module.
+        weight_init: Initialization scheme; see ``NN``.
     """
 
     def __init__(

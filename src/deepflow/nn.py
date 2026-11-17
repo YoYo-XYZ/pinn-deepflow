@@ -18,30 +18,14 @@ class _NonFiniteLossError(RuntimeError):
 
 
 class HardConstraint:
-    """Represent a constant boundary or initial-condition constraint.
-
-    Args:
-        constant: Value imposed by the constraint.
-
-    Notes:
-        Use ``hard_constraint`` as a concise factory when defining a
-        geometry condition.
-    """
+    """A constant boundary or initial condition, also created by ``hard_constraint``."""
     def __init__(self, constant: float = 0.0):
         """Initialize a constant hard constraint."""
         self.constant = constant
 
     @staticmethod
     def define_zero_func(bound):
-        """Create a function that vanishes on a boundary.
-
-        Args:
-            bound: Boundary whose parameterization defines the zero set.
-
-        Returns:
-            Callable accepting a coordinate mapping and returning the signed
-            distance-like constraint factor.
-        """
+        """Return a function of coordinate mappings that vanishes on ``bound``."""
         def zero_func(coords):
             return coords[bound.axes_sec[0]] - bound.funcs[bound.ax][0](coords[bound.ax])
         return zero_func
@@ -50,33 +34,22 @@ class HardConstraint:
         return str(self.constant)
 
 def hard_constraint(constant=0):
-    """Create a ``HardConstraint`` with a prescribed constant.
-
-    Args:
-        constant: Value imposed on the constrained boundary or initial slice.
-
-    Returns:
-        A ``HardConstraint`` instance.
+    """Return a ``HardConstraint`` imposing ``constant`` at a boundary or initial
+    slice.
     """
     return HardConstraint(constant)
 
 class NN(ABC, nn.Module):
-    """
-    Physics-Informed Neural Network (PINN) model.
-
-    A feedforward neural network that takes input coordinates (e.g., x, y, t)
-    and outputs physical quantities (e.g., u, v, p), with support for 
-    hard constraints.
+    """Base PINN mapping coordinates to fields with optional hard constraints.
 
     Args:
-        input_vars: Names of coordinate inputs, such as ``["x", "y"]``.
-        output_vars: Names of predicted fields, such as ``["u", "v", "p"]``.
-        weight_init: Initialization alias (``"kaiming"``/``"he"`` or
-            ``"xavier"``/``"glorot"``), ``None``, or a callable.
+        input_vars: Coordinate names, such as ``["x", "y"]``.
+        output_vars: Field names, such as ``["u", "v", "p"]``.
+        weight_init: ``"kaiming"``/``"he"``, ``"xavier"``/``"glorot"``,
+            ``None`` for PyTorch defaults, or a callable receiving the model.
 
-    Attributes:
-        loss_history: Recorded total, boundary, PDE, and optional initial
-            condition losses.
+    ``loss_history`` stores total, boundary, PDE, and optional
+    initial-condition losses.
     """
 
     def __init__(
@@ -85,16 +58,7 @@ class NN(ABC, nn.Module):
         output_vars: Optional[List[str]] = None,
         weight_init: Union[str, Callable, None] = 'kaiming',
     ):
-        """
-        Args:
-            input_vars (list): List of input variable names (e.g., ['x', 'y']).
-            output_vars (list): List of output variable names (e.g., ['u']).
-            weight_init: Weight initialization scheme for ``nn.Linear`` layers.
-                Supported string aliases: ``'kaiming'``/``'he'`` (default),
-                ``'xavier'``/``'glorot'``.  ``None`` leaves PyTorch's default
-                initialization untouched.  A callable receives the model and
-                can apply arbitrary initialization.
-        """
+        """Set coordinate names, field names, and weight initialization."""
         super().__init__()
         
         self.input_keys = input_vars if input_vars is not None else ['x', 'y']
@@ -151,15 +115,10 @@ class NN(ABC, nn.Module):
         self.loss_history = {key: [] for key in base_keys}
 
     def forward(self, inputs_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        """
-        Forward pass through the network.
-        
-        Args:
-            inputs_dict: Dictionary containing input tensors (e.g., {'x': tensor, 'y': tensor})
+        """Return predictions by field name for coordinate tensors in
+        ``inputs_dict``.
 
-        Returns:
-            Dictionary mapping each configured output name to a prediction
-            tensor. Hard constraints are applied when configured.
+        Configured hard constraints are applied.
         """
         input_tensor = torch.stack([inputs_dict[key] for key in self.input_keys], dim=1)
         
@@ -180,15 +139,9 @@ class NN(ABC, nn.Module):
         return output_dict
 
     def apply_hard_constraints(self, bound_list: list):
-        """Configure output constraints from a list of boundary objects.
+        """Apply ``HardConstraint`` values from boundaries in ``bound_list``.
 
-        Args:
-            bound_list: Boundaries whose condition dictionaries may contain
-                ``HardConstraint`` values.
-
-        Raises:
-            ValueError: If boundaries impose different constants for the same
-                output field.
+        Conflicting constants for one output field raise ``ValueError``.
         """
         self.hard_constraints = {}
         self.hard_constants = {}
@@ -248,32 +201,24 @@ class NN(ABC, nn.Module):
         compile_model: bool = False,
         max_grad_norm: Optional[float] = 1.0,
     )-> tuple['NN', 'NN']:
-        """
-        Train a copy of the model using the Adam optimizer.
+        """Train a copy with Adam; return ``(trained_model, best_model)``.
 
         Args:
-            learning_rate: Adam learning rate.
-            epochs: Maximum number of training epochs.
-            calc_loss: Callable returning a loss dictionary with
-                ``total_loss``.
-            use_scheduler: Whether to use a decaying step scheduler.
-            print_every: Print status at this many epochs.
-            threshold_loss: Stop when the best loss falls below this value.
-            do_between_epochs: Optional callback called as ``callback(epoch,
-                model)`` after each epoch.
-            compile_model: If ``True``, wraps the model with ``torch.compile``
-                for kernel fusion and reduced overhead. Requires PyTorch 2.0+
-                and the Triton backend (Linux). The first epoch will be slower
-                due to compilation; subsequent epochs benefit from fused kernels.
-            max_grad_norm: Maximum global gradient norm used for clipping. Set
-                to ``None`` to disable gradient clipping.
+            learning_rate: Adam step size.
+            epochs: Training epoch limit.
+            calc_loss: ``loss(model)`` returning a dict with ``total_loss``.
+            use_scheduler: Enable stepwise learning-rate decay.
+            print_every: Positive status-print interval in epochs.
+            threshold_loss: Stop below this best-loss value.
+            do_between_epochs: Call ``callback(epoch, model)`` after each
+                epoch.
+            compile_model: Use ``torch.compile`` with PyTorch 2+ and Triton on
+                Linux.
+            max_grad_norm: Positive gradient clip limit; ``None`` disables
+                clipping.
 
-        Returns:
-            Tuple ``(model, best_model)`` containing the trained copy and a
-            copy restored to its lowest recorded loss.
-
-        Raises:
-            ValueError: If ``print_every`` or ``max_grad_norm`` is not positive.
+        ``best_model`` holds the lowest recorded loss. Compilation adds startup
+        overhead.
         """
         if max_grad_norm is not None and max_grad_norm <= 0:
             raise ValueError("max_grad_norm must be positive or None")
@@ -365,26 +310,19 @@ class NN(ABC, nn.Module):
         do_between_epochs: Optional[Callable] = None,
         compile_model: bool = False,
     ) -> tuple['NN', 'NN']:
-        """
-        Train a copy of the model using the L-BFGS optimizer.
+        """Train a copy with L-BFGS; return ``(trained_model, best_model)``.
 
         Args:
-            epochs: Maximum number of training epochs.
-            calc_loss: Callable returning a loss dictionary with
-                ``total_loss``.
-            print_every: Print status at this many epochs.
-            threshold_loss: Stop when the loss falls below this value.
-            do_between_epochs: Optional callback called as ``callback(epoch,
-                model)`` after each epoch.
-            compile_model: If ``True``, wraps the model with ``torch.compile``
-                for kernel fusion and reduced overhead. Requires PyTorch 2.0+.
-        
-        Returns:
-            Tuple ``(model, best_model)`` containing the trained copy and a
-            copy restored to its lowest recorded loss.
+            epochs: Training epoch limit.
+            calc_loss: ``loss(model)`` returning a dict with ``total_loss``.
+            print_every: Positive status-print interval in epochs.
+            threshold_loss: Stop below this loss.
+            do_between_epochs: Call ``callback(epoch, model)`` after each
+                epoch.
+            compile_model: Use ``torch.compile``; requires PyTorch 2+.
 
-        Raises:
-            ValueError: If ``print_every`` is not positive.
+        ``best_model`` holds the lowest recorded loss. Compilation adds startup
+        overhead.
         """
         if print_every <= 0:
             raise ValueError("print_every must be positive")
@@ -465,18 +403,10 @@ class NN(ABC, nn.Module):
         return model, best_model
     
     def save_as_pickle(self, file_name: str = "model.pkl") -> None:
-        """Serialize the model to a pickle file.
+        """Save to ``file_name``, adding ``.pkl`` if absent.
 
-        ``cloudpickle`` is used so models with geometry-based hard constraints
-        retain their dynamically defined constraint functions.
-
-        Pickle files must be trusted because loading can execute Python code.
-
-        Args:
-            file_name: Output path. The ``.pkl`` suffix is added when absent.
-
-        Returns:
-            None.
+        Uses ``cloudpickle`` to preserve dynamic hard constraints. Loading
+        pickle files can execute code; only load trusted files.
         """
         import cloudpickle as pickle
         if file_name[-4:] != '.pkl': file_name += '.pkl'
@@ -485,19 +415,10 @@ class NN(ABC, nn.Module):
 
 
 def load_from_pickle(file_name: str) -> NN:
-    """Load a model serialized by ``NN.save_as_pickle``.
+    """Return a saved model from ``file_name``, adding ``.pkl`` if absent.
 
-    The loader also accepts legacy files produced with the standard pickle
-    module.
-
-    Only load trusted pickle files because deserialization can execute Python
-    code.
-
-    Args:
-        file_name: Pickle path. The ``.pkl`` suffix is added when absent.
-
-    Returns:
-        The deserialized model instance.
+    Accepts cloudpickle and legacy pickle files. Only load trusted files;
+    loading can execute code.
     """
     import cloudpickle as pickle
     if file_name[-4:] != '.pkl': file_name += '.pkl'
@@ -540,14 +461,14 @@ class _JointRFFEmbedding(nn.Module):
         return torch.cat((torch.cos(projection), torch.sin(projection)), dim=-1)
     
 class FNN(NN):
-    """Fully connected feedforward neural network for PINN fields.
+    """Fully connected PINN with configurable hidden-layer widths.
 
     Args:
-        input_vars: Names of coordinate inputs.
-        output_vars: Names of predicted fields.
-        hidden_layer: Width of each hidden layer.
-        activation: PyTorch activation module inserted after hidden layers.
-        weight_init: Weight initialization scheme passed to ``NN``.
+        input_vars: Coordinate names.
+        output_vars: Field names.
+        hidden_layer: Width per hidden layer.
+        activation: Hidden-layer activation module.
+        weight_init: Initialization scheme; see ``NN``.
     """
 
     def __init__(
@@ -579,15 +500,15 @@ class FNN(NN):
         self._init_weights()
 
 class PINN(FNN):
-    """Standard fully connected physics-informed neural network.
+    """Fully connected PINN with equal-width hidden layers.
 
     Args:
-        input_vars: Names of coordinate inputs.
-        output_vars: Names of predicted fields.
-        width: Width of every hidden layer.
-        length: Number of hidden layers.
-        activation: PyTorch activation module for hidden layers.
-        weight_init: Weight initialization scheme.
+        input_vars: Coordinate names.
+        output_vars: Field names.
+        width: Hidden-layer width.
+        length: Hidden-layer count.
+        activation: Hidden-layer activation module.
+        weight_init: Initialization scheme; see ``NN``.
     """
 
     def __init__(
@@ -609,17 +530,17 @@ class PINN(FNN):
 
 
 class RFFPINN(FNN):
-    """PINN with a fixed joint random Fourier feature input embedding.
+    """PINN with a fixed random Fourier input embedding.
 
     Args:
-        input_vars: Names of coordinate inputs.
-        output_vars: Names of predicted fields.
-        width: Width of each post-embedding hidden layer.
-        length: Number of post-embedding hidden layers.
-        embed_dim: Positive even dimension of the Fourier embedding.
-        alpha: Standard deviation scale of the sampled frequencies.
-        activation: PyTorch activation module for hidden layers.
-        weight_init: Weight initialization scheme.
+        input_vars: Coordinate names.
+        output_vars: Field names.
+        width: Hidden-layer width after embedding.
+        length: Hidden-layer count after embedding.
+        embed_dim: Positive even embedding dimension.
+        alpha: Frequency standard-deviation scale.
+        activation: Hidden-layer activation module.
+        weight_init: Initialization scheme; see ``NN``.
     """
 
     def __init__(

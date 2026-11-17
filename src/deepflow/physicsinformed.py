@@ -12,17 +12,13 @@ from .pde import PDE
 from .utility import calc_grad, get_device, get_dtype, _next_seed
 
 class PhysicsAttach:
-    """Manage constraints, residuals, and samples for a PINN geometry.
-
-    The class is inherited by geometry objects and normally used through
-    methods such as ``define_bc``, ``define_pde``, and
-    ``process_coordinates``.
+    """Attach conditions, PDEs, and samples to a geometry.
 
     Attributes:
-        physics_type: Attached physics kind: ``"BC"``, ``"IC"``, or ``"PDE"``.
-        inputs_tensor_dict: Coordinate tensors used by the model.
-        model_outputs: Most recently cached model predictions.
-        residual_field: Pointwise absolute residual magnitude.
+        physics_type: ``"BC"``, ``"IC"``, or ``"PDE"``.
+        inputs_tensor_dict: Model coordinate tensors.
+        model_outputs: Cached predictions.
+        residual_field: Pointwise absolute residuals.
     """
 
     def __init__(self):
@@ -60,73 +56,39 @@ class PhysicsAttach:
 
 
     def define_bc(self, condition_dict: Dict[str, Any]) -> None:
-        """
-        Define Boundary Conditions (BC).
-
-        Args:
-            condition_dict: Dictionary mapping variable names to conditions.
-
-        Returns:
-            None. The geometry is marked as a boundary-condition geometry.
-        """
+        """Set boundary conditions as a mapping of variable names to conditions."""
         self.condition_dict = condition_dict
         self.condition_num = len(condition_dict)
         self.physics_type = "BC"
     
     def define_ic(self, condition_dict: Dict[str, Any]) -> None:
-        """
-        Define Initial Conditions (IC).
-
-        Args:
-            condition_dict: Dictionary mapping variable names to conditions.
-
-        Returns:
-            None. The geometry is marked as an initial-condition geometry.
-        """
+        """Set initial conditions as a mapping of variable names to conditions."""
         self.condition_dict = condition_dict
         self.condition_num = len(condition_dict)
         self.physics_type = "IC"
     
     def define_pde(self, pde: PDE) -> None:
-        """
-        Define the Partial Differential Equation (PDE) to enforce.
-
-        Args:
-            pde: Initialized ``deepflow.pde.PDE`` instance.
-
-        Returns:
-            None. The geometry is marked as a PDE geometry.
-        """
+        """Attach an initialized ``deepflow.pde.PDE`` instance."""
         self.PDE = pde
         self.physics_type = "PDE"
 
 
     def set_coordinates(self, x: torch.Tensor, y: torch.Tensor) -> None:
-        """
-        Set spatial coordinates manually.
-
-        Args:
-            x: Tensor of x coordinates.
-            y: Tensor of y coordinates with the same shape as ``x``.
-
-        Returns:
-            None. Coordinates are stored until ``process_coordinates`` is
-            called.
+        """Store matching ``x`` and ``y`` tensors; call ``process_coordinates`` to
+        prepare them.
         """
         self.X = x
         self.Y = y
     
     def define_time(self, range_t: Union[Tuple[float, float], int, float] = None, sampling_scheme: str = None, expo_scaling = None) -> None:
-        """
-        Configure the time coordinate range and sampling scheme.
+        """Set time coordinates and sampling options.
 
         Args:
-            range_t: A ``(start, end)`` interval or a fixed time value.
+            range_t: ``(start, end)`` interval or fixed time.
             sampling_scheme: ``"uniform"`` or ``"random"`` for intervals.
-            expo_scaling: Whether to apply exponential time scaling.
+            expo_scaling: Apply exponential time scaling.
 
-        Raises:
-            ValueError: If no range is supplied and no previous range exists.
+        Raises ``ValueError`` if neither a new nor a saved range exists.
         """
         if range_t is not None: self.range_t = range_t
         elif self.range_t is None:
@@ -145,14 +107,9 @@ class PhysicsAttach:
             warnings.warn("expo_scaling has not yet defined. False is set as default.")
 
     def sampling_time(self) -> None:
-        """
-        Generate time coordinates from the configured time range.
+        """Sample time into ``t`` and ``T`` using the configured range.
 
-        Returns:
-            None. The generated values are stored in ``t`` and ``T``.
-
-        Raises:
-            ValueError: If spatial coordinates or a time range are missing.
+        Missing spatial coordinates or time range raises ``ValueError``.
         """
         if self.X is None: raise ValueError("Before sampling time t, X coordinate must be sampling first")
         n_points = len(self.X)
@@ -183,18 +140,10 @@ class PhysicsAttach:
         self.inputs_tensor_dict['t'] = self.T_
 
     def process_coordinates(self, device: Optional[torch.device] = None) -> Dict[str, Optional[torch.Tensor]]:
-        """
-        Prepare coordinate tensors for PINN training.
-        
-        Args:
-            device: Target device. If ``None``, use DeepFlow's configured
-                device.
+        """Return differentiable coordinate tensors on ``device``.
 
-        Returns:
-            Dictionary of differentiable model-input tensors.
-
-        Raises:
-            ValueError: If spatial coordinates are not set.
+        ``None`` uses the configured device. Missing coordinates raise
+        ``ValueError``.
         """
         if self.X is None or self.Y is None:    
             raise ValueError("Coordinates X and Y must be set before processing.")
@@ -234,19 +183,8 @@ class PhysicsAttach:
 
 
     def calc_output(self) -> Dict[str, torch.Tensor]:
-        """
-        Post-process cached model outputs to match target conditions.
-        Handles derivative constraints (e.g., if key is 'u_x').
-
-        Uses ``self.model_inputs`` (not ``self.inputs_tensor_dict``) for
-        derivative computation so that batched forward passes work correctly:
-        ``model_inputs`` points to the tensors actually fed to the model (which
-        are in the autograd graph), whereas ``inputs_tensor_dict`` may hold the
-        original per-geometry tensors that are not in a batched graph.
-
-        Returns:
-            Predictions or derivatives corresponding to the configured target
-            conditions.
+        """Return cached predictions or derivatives for target conditions such as
+        ``u_x``.
         """
         prediction_dict = self.model_outputs
         pred_dict = {}
@@ -263,15 +201,7 @@ class PhysicsAttach:
         return pred_dict
     
     def calc_loss(self, model: nn.Module) -> torch.Tensor:
-        """
-        Calculate the mean per-point sum of squared residual components.
-
-        Args:
-            model: Model used to produce predictions.
-
-        Returns:
-            Scalar loss tensor.
-        """
+        """Return the mean sum of squared residuals for ``model`` as a scalar tensor."""
         self.calc_residual_field(model)
         self.loss = torch.mean(self.residual_field_raw.square().sum(dim=0))
         if torch.isnan(self.loss):
@@ -279,15 +209,8 @@ class PhysicsAttach:
         return self.loss
 
     def calc_residual_field(self, model: nn.Module) -> Union[int, torch.Tensor]:
-        """
-        Calculate the pointwise absolute residual field.
-
-        Args:
-            model: Model used to produce predictions.
-
-        Returns:
-            One-dimensional tensor containing the absolute residual magnitude
-            at each sample point.
+        """Return a 1D tensor of pointwise absolute residual magnitudes for
+        ``model``.
         """
         self.process_model(model)
         return self._compute_residual_field()
@@ -312,36 +235,22 @@ class PhysicsAttach:
         return self.residual_field
 
     def set_threshold(self, loss: float = None, top_k_loss: float = None) -> None:
-        """Set thresholds used by adaptive sampling or convergence checks.
-
-        Args:
-            loss: Mean-loss threshold.
-            top_k_loss: Threshold for selecting high-residual points.
+        """Set mean-loss ``loss`` and high-residual selection ``top_k_loss``
+        thresholds.
         """
         self.loss_threshold = loss
         self.top_k_loss_threshold = top_k_loss
 
 
     def save_coordinates(self) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Save the current spatial coordinates for later restoration.
-
-        Returns:
-            Tuple of saved x and y tensors.
-        """
+        """Save spatial coordinates and return copies as ``(x, y)`` tensors."""
         self.X_saved = self.X.clone()
         self.Y_saved = self.Y.clone()
         return self.X_saved, self.Y_saved
 
     def get_residual_based_points_topk(self, top_k: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Select points with the largest residual magnitudes.
-
-        Args:
-            top_k: Number of points to select.
-
-        Returns:
-            Tuple of selected x and y tensors. The points are also appended to
-            the residual-point buffers.
+        """Return the ``top_k`` highest-residual ``(x, y)`` tensors and append to
+        buffers.
         """
         if isinstance(self.residual_field, (int, float)): 
             return torch.tensor([]), torch.tensor([])
@@ -359,16 +268,12 @@ class PhysicsAttach:
         return X_residual, Y_residual
     
     def get_residual_based_points_threshold(self, threshold: float = None, maintain_points = False) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Select points whose residual exceeds a threshold.
+        """Return selected ``(x, y)`` tensors and store them in residual buffers.
 
         Args:
-            threshold: Residual threshold. If ``None``, use the field mean.
-            maintain_points: Avoid re-adding points already selected during an
-                accumulating resampling cycle.
-
-        Returns:
-            Tuple of selected x and y tensors stored in the residual buffers.
+            threshold: Residual cutoff; ``None`` uses the field mean.
+            maintain_points: Avoid re-adding points during accumulating
+                resampling.
         """
         if threshold is None: threshold = torch.mean(self.residual_field).item()
 
@@ -403,13 +308,8 @@ class PhysicsAttach:
 
 
     def process_model(self, model: nn.Module) -> Dict[str, torch.Tensor]:
-        """Run a model on the processed inputs and cache its outputs.
-
-        Args:
-            model: Model accepting ``inputs_tensor_dict``.
-
-        Returns:
-            Dictionary of model output tensors.
+        """Run ``model`` on ``inputs_tensor_dict``; cache and return its output
+        tensors.
         """
         self.model_inputs = self.inputs_tensor_dict
         self.model_outputs = model(self.inputs_tensor_dict)
@@ -420,27 +320,14 @@ class PhysicsAttach:
         self.PDE.compute_residuals(inputs_dict = self.model_inputs | self.model_outputs)
 
     def evaluate(self, model: nn.Module):
-        """Create an evaluator for this geometry and model.
-
-        Args:
-            model: PINN model used for prediction and residual evaluation.
-
-        Returns:
-            A ``deepflow.evaluation.Evaluator`` instance.
-        """
+        """Return an ``Evaluator`` for this geometry and PINN ``model``."""
         from .evaluation import Evaluator
         return Evaluator(model, self)
     
 def function(input_key: str, function: Callable) -> List[Union[str, Callable]]:
-    """Package a coordinate key and callable boundary condition.
+    """Return ``[input_key, function]`` for use in ``define_bc`` or ``define_ic``.
 
-    Args:
-        input_key: Coordinate name passed to ``function``.
-        function: Callable producing the target value.
-
-    Returns:
-        Two-item list ``[input_key, function]`` accepted by ``define_bc`` or
-        ``define_ic``.
+    ``input_key`` selects the coordinate passed to the target-value callable.
     """
     return [input_key, function]
 func = function
@@ -452,16 +339,13 @@ def parabolic_func(
     max_val,
     center_distance=0,
 ) -> List[Union[str, Callable]]:
-    """Create a parabolic boundary-condition function descriptor.
+    """Return a parabolic condition as ``[input_key, callable]``.
 
     Args:
-        input_key: Coordinate name used by the generated callable.
-        width: Width parameter of the parabola.
-        max_val: Value at the parabola center.
-        center_distance: Coordinate of the center.
-
-    Returns:
-        Two-item list compatible with ``function``.
+        input_key: Coordinate passed to the callable.
+        width: Parabola width.
+        max_val: Value at the center.
+        center_distance: Center coordinate.
     """
     return [input_key, lambda x: (-4*max_val/width**2)*(x - center_distance)**2 + max_val]
 parabolic = parabolic_func

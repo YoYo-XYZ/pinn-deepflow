@@ -421,14 +421,14 @@ def _make_solution_evaluator(mesh):
 
 
 class ReferenceSolver:
-    """Solve DeepFlow's built-in PDEs with optional NGSolve/Netgen FEM.
+    """Solve built-in PDEs with optional NGSolve/Netgen FEM.
 
     Args:
-        mesh_size: Target mesh size, or ``None`` to infer it from the PDE area.
-        boundary_resolution: Boundary sampling resolution used during meshing.
-        time_step: Snapshot spacing for transient problems.
-        tolerance: Iterative solver convergence tolerance.
-        max_iterations: Maximum number of solver iterations.
+        mesh_size: Target mesh size; ``None`` infers it from the area.
+        boundary_resolution: Samples per mesh boundary.
+        time_step: Transient snapshot spacing.
+        tolerance: Solver convergence tolerance.
+        max_iterations: Solver iteration limit.
     """
 
     def __init__(
@@ -457,26 +457,16 @@ class ReferenceSolver:
         self.max_iterations = max_iterations
 
     def clear_cache(self):
-        """Retain the historical cache API; solutions are not solver-cached.
-
-        Returns:
-            None.
-        """
+        """Compatibility no-op; the solver does not cache solutions."""
 
     def solve(self, domain) -> ReferenceSolution:
-        """Solve the PDE attached to one ``ProblemDomain`` area.
-
-        Args:
-            domain: Domain containing exactly one area with a supported PDE.
-
-        Returns:
-            A ``ReferenceSolution`` retaining the solved FEM fields.
+        """Return a ``ReferenceSolution`` for a domain with exactly one PDE area.
 
         Raises:
-            ImportError: If the optional NGSolve/Netgen backend is unavailable.
-            ReferenceConfigurationError: If geometry, conditions, or time
-                configuration is unsupported.
-            UnsupportedReferencePDE: If the attached PDE has no FEM backend.
+            ImportError: NGSolve/Netgen is unavailable.
+            ReferenceConfigurationError: Unsupported geometry, conditions, or
+                time settings.
+            UnsupportedReferencePDE: No FEM backend for the PDE.
         """
         areas = list(getattr(domain, "area_list", ()))
         pde_areas = [area for area in areas if getattr(area, "physics_type", None) == "PDE"]

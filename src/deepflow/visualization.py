@@ -9,11 +9,10 @@ from scipy.spatial import QhullError
 
 
 class Visualizer:
-    """Create plots from a mapping of field names to NumPy arrays.
+    """Plot named fields and coordinates from NumPy arrays in ``data_dict``.
 
-    Args:
-        data_dict: Evaluated fields and coordinates. Plot methods expect the
-            requested field keys and usually ``x`` and ``y`` coordinates.
+    Axis and field arguments select dictionary keys. Plot methods return a
+    figure, or ``(figure, axes)`` when ``return_ax=True``.
     """
     refwidth_default = 6
     refheight_max_default = None
@@ -60,19 +59,9 @@ class Visualizer:
         return self._create_subplot(**subplot_kwargs)
 
     def plot_color(self, color_axis: str, x_axis: str = 'x', y_axis: str = 'y', cmap='viridis', s: Union[int, float] = 2, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
-        """
-        Create a scatter plot colored by a field.
+        """Scatter ``x_axis`` and ``y_axis``, colored by ``color_axis``.
 
-        Args:
-            color_axis: Field used for point colors.
-            x_axis: Field used for horizontal coordinates.
-            y_axis: Field used for vertical coordinates.
-            cmap: Matplotlib colormap name.
-            s: Marker size.
-            return_ax: Return ``(figure, axes)`` instead of only the figure.
-
-        Returns:
-            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
+        ``cmap`` selects the colormap; ``s`` sets marker size.
         """
         fig, ax = self._create_equal_aspect_subplot(
             self.data_dict.get(x_axis), self.data_dict.get(y_axis)
@@ -92,19 +81,10 @@ class Visualizer:
     plot_scatter = plot_color
 
     def plot(self, z_axis: str = None, x_axis:str = 'x', y_axis:str = 'y', return_ax: bool = False, color = None) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
-        """
-        Create a line plot or a three-dimensional scatter plot.
+        """Plot ``y_axis`` against ``x_axis``, or scatter in 3D when ``z_axis`` is
+        set.
 
-        Args:
-            z_axis: Optional field for a 3-D scatter plot. If omitted, plot
-                ``y_axis`` against ``x_axis`` as a line.
-            x_axis: Field used for horizontal coordinates.
-            y_axis: Field used for vertical coordinates.
-            return_ax: Return ``(figure, axes)`` instead of only the figure.
-            color: Optional line color or colormap name.
-
-        Returns:
-            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
+        ``color`` is a line color for 2D or a colormap name for 3D.
         """
         if z_axis is None:
             fig, ax = self._create_subplot()
@@ -124,16 +104,8 @@ class Visualizer:
         return fig
 
     def plot_distribution(self, key: str, bins: Union[str, int] = 'fd', return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
-        """
-        Plot a histogram for a field.
-
-        Args:
-            key: Field to plot.
-            bins: Number of bins or a NumPy binning strategy.
-            return_ax: Return ``(figure, axes)`` instead of only the figure.
-
-        Returns:
-            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
+        """Plot a histogram of ``key``; ``bins`` is a count or NumPy binning
+        strategy.
         """
         fig, ax = self._create_subplot()
         ax.hist(self.data_dict[key], bins=bins)
@@ -146,18 +118,10 @@ class Visualizer:
     def plot_loss_curve(self, log_scale: bool = True, 
                         start: int = 0, end: Optional[int] = None, 
                         keys: Tuple[str, ...] = ('total_loss', 'bc_loss', 'pde_loss'), return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
-        """
-        Plot recorded losses over training iterations.
+        """Plot available loss-history ``keys`` over iterations.
 
-        Args:
-            log_scale: Use a logarithmic y-axis.
-            start: First history index to display.
-            end: Exclusive final history index.
-            keys: Loss-history keys to plot when present.
-            return_ax: Return ``(figure, axes)`` instead of only the figure.
-
-        Returns:
-            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
+        ``start:end`` selects history indices, excluding ``end``. ``log_scale``
+        uses a logarithmic y-axis.
         """
         fig, ax = plt.subplots(refwidth=5, refheight=3)
 
@@ -177,19 +141,9 @@ class Visualizer:
         return fig
     
     def plot_contour(self, color_axis:str, x_axis:str = 'x', y_axis:str = 'y', cmap = 'jet', levels = 50, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
-        """
-        Create a filled contour plot for an interpolated field.
+        """Plot interpolated ``color_axis`` contours on ``x_axis`` and ``y_axis``.
 
-        Args:
-            color_axis: Field to interpolate and plot.
-            x_axis: x-coordinate field.
-            y_axis: y-coordinate field.
-            cmap: Matplotlib colormap name.
-            levels: Number of contour levels.
-            return_ax: Return ``(figure, axes)`` instead of only the figure.
-
-        Returns:
-            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
+        ``cmap`` selects the colormap; ``levels`` sets the contour count.
         """
         fig, ax = self._create_equal_aspect_subplot(
             self.data_dict.get(x_axis), self.data_dict.get(y_axis)
@@ -208,20 +162,10 @@ class Visualizer:
         return fig
     
     def plot_streamline(self, u:str, v:str, x_axis:str = 'x', y_axis:str = 'y', cmap = 'viridis', levels = 100, return_ax: bool = False) -> Union[plt.Figure, Tuple[plt.Figure, object]]:
-        """
-        Create a streamline plot for two interpolated vector components.
+        """Plot interpolated vector fields ``u`` and ``v`` on ``x_axis`` and
+        ``y_axis``.
 
-        Args:
-            u: Field containing the x component.
-            v: Field containing the y component.
-            x_axis: x-coordinate field.
-            y_axis: y-coordinate field.
-            cmap: Matplotlib colormap name.
-            levels: Streamline density or plotting level configuration.
-            return_ax: Return ``(figure, axes)`` instead of only the figure.
-
-        Returns:
-            A figure, or a ``(figure, axes)`` tuple when ``return_ax`` is true.
+        ``cmap`` and ``levels`` are passed to the streamline plot.
         """
         fig, ax = self._create_equal_aspect_subplot(
             self.data_dict.get(x_axis), self.data_dict.get(y_axis)
