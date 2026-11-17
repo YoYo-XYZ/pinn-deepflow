@@ -146,17 +146,12 @@ class ReferenceSolution:
             bound_points = np.column_stack(
                 [
                     np.asarray(
-                        bound_x.detach().cpu()
-                        if isinstance(bound_x, torch.Tensor)
-                        else bound_x,
+                        coordinate.detach().cpu()
+                        if isinstance(coordinate, torch.Tensor)
+                        else coordinate,
                         dtype=float,
-                    ),
-                    np.asarray(
-                        bound_y.detach().cpu()
-                        if isinstance(bound_y, torch.Tensor)
-                        else bound_y,
-                        dtype=float,
-                    ),
+                    )
+                    for coordinate in (bound_x, bound_y)
                 ]
             )
             if bound_points.size:
@@ -165,12 +160,7 @@ class ReferenceSolution:
         if not boundary_points:
             return inside
 
-        query_points = np.column_stack(
-            [
-                np.asarray(x, dtype=float),
-                np.asarray(y, dtype=float),
-            ]
-        )
+        query_points = np.column_stack((x, y))
         scale = max(
             1.0,
             float(np.max(np.abs(query_points))) if query_points.size else 1.0,
@@ -229,31 +219,21 @@ class ReferenceSolution:
         area, missing time, or times outside the stored interval raise
         ``ValueError``.
         """
-        x_input = np.asarray(x, dtype=float)
-        y_input = np.asarray(y, dtype=float)
+        x_array, y_array = np.broadcast_arrays(
+            np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+        )
+        t_array = None
         if t is not None:
-            x_array, y_array, t_input = np.broadcast_arrays(
-                x_input, y_input, np.asarray(t, dtype=float)
+            x_array, y_array, t_array = np.broadcast_arrays(
+                x_array, y_array, np.asarray(t, dtype=float)
             )
-        else:
-            x_array, y_array = np.broadcast_arrays(x_input, y_input)
-            t_input = None
+        elif self._time_from_y:
+            t_array = y_array
+        elif self.is_transient:
+            raise ValueError("Transient reference queries require t.")
 
-        if t is None and self._time_from_y:
-            t_array = np.asarray(y_array, dtype=float)
-            domain_y_array = y_array
-            query_shape = x_array.shape
-        elif t is None:
-            if self.is_transient:
-                raise ValueError("Transient reference queries require t.")
-            t_array = None
-            domain_y_array = y_array
-            query_shape = x_array.shape
-        else:
-            t_array = t_input
-            domain_y_array = t_array if self._time_from_y else y_array
-            query_shape = x_array.shape
-
+        query_shape = x_array.shape
+        domain_y_array = t_array if self._time_from_y else y_array
         x_flat = np.asarray(x_array, dtype=float).reshape(-1)
         y_flat = np.asarray(domain_y_array, dtype=float).reshape(-1)
         t_flat = None if t_array is None else np.asarray(t_array).reshape(-1)
@@ -278,61 +258,7 @@ class ReferenceSolution:
         if not self.is_transient:
             values = self._evaluate_snapshot(self._fields, x_flat, y_flat, selected)
         else:
-            time_start = self._times[0]
-            time_end = self._times[-1]
-            time_tolerance = 1.0e-7 * max(
-                1.0, float(np.max(np.abs(self._times)))
-            )
-            near_start = np.isclose(
-                t_flat, time_start, rtol=0.0, atol=time_tolerance
-            )
-            near_end = np.isclose(
-                t_flat, time_end, rtol=0.0, atol=time_tolerance
-            )
-            out_of_range = ((t_flat < time_start) & ~near_start) | (
-                (t_flat > time_end) & ~near_end
-            )
-            if np.any(out_of_range):
-                raise ValueError(
-                    f"Transient query times must lie in [{self._times[0]}, {self._times[-1]}]."
-                )
-            t_flat = np.clip(t_flat, time_start, time_end)
-            upper = np.searchsorted(self._times, t_flat, side="right")
-            upper = np.clip(upper, 1, len(self._times) - 1)
-            lower = upper - 1
-            exact_first = t_flat <= self._times[0]
-            exact_last = t_flat >= self._times[-1]
-
-            values = {name: np.empty(x_flat.shape, dtype=float) for name in selected}
-            for lower_index in np.unique(lower):
-                mask = lower == lower_index
-                first_values = self._evaluate_snapshot(
-                    self._snapshots[lower_index], x_flat[mask], y_flat[mask], selected
-                )
-                second_values = self._evaluate_snapshot(
-                    self._snapshots[lower_index + 1], x_flat[mask], y_flat[mask], selected
-                )
-                fraction = (
-                    (t_flat[mask] - self._times[lower_index])
-                    / (self._times[lower_index + 1] - self._times[lower_index])
-                )
-                for name in selected:
-                    values[name][mask] = first_values[name] + fraction * (
-                        second_values[name] - first_values[name]
-                    )
-
-            if exact_first.any():
-                first_values = self._evaluate_snapshot(
-                    self._snapshots[0], x_flat[exact_first], y_flat[exact_first], selected
-                )
-                for name in selected:
-                    values[name][exact_first] = first_values[name]
-            if exact_last.any():
-                last_values = self._evaluate_snapshot(
-                    self._snapshots[-1], x_flat[exact_last], y_flat[exact_last], selected
-                )
-                for name in selected:
-                    values[name][exact_last] = last_values[name]
+            values = self._evaluate_transient(x_flat, y_flat, t_flat, selected)
 
         values = {
             name: np.asarray(value, dtype=float).reshape(query_shape)
@@ -342,6 +268,38 @@ class ReferenceSolution:
         self._query_cache_values = {
             name: value.copy() for name, value in values.items()
         }
+        return values
+
+    def _evaluate_transient(self, x, y, t, fields):
+        start, end = self._times[0], self._times[-1]
+        tolerance = 1.0e-7 * max(1.0, float(np.max(np.abs(self._times))))
+        outside = ((t < start) & ~np.isclose(t, start, rtol=0.0, atol=tolerance)) | (
+            (t > end) & ~np.isclose(t, end, rtol=0.0, atol=tolerance)
+        )
+        if outside.any():
+            raise ValueError(f"Transient query times must lie in [{start}, {end}].")
+        t = np.clip(t, start, end)
+        values = {name: np.full(x.shape, np.nan, dtype=float) for name in fields}
+        for index, time in ((0, start), (-1, end)):
+            mask = t == time
+            if mask.any():
+                endpoint = self._evaluate_snapshot(
+                    self._snapshots[index], x[mask], y[mask], fields
+                )
+                for name in fields:
+                    values[name][mask] = endpoint[name]
+
+        interior = (t > start) & (t < end)
+        lower = np.searchsorted(self._times, t, side="right") - 1
+        for index in np.unique(lower[interior]):
+            mask = interior & (lower == index)
+            first = self._evaluate_snapshot(self._snapshots[index], x[mask], y[mask], fields)
+            second = self._evaluate_snapshot(self._snapshots[index + 1], x[mask], y[mask], fields)
+            fraction = (t[mask] - self._times[index]) / (
+                self._times[index + 1] - self._times[index]
+            )
+            for name in fields:
+                values[name][mask] = first[name] + fraction * (second[name] - first[name])
         return values
 
     def export_npz(self, path, x, y, t=None, fields=None) -> None:

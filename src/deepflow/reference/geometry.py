@@ -129,9 +129,6 @@ def _stitch(edges: Sequence[_Edge], tolerance: float) -> List[List[_Edge]]:
             loop.append(_Edge(candidate.bound, candidate.label, points))
             end = points[-1]
 
-            if len(loop) > len(edges):
-                raise ReferenceGeometryError("Could not stitch boundary loops safely.")
-
         loop[-1].points[-1] = start
         loops.append(loop)
 
@@ -194,21 +191,17 @@ class NetgenGeometryAdapter:
             raise ValueError("boundary_resolution must be an integer >= 4")
         self.boundary_resolution = boundary_resolution
 
-    def _make_edges(self, bounds: Sequence[Bound], prefix: str, hole: bool) -> List[_Edge]:
+    def _loops_for_bounds(
+        self, bounds: Sequence[Bound], prefix: str, hole: bool, tolerance: float
+    ) -> List[_Loop]:
+        if not bounds:
+            return []
         edges = []
         for index, bound in enumerate(bounds):
             label = f"{prefix}_{index:04d}"
             edges.append(
                 _Edge(bound, label, _sample_bound(bound, self.boundary_resolution))
             )
-        return edges
-
-    def _loops_for_bounds(
-        self, bounds: Sequence[Bound], prefix: str, hole: bool, tolerance: float
-    ) -> List[_Loop]:
-        if not bounds:
-            return []
-        edges = self._make_edges(bounds, prefix, hole)
         loops = [_Loop(loop, hole) for loop in _stitch(edges, tolerance)]
         for loop_index, loop in enumerate(loops):
             area = _signed_area(_loop_points(loop))
