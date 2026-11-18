@@ -118,7 +118,7 @@ def _validate_condition(condition, key: str, *, allow_time_derivative: bool = Fa
     )
 
 
-def _validate_geometry_conditions(domain, pde_area, supported_fields, *, transient=False):
+def _validate_geometry_conditions(domain, supported_fields, *, transient=False):
     for item in _all_geometries(domain):
         if getattr(item, "physics_type", None) == "BC" and isinstance(item, Bound):
             for key, condition in (item.condition_dict or {}).items():
@@ -264,8 +264,7 @@ def _polynomial_condition_cf(ngs, function, symbol, variable, coordinate_ranges=
         return ngs.CoefficientFunction(_numeric_function_value(function, lower))
     samples = np.linspace(lower, upper, 33)
     values = np.asarray([_numeric_function_value(function, value) for value in samples])
-    degree = min(16, len(samples) - 1)
-    polynomial = np.polynomial.Polynomial.fit(samples, values, degree).convert()
+    polynomial = np.polynomial.Polynomial.fit(samples, values, 16).convert()
     expression = sum(float(coefficient) * symbol ** index for index, coefficient in enumerate(polynomial.coef))
     return ngs.CoefficientFunction(expression)
 
@@ -284,53 +283,22 @@ def _condition_to_cf(ngs, condition, x_symbol, y_symbol, coordinate_ranges=None)
         )
 
 
-def _set_boundary_values(
-    ngs,
-    mesh,
-    grid_function,
-    boundary_conditions,
-    field,
-    *,
-    component=None,
-    points_by_label=None,
-    coordinate_ranges=None,
-):
-    target = grid_function if component is None else grid_function.components[component]
-    x_symbol = getattr(ngs, "x", None)
-    y_symbol = getattr(ngs, "y", None)
-    selected = {
-        label: conditions[field]
-        for label, conditions in boundary_conditions.items()
-        if field in conditions
-    }
-    if not selected:
-        return
-    if points_by_label is None:
-        for label, condition in selected.items():
-            coefficient = _condition_to_cf(
-                ngs, condition, x_symbol, y_symbol, coordinate_ranges
-            )
-            target.Set(coefficient, ngs.BND, definedon=mesh.Boundaries(label))
-        return
-
+def _set_boundary_values(ngs, geometry, target, boundary_conditions, field):
     vector = target.vec.FV().NumPy()
-    for label, condition in selected.items():
-        temporary = ngs.GridFunction(target.space)
+    for label, conditions in boundary_conditions.items():
+        if field not in conditions:
+            continue
+        region = geometry.mesh.Boundaries(label)
         coefficient = _condition_to_cf(
-            ngs, condition, x_symbol, y_symbol, coordinate_ranges
+            ngs, conditions[field], ngs.x, ngs.y, geometry.area.ranges
         )
-        temporary.Set(coefficient, ngs.BND, definedon=mesh.Boundaries(label))
-        dofs = target.space.GetDofs(mesh.Boundaries(label))
+        temporary = ngs.GridFunction(target.space)
+        temporary.Set(coefficient, ngs.BND, definedon=region)
+        dofs = target.space.GetDofs(region)
+        boundary_vector = temporary.vec.FV().NumPy()
         for dof in range(vector.size):
             if dofs[dof]:
-                vector[dof] = temporary.vec.FV().NumPy()[dof]
-
-
-def _assign_gridfunction_condition(ngs, grid_function, condition, coordinate_ranges):
-    coefficient = _condition_to_cf(
-        ngs, condition, ngs.x, ngs.y, coordinate_ranges
-    )
-    grid_function.Set(coefficient)
+                vector[dof] = boundary_vector[dof]
 
 
 def _set_initial_field(
@@ -343,9 +311,10 @@ def _set_initial_field(
 ):
     if mesh is None:
         raise ValueError("An NGSolve mesh is required for initial field projection.")
-    _assign_gridfunction_condition(
-        ngs, grid_function, condition, coordinate_ranges
+    coefficient = _condition_to_cf(
+        ngs, condition, ngs.x, ngs.y, coordinate_ranges
     )
+    grid_function.Set(coefficient)
 
 
 def _copy_grid_function(ngs, grid_function, fes):
@@ -360,7 +329,7 @@ def _relative_change(current, previous):
     return float(difference / denominator)
 
 
-def _linear_solve(ngs, bilinear_form, linear_form, grid_function, fes):
+def _linear_solve(bilinear_form, linear_form, grid_function, fes):
     right_hand_side = linear_form.vec - bilinear_form.mat * grid_function.vec
     grid_function.vec.data += bilinear_form.mat.Inverse(fes.FreeDofs()) * right_hand_side
 
@@ -386,19 +355,10 @@ def _make_scalar_fes(ngs, mesh, labels, order=2):
 
 
 def _make_navier_fes(ngs, mesh, labels):
-    velocity_kwargs = {"order": 2}
-    if labels["u"]:
-        velocity_kwargs["dirichlet"] = "|".join(labels["u"])
-    u_space = ngs.H1(mesh, **velocity_kwargs)
-    velocity_kwargs = {"order": 2}
-    if labels["v"]:
-        velocity_kwargs["dirichlet"] = "|".join(labels["v"])
-    v_space = ngs.H1(mesh, **velocity_kwargs)
-    pressure_kwargs = {"order": 1}
-    if labels["p"]:
-        pressure_kwargs["dirichlet"] = "|".join(labels["p"])
-    pressure_space = ngs.H1(mesh, **pressure_kwargs)
-    return ngs.FESpace([u_space, v_space, pressure_space])
+    return ngs.FESpace([
+        _make_scalar_fes(ngs, mesh, labels[field], order=order)
+        for field, order in (("u", 2), ("v", 2), ("p", 1))
+    ])
 
 
 def _initial_conditions(domain):
@@ -408,16 +368,6 @@ def _initial_conditions(domain):
             for key, condition in (item.condition_dict or {}).items():
                 initial.setdefault(key, condition)
     return initial
-
-
-def _make_solution_evaluator(mesh):
-    def evaluate(field, x, y):
-        values = np.empty(x.size, dtype=float)
-        for index, (x_value, y_value) in enumerate(zip(x.flat, y.flat)):
-            values[index] = float(np.real(field(mesh(float(x_value), float(y_value)))))
-        return values
-
-    return evaluate
 
 
 class ReferenceSolver:
@@ -487,9 +437,7 @@ class ReferenceSolver:
             if isinstance(pde, StreamFunctionNavierStokes):
                 supported.add("psi")
         _validate_geometry_conditions(
-            domain,
-            pde_area,
-            supported,
+            domain, supported,
             transient=isinstance(pde, (NavierStokes, HeatEquation, WaveEquation)),
         )
 
@@ -508,49 +456,41 @@ class ReferenceSolver:
             )
 
         ngs = _load_ngsolve()
+        mesh_size = self.mesh_size or _default_mesh_size(pde_area)
+        adapter = NetgenGeometryAdapter(self.boundary_resolution)
+        geometry = adapter.build(pde_area, ngs, mesh_size)
+        boundary_conditions = _collect_boundary_conditions(domain, pde_area, geometry)
         if isinstance(pde, BurgersEquation1D):
-            mesh_size = self.mesh_size or _default_mesh_size(pde_area)
-            adapter = NetgenGeometryAdapter(self.boundary_resolution)
-            geometry = adapter.build(pde_area, ngs, mesh_size)
-            boundary_conditions = _collect_boundary_conditions(domain, pde_area, geometry)
-            solution = self._solve_burgers(
+            return self._solve_burgers(
                 pde_area, pde, geometry, boundary_conditions, ngs
             )
-        else:
-            mesh_size = self.mesh_size or _default_mesh_size(pde_area)
-            adapter = NetgenGeometryAdapter(self.boundary_resolution)
-            geometry = adapter.build(pde_area, ngs, mesh_size)
-            boundary_conditions = _collect_boundary_conditions(domain, pde_area, geometry)
-            if isinstance(pde, StreamFunctionNavierStokes):
-                solution = self._solve_stream_function(
-                    domain, pde_area, pde, geometry, boundary_conditions, ngs
-                )
-            elif isinstance(pde, NavierStokes):
-                solution = self._solve_navier_stokes(
-                    domain, pde_area, pde, geometry, boundary_conditions, interval, ngs
-                )
-            elif isinstance(pde, HeatEquation):
-                solution = self._solve_heat(
-                    domain, pde_area, pde, geometry, boundary_conditions, interval, ngs
-                )
-            elif isinstance(pde, WaveEquation):
-                solution = self._solve_wave(
-                    domain, pde_area, pde, geometry, boundary_conditions, interval, ngs
-                )
-            else:
-                raise UnsupportedReferencePDE(
-                    f"Unsupported reference PDE: {pde.__class__.__name__}."
-                )
+        if isinstance(pde, StreamFunctionNavierStokes):
+            return self._solve_stream_function(
+                domain, pde_area, pde, geometry, boundary_conditions, ngs
+            )
+        if isinstance(pde, NavierStokes):
+            return self._solve_navier_stokes(
+                domain, pde_area, pde, geometry, boundary_conditions, interval, ngs
+            )
+        if isinstance(pde, HeatEquation):
+            return self._solve_heat(
+                domain, pde_area, pde, geometry, boundary_conditions, interval, ngs
+            )
+        if isinstance(pde, WaveEquation):
+            return self._solve_wave(
+                domain, pde_area, pde, geometry, boundary_conditions, interval, ngs
+            )
+        raise UnsupportedReferencePDE(
+            f"Unsupported reference PDE: {pde.__class__.__name__}."
+        )
 
-        return solution
-
-    @staticmethod
-    def _metadata(pde, geometry, mesh_size, field_names, **extra):
+    def _solution(self, pde, geometry, *, fields=None, snapshots=None, times=None, **details):
+        field_names = fields if snapshots is None else snapshots[0]
         metadata = {
             "backend": "NGSolve/Netgen",
             "pde": pde.__class__.__name__,
             "fields": list(field_names),
-            "mesh_size": float(mesh_size),
+            "mesh_size": float(self.mesh_size or _default_mesh_size(geometry.area)),
             "mesh": {
                 "dimension": int(geometry.mesh.dim),
                 "elements": int(geometry.mesh.ne),
@@ -558,8 +498,20 @@ class ReferenceSolver:
             },
             "boundary_labels": geometry.boundary_info,
         }
-        metadata.update(extra)
-        return metadata
+        if times is not None:
+            metadata.update(
+                time_values=times.tolist(),
+                time_step=float(np.min(np.diff(times))),
+            )
+        metadata.update(details)
+        return ReferenceSolution(
+            area=geometry.area,
+            mesh=geometry.mesh,
+            fields=fields,
+            snapshots=snapshots,
+            times=times,
+            metadata=metadata,
+        )
 
     def _solve_scalar_initial(
         self, ngs, fes, condition, *, mesh=None, coordinate_ranges=None
@@ -585,7 +537,6 @@ class ReferenceSolver:
         )
         times = _time_values(interval, self.time_step)
         snapshots = [{"u": old}]
-        iterations = []
         residuals = []
         for previous_time, current_time in zip(times[:-1], times[1:]):
             dt = float(current_time - previous_time)
@@ -600,35 +551,21 @@ class ReferenceSolver:
             current = ngs.GridFunction(fes)
             current.vec.data = old.vec
             _set_boundary_values(
-                ngs, geometry.mesh, current, boundary_conditions, "u",
-                points_by_label=geometry.points_by_label,
-                coordinate_ranges=pde_area.ranges,
+                ngs, geometry, current, boundary_conditions, "u"
             )
-            _linear_solve(ngs, bilinear, linear, current, fes)
+            _linear_solve(bilinear, linear, current, fes)
             residuals.append(_relative_change(current, old))
-            iterations.append(1)
             snapshots.append({"u": current})
             old = current
 
-        converged = True
-        metadata = self._metadata(
+        return self._solution(
             pde,
             geometry,
-            self.mesh_size or _default_mesh_size(pde_area),
-            ["u"],
-            time_values=times.tolist(),
-            time_step=float(np.min(np.diff(times))),
-            iterations=iterations,
-            solver_residuals=residuals,
-            converged=converged,
-        )
-        return ReferenceSolution(
-            area=pde_area,
-            mesh=geometry.mesh,
             snapshots=snapshots,
             times=times,
-            metadata=metadata,
-            field_evaluator=_make_solution_evaluator(geometry.mesh),
+            iterations=[1] * (len(times) - 1),
+            solver_residuals=residuals,
+            converged=True,
         )
 
     def _solve_wave(self, domain, pde_area, pde, geometry, boundary_conditions, interval, ngs):
@@ -664,7 +601,7 @@ class ReferenceSolver:
         acceleration_rhs = ngs.LinearForm(fes)
         acceleration_rhs += -pde.c**2 * ngs.grad(displacement) * ngs.grad(mass_test) * ngs.dx
         acceleration_rhs.Assemble()
-        _linear_solve(ngs, mass, acceleration_rhs, acceleration, fes)
+        _linear_solve(mass, acceleration_rhs, acceleration, fes)
 
         beta, gamma = 0.25, 0.5
         for previous_time, current_time in zip(times[:-1], times[1:]):
@@ -688,18 +625,16 @@ class ReferenceSolver:
             new_displacement = ngs.GridFunction(fes)
             new_displacement.vec.data = displacement.vec
             _set_boundary_values(
-                ngs, geometry.mesh, new_displacement, boundary_conditions, "u",
-                points_by_label=geometry.points_by_label,
-                coordinate_ranges=pde_area.ranges,
+                ngs, geometry, new_displacement, boundary_conditions, "u"
             )
-            _linear_solve(ngs, bilinear, linear, new_displacement, fes)
+            _linear_solve(bilinear, linear, new_displacement, fes)
 
             new_acceleration = ngs.GridFunction(fes)
             new_acceleration.Set(0)
             acceleration_rhs = ngs.LinearForm(fes)
             acceleration_rhs += -pde.c**2 * ngs.grad(new_displacement) * ngs.grad(mass_test) * ngs.dx
             acceleration_rhs.Assemble()
-            _linear_solve(ngs, mass, acceleration_rhs, new_acceleration, fes)
+            _linear_solve(mass, acceleration_rhs, new_acceleration, fes)
             new_velocity = ngs.GridFunction(fes)
             new_velocity.vec.data = velocity.vec + dt * (
                 (1.0 - gamma) * acceleration.vec + gamma * new_acceleration.vec
@@ -712,25 +647,15 @@ class ReferenceSolver:
                 new_acceleration,
             )
 
-        metadata = self._metadata(
+        return self._solution(
             pde,
             geometry,
-            self.mesh_size or _default_mesh_size(pde_area),
-            ["u"],
-            time_values=times.tolist(),
-            time_step=float(np.min(np.diff(times))),
+            snapshots=snapshots,
+            times=times,
             iterations=[1] * (len(times) - 1),
             solver_residuals=residuals,
             converged=True,
             time_integrator="implicit Newmark (beta=0.25, gamma=0.5)",
-        )
-        return ReferenceSolution(
-            area=pde_area,
-            mesh=geometry.mesh,
-            snapshots=snapshots,
-            times=times,
-            metadata=metadata,
-            field_evaluator=_make_solution_evaluator(geometry.mesh),
         )
 
     def _navier_bilinear(self, ngs, fes, pde, previous, dt, pressure_gauge):
@@ -762,27 +687,16 @@ class ReferenceSolver:
         fes,
         boundary_conditions,
         old_state=None,
-        initial_state=None,
         dt=None,
         pressure_gauge=False,
     ):
         current = ngs.GridFunction(fes)
-        if initial_state is not None:
-            current.vec.data = initial_state.vec
-        elif old_state is not None:
+        if old_state is not None:
             current.vec.data = old_state.vec
         for component, field in enumerate(("u", "v", "p")):
             _set_boundary_values(
-                ngs,
-                geometry.mesh,
-                current,
-                boundary_conditions,
-                field,
-                component=component,
-                points_by_label=geometry.points_by_label,
-                coordinate_ranges=geometry.area.ranges,
+                ngs, geometry, current.components[component], boundary_conditions, field
             )
-        previous_time_state = old_state
         residuals = []
         converged = False
         for iteration in range(1, self.max_iterations + 1):
@@ -791,15 +705,15 @@ class ReferenceSolver:
                 ngs, fes, pde, previous, dt, pressure_gauge
             )
             linear = ngs.LinearForm(fes)
-            if dt is not None and previous_time_state is not None:
-                old_u, old_v, _ = previous_time_state.components
+            if dt is not None and old_state is not None:
+                old_u, old_v, _ = old_state.components
                 test_u, test_v, _ = fes.TestFunction()
                 linear += pde.rho / dt * (
                     old_u * test_u + old_v * test_v
                 ) * ngs.dx
             bilinear.Assemble()
             linear.Assemble()
-            _linear_solve(ngs, bilinear, linear, current, fes)
+            _linear_solve(bilinear, linear, current, fes)
             if pressure_gauge:
                 _normalize_pressure(ngs, geometry.mesh, current.components[2])
             change = _relative_change(current, previous)
@@ -816,62 +730,41 @@ class ReferenceSolver:
         fes = _make_navier_fes(ngs, geometry.mesh, labels)
         pressure_gauge = not bool(labels["p"])
         initial = _initial_conditions(domain)
-        transient = interval is not None
-        if transient and not {"u", "v"}.issubset(initial):
+        if interval is not None and not {"u", "v"}.issubset(initial):
             raise ReferenceConfigurationError(
                 "Transient NavierStokes reference solutions require initial u and v values."
             )
 
-        if transient:
-            initial_state = ngs.GridFunction(fes)
-            _set_initial_field(
-                ngs, initial_state.components[0], initial["u"], mesh=geometry.mesh,
-                coordinate_ranges=pde_area.ranges,
-            )
-            _set_initial_field(
-                ngs, initial_state.components[1], initial["v"], mesh=geometry.mesh,
-                coordinate_ranges=pde_area.ranges,
-            )
-            if "p" in initial:
-                _set_initial_field(
-                    ngs, initial_state.components[2], initial["p"], mesh=geometry.mesh,
-                    coordinate_ranges=pde_area.ranges,
-                )
-        else:
-            initial_state = None
-
-        if not transient:
+        if interval is None:
             current, residuals, iteration_count, converged = self._solve_navier_state(
                 ngs,
                 geometry,
                 pde,
                 fes,
                 boundary_conditions,
-                initial_state=None,
                 pressure_gauge=pressure_gauge,
             )
-            metadata = self._metadata(
+            return self._solution(
                 pde,
                 geometry,
-                self.mesh_size or _default_mesh_size(pde_area),
-                ["u", "v", "p"],
-                iterations=iteration_count,
-                solver_residuals=residuals,
-                converged=converged,
-                pressure_gauge=("zero_mean_stabilization" if pressure_gauge else "configured Dirichlet"),
-            )
-            return ReferenceSolution(
-                area=pde_area,
-                mesh=geometry.mesh,
                 fields={
                     "u": current.components[0],
                     "v": current.components[1],
                     "p": current.components[2],
                 },
-                metadata=metadata,
-                field_evaluator=_make_solution_evaluator(geometry.mesh),
+                iterations=iteration_count,
+                solver_residuals=residuals,
+                converged=converged,
+                pressure_gauge=("zero_mean_stabilization" if pressure_gauge else "configured Dirichlet"),
             )
 
+        initial_state = ngs.GridFunction(fes)
+        for component, field in zip(initial_state.components, ("u", "v", "p")):
+            if field in initial:
+                _set_initial_field(
+                    ngs, component, initial[field], mesh=geometry.mesh,
+                    coordinate_ranges=pde_area.ranges,
+                )
         times = _time_values(interval, self.time_step)
         snapshots = [
             {
@@ -903,25 +796,15 @@ class ReferenceSolver:
             solver_residuals.append(residuals[-1] if residuals else math.inf)
             converged = converged and step_converged
 
-        metadata = self._metadata(
+        return self._solution(
             pde,
             geometry,
-            self.mesh_size or _default_mesh_size(pde_area),
-            ["u", "v", "p"],
-            time_values=times.tolist(),
-            time_step=float(np.min(np.diff(times))),
+            snapshots=snapshots,
+            times=times,
             iterations=iteration_counts,
             solver_residuals=solver_residuals,
             converged=converged,
             pressure_gauge=("zero_mean_stabilization" if pressure_gauge else "configured Dirichlet"),
-        )
-        return ReferenceSolution(
-            area=pde_area,
-            mesh=geometry.mesh,
-            snapshots=snapshots,
-            times=times,
-            metadata=metadata,
-            field_evaluator=_make_solution_evaluator(geometry.mesh),
         )
 
     def _solve_stream_function(
@@ -941,9 +824,7 @@ class ReferenceSolver:
         psi_fes = _make_scalar_fes(ngs, geometry.mesh, psi_labels)
         psi = ngs.GridFunction(psi_fes)
         _set_boundary_values(
-            ngs, geometry.mesh, psi, psi_conditions, "psi",
-            points_by_label=geometry.points_by_label,
-            coordinate_ranges=pde_area.ranges,
+            ngs, geometry, psi, psi_conditions, "psi"
         )
         u = navier_solution._fields["u"]
         v = navier_solution._fields["v"]
@@ -955,7 +836,7 @@ class ReferenceSolver:
         linear += (-v * ngs.grad(test)[0] + u * ngs.grad(test)[1]) * ngs.dx
         bilinear.Assemble()
         linear.Assemble()
-        _linear_solve(ngs, bilinear, linear, psi, psi_fes)
+        _linear_solve(bilinear, linear, psi, psi_fes)
 
         metadata = dict(navier_solution.metadata)
         metadata["fields"] = ["psi", "u", "v", "p"]
@@ -966,7 +847,6 @@ class ReferenceSolver:
             mesh=geometry.mesh,
             fields={"psi": psi, "u": u, "v": v, "p": navier_solution._fields["p"]},
             metadata=metadata,
-            field_evaluator=_make_solution_evaluator(geometry.mesh),
         )
 
     def _solve_burgers(
@@ -976,13 +856,7 @@ class ReferenceSolver:
         fes = _make_scalar_fes(ngs, geometry.mesh, labels["u"])
         current = ngs.GridFunction(fes)
         _set_boundary_values(
-            ngs,
-            geometry.mesh,
-            current,
-            boundary_conditions,
-            "u",
-            points_by_label=geometry.points_by_label,
-            coordinate_ranges=pde_area.ranges,
+            ngs, geometry, current, boundary_conditions, "u"
         )
 
         residuals = []
@@ -1000,15 +874,9 @@ class ReferenceSolver:
             linear = ngs.LinearForm(fes)
             bilinear.Assemble()
             linear.Assemble()
-            _linear_solve(ngs, bilinear, linear, current, fes)
+            _linear_solve(bilinear, linear, current, fes)
             _set_boundary_values(
-                ngs,
-                geometry.mesh,
-                current,
-                boundary_conditions,
-                "u",
-                points_by_label=geometry.points_by_label,
-                coordinate_ranges=pde_area.ranges,
+                ngs, geometry, current, boundary_conditions, "u"
             )
             change = _relative_change(current, previous)
             residuals.append(change)
@@ -1016,24 +884,14 @@ class ReferenceSolver:
                 converged = True
                 break
 
-        metadata = {
-            **self._metadata(
-                pde,
-                geometry,
-                self.mesh_size or _default_mesh_size(pde_area),
-                ["u"],
-            ),
-            "spatial_coordinates": ["x", "y"],
-            "iterations": iteration,
-            "solver_residuals": residuals,
-            "converged": converged,
-        }
-        return ReferenceSolution(
-            area=pde_area,
-            mesh=geometry.mesh,
+        return self._solution(
+            pde,
+            geometry,
             fields={"u": current},
-            metadata=metadata,
-            field_evaluator=_make_solution_evaluator(geometry.mesh),
+            spatial_coordinates=["x", "y"],
+            iterations=iteration,
+            solver_residuals=residuals,
+            converged=converged,
         )
 __all__ = [
     "ReferenceConfigurationError",
